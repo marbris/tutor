@@ -414,8 +414,10 @@ func TestTheEscCascadeInAList(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	l := m.ws.current().cardsView()
 	m = drive(m, "/", "e", "l", "f", "enter")
-	m = drive(m, "s", "a", "s") // and a statistics filter on top
-	m = drive(m, "v")           // pick one out
+	// And a statistics filter on top: Creature, the second type down —
+	// the first is Land, the commonest, which would leave no elves.
+	m = drive(m, "s", "j", "a", "s")
+	m = drive(m, "v") // pick one out
 
 	m = drive(m, "esc") // the selection is transient, so it goes first
 	if l.markCount() != 0 {

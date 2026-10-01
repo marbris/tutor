@@ -133,6 +133,7 @@ const (
 	StatsOddsPrev  Action = "odds.prev"
 	StatsClose     Action = "close"
 	StatsBack      Action = "back"
+	StatsTagOrder  Action = "tag.order"
 
 	LeaderFind      Action = "find"
 	LeaderDecks     Action = "decks"
@@ -259,6 +260,7 @@ var defaults = []binding{
 	{Stats, StatsOddsPrev, k("P")},
 	{Stats, StatsClose, k("s")},
 	{Stats, StatsBack, k("esc")},
+	{Stats, StatsTagOrder, k("tab")},
 
 	{Leader, LeaderFind, k("f")},
 	{Leader, LeaderDecks, k("d")},

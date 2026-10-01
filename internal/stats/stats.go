@@ -372,11 +372,28 @@ func copies(e deck.Card) int {
 }
 
 // Groups builds the category list from rowSource and counts it over
+// counted, the tags commonest first. See GroupsBy.
+func Groups(rowSource, counted []deck.Card) []Group {
+	return GroupsBy(rowSource, counted, false)
+}
+
+// ordered are the groups whose rows have an order of their own — the curve
+// from 0 up, the price bands from cheapest, the rarities from common. The
+// rest are just names, and the biggest leads.
+var ordered = map[string]bool{
+	"Mana Value (excl. lands)": true, "Price (USD)": true, "Rarity": true,
+}
+
+// GroupsBy builds the category list from rowSource and counts it over
 // counted. The two differ once you're filtering by a category: which rows
 // exist, their order and their positions all come from the whole result set
 // and so hold still, while the numbers beside them describe just the cards
 // on screen — a category with nothing left in it stays put and reads zero.
-func Groups(rowSource, counted []deck.Card) []Group {
+//
+// tagsByName puts the tags in alphabetical order rather than commonest
+// first: tags tend to come in families — otag-removal, otag-ramp — which
+// read better side by side.
+func GroupsBy(rowSource, counted []deck.Card, tagsByName bool) []Group {
 	// Most telling first: what the deck's author called their cards, then
 	// what those cards are, and the printing details last.
 	groups := []Group{
@@ -412,14 +429,18 @@ func Groups(rowSource, counted []deck.Card) []Group {
 		if len(kept) == 0 {
 			continue
 		}
-		// Tags have no natural order, so the commonest lead — by their
+		// A group without an order of its own puts its commonest first — by
 		// standing in the whole set, so walking the list can't reorder it.
-		if g.Title == "Tags" {
+		if !ordered[g.Title] {
+			byName := tagsByName && g.Title == "Tags"
 			sort.SliceStable(kept, func(i, j int) bool {
 				// Untagged is the leftover, not a tag, so it sinks below every
 				// real tag however many cards it holds.
 				if iu, ju := kept[i].Label == untaggedLabel, kept[j].Label == untaggedLabel; iu != ju {
 					return ju
+				}
+				if byName {
+					return strings.ToLower(kept[i].Label) < strings.ToLower(kept[j].Label)
 				}
 				return kept[i].Base > kept[j].Base
 			})

@@ -157,3 +157,45 @@ func TestPriceBandEdges(t *testing.T) {
 		}
 	}
 }
+
+func TestNamedGroupsLeadWithTheCommonestAndOrderedOnesKeepTheirOrder(t *testing.T) {
+	mk := func(name, tl string, cmc float64, rarity string, qty int, tags ...string) deck.Card {
+		return deck.Card{Qty: qty, Tags: tags, Card: mtg.Card{Name: name, TypeLine: tl, CMC: cmc, Rarity: rarity}}
+	}
+	entries := []deck.Card{
+		mk("Sol Ring", "Artifact", 1, "uncommon", 1, "otag-ramp"),
+		mk("Elf", "Creature — Elf", 1, "common", 3, "otag-ramp", "b-tribe"),
+		mk("Hoof", "Creature — Beast", 8, "mythic", 1, "a-wincon"),
+		mk("Forest", "Basic Land — Forest", 0, "common", 12),
+	}
+	labels := func(groups []Group, title string) []string {
+		for _, g := range groups {
+			if g.Title == title {
+				var out []string
+				for _, r := range g.Rows {
+					out = append(out, r.Label)
+				}
+				return out
+			}
+		}
+		return nil
+	}
+	groups := Groups(entries, entries)
+	for title, want := range map[string]string{
+		"Type":                     "Land Creature Artifact",
+		"Tags":                     "otag-ramp b-tribe a-wincon untagged",
+		"Mana Value (excl. lands)": "1 7+",
+		"Rarity":                   "common uncommon mythic",
+	} {
+		if got := strings.Join(labels(groups, title), " "); got != want {
+			t.Errorf("%s = %q, want %q", title, got, want)
+		}
+	}
+	byName := GroupsBy(entries, entries, true)
+	if got := strings.Join(labels(byName, "Tags"), " "); got != "a-wincon b-tribe otag-ramp untagged" {
+		t.Errorf("tags by name = %q", got)
+	}
+	if got := strings.Join(labels(byName, "Type"), " "); got != "Land Creature Artifact" {
+		t.Errorf("by name reordered the types too: %q", got)
+	}
+}

@@ -43,6 +43,9 @@ type statsState struct {
 	// odds is 0 for counts, or n for the chance of at least n in the
 	// opening hand. p and P step it.
 	odds int
+	// tagsByName is tab on a tag: the tags alphabetical rather than
+	// commonest first.
+	tagsByName bool
 }
 
 // groupOrder is the order the groups are drawn in before J or K turns it.
@@ -67,7 +70,7 @@ func statRows(groups []stats.Group) []stats.Row {
 // reads zero rather than vanishing under the cursor.
 func (m Model) statGroups() []stats.Group {
 	counted, source := m.statCards()
-	return rotateGroups(stats.Groups(source, counted), m.stats.top)
+	return rotateGroups(stats.GroupsBy(source, counted, m.stats.tagsByName), m.stats.top)
 }
 
 // rotateGroups turns the groups over so top comes first, the rest following
@@ -143,6 +146,12 @@ func (m Model) statUnder() (stats.Row, bool) {
 	return rows[m.statCursor(m.statGroups())], true
 }
 
+// onTags reports whether the highlight is on a tag, where tab reorders them.
+func (m Model) onTags() bool {
+	r, ok := m.statUnder()
+	return ok && r.Group == "Tags"
+}
+
 func (m *Model) pointAt(r stats.Row) {
 	m.stats.group, m.stats.label = r.Group, r.Label
 }
@@ -179,7 +188,7 @@ func (m *Model) moveStat(delta int) {
 // the top, K the one before. The highlight goes with it, to the new top.
 func (m *Model) rotateStat(delta int) {
 	counted, source := m.statCards()
-	groups := stats.Groups(source, counted)
+	groups := stats.GroupsBy(source, counted, m.stats.tagsByName)
 	if len(groups) == 0 {
 		return
 	}
@@ -316,6 +325,16 @@ func (m *Model) statsKey(key string) bool {
 		m.stepOdds(-1)
 	case keymap.StatsClose:
 		m.info.mode = infoCard
+	case keymap.StatsTagOrder:
+		// Only on a tag: elsewhere tab would reorder rows you can't see.
+		if !m.onTags() {
+			return false
+		}
+		// The highlight stays on its tag as the tags move round it.
+		if r, ok := m.statUnder(); ok {
+			m.pointAt(r)
+		}
+		m.stats.tagsByName = !m.stats.tagsByName
 	case keymap.StatsBack:
 		// Back, a step at a time: the categories, then the text filter,
 		// then out of the statistics.

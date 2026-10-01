@@ -66,6 +66,8 @@ type session struct {
 	Editing int `json:"editing,omitempty"`
 	// LastTag is what A tags with.
 	LastTag string `json:"lastTag,omitempty"`
+	// TagsByName is the statistics' tags in alphabetical order (tab).
+	TagsByName bool `json:"tagsByName,omitempty"`
 }
 
 func sessionPath() string { return filepath.Join(paths.State(), sessionFile) }
@@ -86,7 +88,7 @@ func loadSession() session {
 // a few keystrokes tomorrow, and a dialogue about it on the way out would
 // cost more.
 func (m Model) saveSession() {
-	s := session{Focused: m.ws.focused, Editing: -1, LastTag: m.lastTag}
+	s := session{Focused: m.ws.focused, Editing: -1, LastTag: m.lastTag, TagsByName: m.stats.tagsByName}
 
 	for i, p := range m.ws.panels {
 		ps := panelSession{Kind: p.kind.String()}
@@ -156,6 +158,7 @@ func (m *Model) restore() tea.Cmd {
 	}
 
 	m.lastTag = s.LastTag
+	m.stats.tagsByName = s.TagsByName
 
 	var cmds []tea.Cmd
 	for _, ps := range s.Panels {

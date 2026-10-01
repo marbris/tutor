@@ -280,7 +280,7 @@ func (m Model) infoHintGroups() []hintGroup {
 		return nil
 	}
 	if m.info.mode == infoStats && m.statList() != nil {
-		return dropUnbound([]hintGroup{{"statistics", statsHints()}})
+		return dropUnbound([]hintGroup{{"statistics", m.statsHints()}})
 	}
 	// Untitled: the keys sit in the panel they move, so a heading naming
 	// that panel says nothing.
@@ -411,9 +411,10 @@ func (m Model) infoKeys(p *panel) [][2]string {
 	)
 }
 
-// statsHints are the keys while the statistics have them.
-func statsHints() [][2]string {
-	return [][2]string{
+// statsHints are the keys while the statistics have them. tab reorders the
+// tags, so it is offered only on one, naming the order it would switch to.
+func (m Model) statsHints() [][2]string {
+	keys := [][2]string{
 		hint("category", keymap.Stats, keymap.StatsDown, keymap.StatsUp),
 		hint("turn groups", keymap.Stats, keymap.StatsNextGroup, keymap.StatsPrevGroup),
 		hint("filter and/or/not", keymap.Stats, keymap.StatsAnd, keymap.StatsOr, keymap.StatsNot),
@@ -423,6 +424,14 @@ func statsHints() [][2]string {
 		hint("close", keymap.Stats, keymap.StatsClose),
 		hint("back", keymap.Stats, keymap.StatsBack),
 	}
+	if m.onTags() {
+		order := "tags by name"
+		if m.stats.tagsByName {
+			order = "tags by count"
+		}
+		keys = append(keys, hint(order, keymap.Stats, keymap.StatsTagOrder))
+	}
+	return keys
 }
 
 // editableCount is how many decks of yours are open — how many places e and

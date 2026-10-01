@@ -583,3 +583,57 @@ func TestJAndKWalkRoundTheGroups(t *testing.T) {
 		t.Errorf("j off the bottom landed on %s/%s, want the first row of %s", r.Group, r.Label, top.Title)
 	}
 }
+
+func TestTabOnATagSortsTheTagsByName(t *testing.T) {
+	cards := deckSample()
+	cards[3].Tags = []string{"anthem"} // Beast Within: alone, but first by name
+	m := withCards(sized(120, 30), "d", cards, sortArrival)
+	m = drive(m, "s")
+	tags := func() string {
+		for _, g := range m.statGroups() {
+			if g.Title == "Tags" {
+				var out []string
+				for _, r := range g.Rows {
+					out = append(out, r.Label)
+				}
+				return strings.Join(out, " ")
+			}
+		}
+		return ""
+	}
+	offers := func(what string) bool {
+		for _, g := range m.hintGroups() {
+			for _, k := range g.keys {
+				if k[1] == what {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if got := tags(); got != "ramp anthem wincon untagged" {
+		t.Fatalf("tags start as %q, want commonest first", got)
+	}
+	if !offers("tags by name") {
+		t.Error("no hint for tab on a tag")
+	}
+	m = drive(m, "tab")
+	if got := tags(); got != "anthem ramp wincon untagged" {
+		t.Errorf("tags by name = %q", got)
+	}
+	if !offers("tags by count") {
+		t.Error("the hint didn't follow the order")
+	}
+	if r, _ := m.statUnder(); r.Label != "ramp" {
+		t.Errorf("the highlight moved to %q", r.Label)
+	}
+
+	// Off the tags, tab is not the statistics' to take.
+	m = drive(m, "J")
+	if m.onTags() {
+		t.Fatal("J stayed on the tags")
+	}
+	if offers("tags by count") {
+		t.Error("the tab hint shows off the tags")
+	}
+}
