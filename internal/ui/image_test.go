@@ -3,9 +3,11 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
+	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 )
 
@@ -241,5 +243,30 @@ func TestByteText(t *testing.T) {
 		if got := byteText(n); got != want {
 			t.Errorf("byteText(%d) = %q, want %q", n, got, want)
 		}
+	}
+}
+
+func TestGXStopsWhenScryfallSaysSlowDown(t *testing.T) {
+	withKitty(t, true)
+	var asked []string
+	old := loadPrintingsFor
+	loadPrintingsFor = func(c mtg.Card) (imageMsg, int) {
+		asked = append(asked, c.Name)
+		return imageMsg{key: imageKey(c), err: fetch.RateLimited{Until: time.Now().Add(time.Minute)}}, 0
+	}
+	t.Cleanup(func() { loadPrintingsFor = old })
+
+	m := withCards(sized(160, 40), "f", sample(), sortArrival)
+	m, cmd := press(m, "g")
+	m, cmd = press(m, "X")
+	m = settle(m, cmd)
+	if len(asked) != 1 {
+		t.Errorf("gX kept asking after a 429: %v", asked)
+	}
+	if !strings.Contains(m.notice, "stopped") || !strings.Contains(m.notice, "slow down") {
+		t.Errorf("notice %q", m.notice)
+	}
+	if _, kept := m.images[imageKey(sample()[0].Card)]; kept {
+		t.Error("the refused card is marked as failed, so it won't be asked for again")
 	}
 }

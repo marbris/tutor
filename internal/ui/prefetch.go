@@ -1,11 +1,13 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 	"ttr/internal/scryfall"
 )
@@ -117,6 +119,17 @@ func (m Model) handlePrefetch(msg prefetchMsg) (tea.Model, tea.Cmd) {
 	m.prefetch.bytes += msg.bytes
 	if msg.img.err != nil {
 		m.prefetch.failed++
+	}
+	// Told to slow down, gX stops rather than run down the rest of the list
+	// asking again: every further request only lengthens the wait.
+	var limited fetch.RateLimited
+	if errors.As(msg.img.err, &limited) {
+		// The card it was on is free to be asked for again later.
+		delete(m.images, msg.img.key)
+		m.notice = "gX stopped at " + itoa(m.prefetch.next) + "/" + itoa(len(m.prefetch.cards)) +
+			": " + limited.Error()
+		m.prefetch.cards = nil
+		return m, nil
 	}
 	cmd := m.prefetchNext()
 	return m, cmd

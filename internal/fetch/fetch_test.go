@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestGetReturnsTheBody(t *testing.T) {
@@ -133,5 +136,69 @@ func TestHostNamesTheServiceRatherThanTheEndpoint(t *testing.T) {
 		if got := Host(u); got != want {
 			t.Errorf("Host(%q) = %q, want %q", u, got, want)
 		}
+	}
+}
+
+// paced puts a test server under a limiter, as if it were Scryfall's API.
+func paced(t *testing.T, srv *httptest.Server, gap time.Duration) *limiter {
+	t.Helper()
+	host := strings.TrimPrefix(srv.URL, "http://")
+	lim := &limiter{gap: gap}
+	limiters[host] = lim
+	t.Cleanup(func() { delete(limiters, host) })
+	return lim
+}
+
+func TestRequestsToAPacedHostAreSpacedOut(t *testing.T) {
+	var mu sync.Mutex
+	var at []time.Time
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		at = append(at, time.Now())
+		mu.Unlock()
+	}))
+	defer srv.Close()
+	paced(t, srv, 30*time.Millisecond)
+
+	// From several goroutines at once, the way the panels ask.
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); Get(srv.URL) }()
+	}
+	wg.Wait()
+	if len(at) != 4 {
+		t.Fatalf("%d requests arrived", len(at))
+	}
+	sort.Slice(at, func(i, j int) bool { return at[i].Before(at[j]) })
+	if span := at[3].Sub(at[0]); span < 85*time.Millisecond {
+		t.Errorf("four requests arrived within %v, want at least three gaps apart", span)
+	}
+}
+
+func TestA429HoldsBackEveryRequestUntilTheHostSaysSo(t *testing.T) {
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Header().Set("Retry-After", "30")
+		w.WriteHeader(429)
+		fmt.Fprint(w, `{"details": "You are being rate-limited"}`)
+	}))
+	defer srv.Close()
+	paced(t, srv, time.Millisecond)
+
+	_, err := Get(srv.URL)
+	rl, ok := err.(RateLimited)
+	if !ok {
+		t.Fatalf("got %v, want RateLimited", err)
+	}
+	if strings.Contains(err.Error(), "details") || !strings.Contains(err.Error(), "slow down") {
+		t.Errorf("error reads %q", err)
+	}
+	if d := time.Until(rl.Until); d < 25*time.Second || d > 31*time.Second {
+		t.Errorf("cooling off for %v, want the 30s the host asked for", d)
+	}
+	if _, err := Get(srv.URL); err == nil || hits != 1 {
+		t.Errorf("a request went out during the cool-off (%d hits)", hits)
 	}
 }
