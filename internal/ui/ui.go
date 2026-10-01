@@ -58,7 +58,8 @@ type Model struct {
 	// images are the pictures gx has fetched, by card; imageSeq does for
 	// them what hoverSeq does for rulings; kitty is what the terminal is
 	// holding to draw.
-	images   map[string]*cardImage
+	images   map[string]*cardPrintings
+	pictures map[string]*picture
 	imageSeq int
 	kitty    kittyShown
 
@@ -92,7 +93,8 @@ func New() Model {
 		history:   LoadQueryHistory(),
 		stats:     statsState{},
 		histories: map[string]*cardHistory{},
-		images:    map[string]*cardImage{},
+		images:    map[string]*cardPrintings{},
+		pictures:  map[string]*picture{},
 	}
 }
 
@@ -282,6 +284,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case imageMsg:
 		return m.handleImage(msg)
+
+	case pictureMsg:
+		return m.handlePicture(msg)
 
 	case rulingsMsg:
 		return m.handleRulings(msg)

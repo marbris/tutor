@@ -328,9 +328,7 @@ func renderMana(cost string) string {
 // cardInfo is everything worth saying about a card, in the order you want to
 // read it: what it is, what it does, and only then the bookkeeping.
 func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulingsErr error) []string {
-	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
-	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	var out []string
 
@@ -357,6 +355,20 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		}
 	}
 
+	return append(out, cardMeta(c, c.Card, width, rulings, rulingsErr)...)
+}
+
+// cardMeta is the bookkeeping under a card — its tags, which printing and
+// what it's worth, where it's legal, its rulings — for the printing p. The
+// card view passes the card's own printing; the printing view whichever
+// printing is up, since a price belongs to a printing.
+func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsErr error) []string {
+	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
+
+	var out []string
+
 	// The card's own tags, then in a dimmer hand the ones a tag list gives
 	// it — they count the same, but they aren't in this list's file.
 	if global := onlyGlobal(c); len(c.Tags) > 0 || len(global) > 0 {
@@ -370,7 +382,12 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		out = append(out, "", lipgloss.NewStyle().MaxWidth(width).Render(line))
 	}
 
-	if facts := printingFacts(c.Card, width); len(facts) > 0 {
+	// EDHREC ranks the card, not the printing; a printing that doesn't carry
+	// the rank still has it.
+	if p.EDHRECRank == 0 {
+		p.EDHRECRank = c.Card.EDHRECRank
+	}
+	if facts := printingFacts(p, width); len(facts) > 0 {
 		out = append(out, "")
 		out = append(out, facts...)
 	}

@@ -51,25 +51,28 @@ const (
 )
 
 const (
-	GlobalLeader      Action = "leader"
-	GlobalGoto        Action = "goto"
-	GlobalPanelPrev   Action = "panel.prev"
-	GlobalPanelNext   Action = "panel.next"
-	GlobalMoveLeft    Action = "panel.move-left"
-	GlobalMoveRight   Action = "panel.move-right"
-	GlobalBar         Action = "bar"
-	GlobalEditNext    Action = "editing.next"
-	GlobalEditPrev    Action = "editing.prev"
-	GlobalInfoUp      Action = "info.half-page-up"
-	GlobalInfoDown    Action = "info.half-page-down"
-	GlobalFetchSets   Action = "info.fetch-sets"
-	GlobalStats       Action = "stats"
-	GlobalStatsEdit   Action = "stats.editing"
-	GlobalHelp        Action = "help"
-	GlobalBack        Action = "back"
-	GlobalClearFilter Action = "clear-filters"
-	GlobalClearAll    Action = "clear-all-filters"
-	GlobalQuit        Action = "quit"
+	GlobalLeader    Action = "leader"
+	GlobalGoto      Action = "goto"
+	GlobalPanelPrev Action = "panel.prev"
+	GlobalPanelNext Action = "panel.next"
+	GlobalMoveLeft  Action = "panel.move-left"
+	GlobalMoveRight Action = "panel.move-right"
+	GlobalBar       Action = "bar"
+	GlobalEditNext  Action = "editing.next"
+	GlobalEditPrev  Action = "editing.prev"
+	GlobalInfoUp    Action = "info.half-page-up"
+	GlobalInfoDown  Action = "info.half-page-down"
+	GlobalFetchSets Action = "info.fetch-sets"
+	GlobalStats     Action = "stats"
+	GlobalStatsEdit Action = "stats.editing"
+	// H and L only do anything while the printing view is up.
+	GlobalPrintingOlder Action = "printing.older"
+	GlobalPrintingNewer Action = "printing.newer"
+	GlobalHelp          Action = "help"
+	GlobalBack          Action = "back"
+	GlobalClearFilter   Action = "clear-filters"
+	GlobalClearAll      Action = "clear-all-filters"
+	GlobalQuit          Action = "quit"
 
 	ListDown   Action = "down"
 	ListUp     Action = "up"
@@ -185,6 +188,8 @@ var defaults = []binding{
 	{Global, GlobalInfoUp, k("K", "shift+up")},
 	{Global, GlobalInfoDown, k("J", "shift+down")},
 	{Global, GlobalFetchSets, k("y")},
+	{Global, GlobalPrintingOlder, k("H")},
+	{Global, GlobalPrintingNewer, k("L")},
 	{Global, GlobalStats, k("s")},
 	{Global, GlobalStatsEdit, k("S")},
 	{Global, GlobalHelp, k("?")},

@@ -13,12 +13,14 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"ttr/internal/browser"
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 	"ttr/internal/paths"
 	"ttr/internal/prints"
+	"ttr/internal/theme"
 )
 
 // gx: the card as printed, in the information panel.
@@ -72,28 +74,54 @@ const (
 	imgFailed
 )
 
-// cardImage is one card's picture, and how far along getting it is.
-type cardImage struct {
-	state    imgState
-	printing mtg.Card
-	png      []byte
-	w, h     int // in pixels
-	err      error
+// cardPrintings is every printing of one card, newest first, and which of
+// them is up: the most normal one to start with, then wherever H and L
+// have taken it.
+type cardPrintings struct {
+	state imgState
+	list  []mtg.Card
+	at    int
+	err   error
 }
 
-// kittyShown is what the terminal is holding under kittyImageID: which card,
-// at what size in cells. The placeholders only draw once it's there.
+// current is the printing on show, if the list is in.
+func (cp *cardPrintings) current() (mtg.Card, bool) {
+	if cp == nil || cp.state != imgReady || cp.at < 0 || cp.at >= len(cp.list) {
+		return mtg.Card{}, false
+	}
+	return cp.list[cp.at], true
+}
+
+// picture is one printing's picture, and how far along getting it is.
+type picture struct {
+	state imgState
+	png   []byte
+	w, h  int // in pixels
+	err   error
+}
+
+// kittyShown is what the terminal is holding under kittyImageID: which
+// printing, at what size in cells. The placeholders only draw once it's
+// there.
 type kittyShown struct {
 	key        string
 	cols, rows int
 }
 
+// imageMsg is a card's printings and the picture of the one chosen, fetched
+// together since the one is no use without the other.
 type imageMsg struct {
-	key      string
-	printing mtg.Card
-	png      []byte
-	w, h     int
-	err      error
+	key     string
+	list    []mtg.Card
+	at      int
+	picture picture
+	err     error
+}
+
+// pictureMsg is one printing's picture, for H and L.
+type pictureMsg struct {
+	id      string
+	picture picture
 }
 
 type imageTickMsg struct {
@@ -101,7 +129,7 @@ type imageTickMsg struct {
 	seq int
 }
 
-// imageKey is what a card's picture is filed under: the card, not the
+// imageKey is what a card's printings are filed under: the card, not the
 // printing, since which printing is shown is the answer, not the question.
 func imageKey(c mtg.Card) string {
 	if c.OracleID != "" {
@@ -125,20 +153,60 @@ func (m *Model) gxCard(c mtg.Card) tea.Cmd {
 	return m.fetchImage(c)
 }
 
-// fetchImage asks for a card's picture, unless it has it or is asking.
+// loadPrintings is the slow part of gx, off the main loop: every printing,
+// the one to show, and its picture — and how many bytes that took, which
+// gX adds up.
+func loadPrintings(c mtg.Card) (imageMsg, int) {
+	key := imageKey(c)
+	list, size, err := prints.All(c)
+	if err != nil {
+		return imageMsg{key: key, err: err}, size
+	}
+	at, ok := prints.PreferIndex(list, time.Now().Format("2006-01-02"))
+	if !ok {
+		return imageMsg{key: key, err: fmt.Errorf("no picture of %s", c.Name)}, size
+	}
+	pic, got := loadPicture(list[at])
+	return imageMsg{key: key, list: list, at: at, picture: pic}, size + got
+}
+
+// loadPicture is one printing's picture, and the bytes downloaded for it.
+func loadPicture(p mtg.Card) (picture, int) {
+	data, w, h, got, err := printingPNG(p)
+	if err != nil {
+		return picture{state: imgFailed, err: err}, got
+	}
+	return picture{state: imgReady, png: data, w: w, h: h}, got
+}
+
+// fetchImage asks for a card's printings and picture, unless it has them or
+// is asking.
 func (m *Model) fetchImage(c mtg.Card) tea.Cmd {
 	key := imageKey(c)
-	if img, ok := m.images[key]; ok && img.state != imgFailed {
+	if cp, ok := m.images[key]; ok && cp.state != imgFailed {
+		return m.fetchShown(cp)
+	}
+	m.images[key] = &cardPrintings{state: imgFetching}
+	return func() tea.Msg {
+		msg, _ := loadPrintings(c)
+		return msg
+	}
+}
+
+// fetchShown asks for the picture of the printing on show, if it isn't in
+// hand or on its way.
+func (m *Model) fetchShown(cp *cardPrintings) tea.Cmd {
+	p, ok := cp.current()
+	if !ok {
 		return nil
 	}
-	m.images[key] = &cardImage{state: imgFetching}
+	if pic, ok := m.pictures[p.ID]; ok && pic.state != imgFailed {
+		return nil
+	}
+	m.pictures[p.ID] = &picture{state: imgFetching}
 	return func() tea.Msg {
-		p, err := prints.Preferred(c)
-		if err != nil {
-			return imageMsg{key: key, err: err}
-		}
-		data, w, h, err := printingPNG(p)
-		return imageMsg{key: key, printing: p, png: data, w: w, h: h, err: err}
+		pic, _ := loadPicture(p)
+		return pictureMsg{id: p.ID, picture: pic}
 	}
 }
 
@@ -174,48 +242,97 @@ func (m Model) handleImageTick(msg imageTickMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleImage(msg imageMsg) (tea.Model, tea.Cmd) {
-	img := m.images[msg.key]
-	if img == nil {
-		return m, nil
-	}
-	if msg.err != nil {
-		img.state, img.err = imgFailed, msg.err
-		return m, nil
-	}
-	img.state = imgReady
-	img.printing, img.png, img.w, img.h = msg.printing, msg.png, msg.w, msg.h
+	m.storeImage(msg)
 	return m, nil
+}
+
+// storeImage files a card's printings and its picture.
+func (m *Model) storeImage(msg imageMsg) {
+	if msg.err != nil {
+		m.images[msg.key] = &cardPrintings{state: imgFailed, err: msg.err}
+		return
+	}
+	m.images[msg.key] = &cardPrintings{state: imgReady, list: msg.list, at: msg.at}
+	pic := msg.picture
+	m.pictures[msg.list[msg.at].ID] = &pic
+}
+
+func (m Model) handlePicture(msg pictureMsg) (tea.Model, tea.Cmd) {
+	pic := msg.picture
+	m.pictures[msg.id] = &pic
+	return m, nil
+}
+
+// shown is the focused card's printings, the printing on show and its
+// picture, as far as each is known.
+func (m Model) shown() (*cardPrintings, mtg.Card, *picture) {
+	c := m.focusedCard()
+	if c == nil {
+		return nil, mtg.Card{}, nil
+	}
+	cp := m.images[imageKey(*c)]
+	p, ok := cp.current()
+	if !ok {
+		return cp, mtg.Card{}, nil
+	}
+	return cp, p, m.pictures[p.ID]
+}
+
+// stepPrinting is H and L in the printing view: an older printing of the
+// card, or a newer one. The list is newest first, so older is further on.
+func (m *Model) stepPrinting(older bool) tea.Cmd {
+	if m.info.mode != infoImage {
+		return nil
+	}
+	cp, _, _ := m.shown()
+	if cp == nil || cp.state != imgReady {
+		return nil
+	}
+	switch {
+	case older && cp.at >= len(cp.list)-1:
+		m.notice = "that's the oldest printing"
+		return nil
+	case !older && cp.at <= 0:
+		m.notice = "that's the newest printing"
+		return nil
+	case older:
+		cp.at++
+	default:
+		cp.at--
+	}
+	return m.fetchShown(cp)
 }
 
 // printingPNG is a printing's picture as a PNG — the one format kitty takes
 // without being told the pixel size — from the cache if it has been fetched
-// before.
-func printingPNG(p mtg.Card) ([]byte, int, int, error) {
+// before, and how many bytes were downloaded for it (none, from the cache).
+// A variable, so the tests needn't go to Scryfall.
+var printingPNG = func(p mtg.Card) ([]byte, int, int, int, error) {
 	path := filepath.Join(paths.Cache(), "images", p.ID+".png")
 	if data, err := os.ReadFile(path); err == nil {
 		if cfg, err := png.DecodeConfig(bytes.NewReader(data)); err == nil {
-			return data, cfg.Width, cfg.Height, nil
+			return data, cfg.Width, cfg.Height, 0, nil
 		}
 	}
 
 	raw, err := fetch.GetFile(p.Image("normal"))
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, 0, err
 	}
 	img, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, len(raw), err
 	}
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, len(raw), err
 	}
 	// The cache is a convenience: failing to keep a copy loses nothing.
 	if os.MkdirAll(filepath.Dir(path), 0755) == nil {
 		os.WriteFile(path, buf.Bytes(), 0644)
 	}
 	b := img.Bounds()
-	return buf.Bytes(), b.Dx(), b.Dy(), nil
+	return buf.Bytes(), b.Dx(), b.Dy(), len(raw), nil
 }
 
 // openPrintingInBrowser finds the printing gx would show, and opens its
@@ -265,16 +382,14 @@ func imageFit(w, h, cols, rows int, aspect float64) (int, int) {
 // the panel stops showing pictures.
 func (m Model) syncImage() (Model, tea.Cmd) {
 	want := kittyShown{}
-	var img *cardImage
+	var img *picture
 	if m.info.mode == infoImage {
-		if c := m.focusedCard(); c != nil {
-			if i, ok := m.images[imageKey((*c))]; ok && i.state == imgReady {
-				if inner, room, _, ok := m.infoSpan(); ok {
-					cols, rows := imageFit(i.w, i.h, inner, room-imageCaptionRows, cellAspect())
-					if cols > 0 && rows > 0 && rows <= len(placeholderDiacritics) {
-						want = kittyShown{imageKey((*c)), cols, rows}
-						img = i
-					}
+		if _, p, pic := m.shown(); pic != nil && pic.state == imgReady {
+			if inner, room, _, ok := m.infoSpan(); ok {
+				cols, rows := imageFit(pic.w, pic.h, inner, room-imageCaptionRows, cellAspect())
+				if cols > 0 && rows > 0 && rows <= len(placeholderDiacritics) {
+					want = kittyShown{p.ID, cols, rows}
+					img = pic
 				}
 			}
 		}
@@ -342,30 +457,55 @@ func placeholderRows(cols, rows int) []string {
 	return out
 }
 
-// infoImageLines is the information panel with the picture up.
+// infoImageLines is the information panel with the picture up: the
+// picture, which printing it is, and then what is worth knowing about the
+// card — its price in this printing among it — for J to scroll down to.
 func (m Model) infoImageLines(width int) []string {
+	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
 	c := m.focusedCard()
 	if c == nil {
-		return []string{mutedLine("no card here", width)}
+		return wrapStyled("no card here", width, muted)
 	}
-	img, ok := m.images[imageKey((*c))]
+	cp, p, pic := m.shown()
 	switch {
-	case !ok || img.state == imgFetching:
-		return []string{mutedLine("fetching "+c.Name+"…", width)}
-	case img.state == imgFailed:
-		return []string{mutedLine("no picture: "+img.err.Error(), width)}
+	case cp == nil || cp.state == imgFetching:
+		return wrapStyled("fetching "+c.Name+"…", width, muted)
+	case cp.state == imgFailed:
+		return wrapStyled("no picture: "+errorText(cp.err), width, muted)
 	}
-	if m.kitty.key != imageKey((*c)) {
-		return []string{mutedLine("drawing…", width)}
+
+	var lines []string
+	switch {
+	case pic == nil || pic.state == imgFetching:
+		lines = wrapStyled("fetching the "+p.SetName+" printing…", width, muted)
+	case pic.state == imgFailed:
+		lines = wrapStyled("no picture: "+errorText(pic.err), width, muted)
+	case m.kitty.key != p.ID:
+		lines = wrapStyled("drawing…", width, muted)
+	default:
+		lines = placeholderRows(m.kitty.cols, m.kitty.rows)
+		for i := range lines {
+			lines[i] += strings.Repeat(" ", maxInt(width-m.kitty.cols, 0))
+		}
 	}
-	lines := placeholderRows(m.kitty.cols, m.kitty.rows)
-	for i := range lines {
-		lines[i] += strings.Repeat(" ", maxInt(width-m.kitty.cols, 0))
-	}
-	p := img.printing
+
 	caption := p.SetName + " (" + strings.ToUpper(p.Set) + ")"
 	if len(p.ReleasedAt) >= 4 {
 		caption += " · " + p.ReleasedAt[:4]
 	}
-	return append(lines, "", mutedLine(caption, width))
+	if p.CollectorNumber != "" {
+		caption += " · #" + p.CollectorNumber
+	}
+	lines = append(lines, "")
+	lines = append(lines, wrapStyled(caption, width, lipgloss.NewStyle().Foreground(theme.TextDim))...)
+	if len(cp.list) > 1 {
+		lines = append(lines, wrapStyled("printing "+itoa(cp.at+1)+" of "+itoa(len(cp.list))+", newest first", width, muted)...)
+	}
+
+	if l := m.ws.current().cardsView(); l != nil {
+		if dc, ok := l.current(); ok {
+			lines = append(lines, cardMeta(dc, p, width, l.rulings[dc.Card.ID], l.rulingErr[dc.Card.ID])...)
+		}
+	}
+	return lines
 }

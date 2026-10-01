@@ -72,16 +72,16 @@ func TestGxShowsThePrintingAndSendsItOnce(t *testing.T) {
 	m.ws.current().cardsView().all[0].Card = card
 	m.ws.current().cardsView().refresh()
 	// As if the picture had already been fetched.
-	m.images[imageKey(card)] = &cardImage{
-		state: imgReady, png: []byte("png"), w: 488, h: 680,
-		printing: mtg.Card{Set: "cmm", SetName: "Commander Masters", ReleasedAt: "2023-08-04"},
-	}
+	m.images[imageKey(card)] = &cardPrintings{state: imgReady, list: []mtg.Card{
+		{ID: "cmm1", Set: "cmm", SetName: "Commander Masters", ReleasedAt: "2023-08-04"},
+	}}
+	m.pictures["cmm1"] = &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}
 
 	m = drive(m, "g", "x")
 	if m.info.mode != infoImage {
 		t.Fatalf("gx left the panel in %v", m.info.mode)
 	}
-	if m.kitty.key != imageKey(card) {
+	if m.kitty.key != "cmm1" {
 		t.Fatal("the terminal wasn't given the picture")
 	}
 	view := m.View()
@@ -118,5 +118,81 @@ func TestGxWithoutPicturesOpensTheBrowser(t *testing.T) {
 	}
 	if cmd == nil || !strings.Contains(m.notice, "browser") {
 		t.Errorf("nothing said it's going to the browser: %q", m.notice)
+	}
+}
+
+// printingView is a list on Sol Ring in the printing view, with three
+// printings known and every picture in hand.
+func printingView(t *testing.T, width int) Model {
+	t.Helper()
+	withKitty(t, true)
+	card := mtg.Card{ID: "sol", Name: "Sol Ring", OracleID: "sol", Rarity: "uncommon",
+		Legalities: map[string]string{"commander": "legal"}}
+	m := withCards(sized(width, 40), "f", sample()[2:3], sortArrival)
+	l := m.ws.current().cardsView()
+	l.all[0].Card = card
+	l.all[0].Tags = []string{"ramp"}
+	l.refresh()
+	l.rulings["sol"] = []mtg.Ruling{{Comment: "Sol Ring makes two colorless mana."}}
+	m.images[imageKey(card)] = &cardPrintings{state: imgReady, at: 1, list: []mtg.Card{
+		{ID: "new", Set: "sld", SetName: "Secret Lair Drop", ReleasedAt: "2025-01-01", Rarity: "rare", Prices: mtg.Prices{USD: "40"}},
+		{ID: "mid", Set: "cmm", SetName: "Commander Masters", ReleasedAt: "2023-08-04", Rarity: "uncommon", Prices: mtg.Prices{USD: "1.50"}},
+		{ID: "old", Set: "lea", SetName: "Limited Edition Alpha", ReleasedAt: "1993-08-05", Rarity: "uncommon", Prices: mtg.Prices{USD: "4000"}},
+	}}
+	for _, id := range []string{"new", "mid", "old"} {
+		m.pictures[id] = &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}
+	}
+	return drive(m, "g", "x")
+}
+
+func TestThePrintingViewShowsTheCardsDetailsUnderThePicture(t *testing.T) {
+	m := printingView(t, 160)
+	body := stripANSI(strings.Join(m.infoImageLines(40), "\n"))
+	for _, want := range []string{"Commander Masters (CMM) · 2023", "printing 2 of 3",
+		"ramp", "$1.50", "uncommon", "legal in", "commander", "rulings", "two colorless mana"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("%q is missing from the printing view:\n%s", want, body)
+		}
+	}
+}
+
+func TestHAndLStepThroughThePrintings(t *testing.T) {
+	m := printingView(t, 160)
+	m = drive(m, "H")
+	if _, p, _ := m.shown(); p.ID != "old" {
+		t.Fatalf("H showed %q, want the older printing", p.ID)
+	}
+	if m.kitty.key != "old" {
+		t.Error("the terminal wasn't given the older picture")
+	}
+	if body := stripANSI(strings.Join(m.infoImageLines(40), "\n")); !strings.Contains(body, "$4000") {
+		t.Errorf("the price didn't follow the printing:\n%s", body)
+	}
+	m = drive(m, "H")
+	if _, p, _ := m.shown(); p.ID != "old" || !strings.Contains(m.notice, "oldest") {
+		t.Errorf("H past the oldest went to %q, notice %q", p.ID, m.notice)
+	}
+	m = drive(m, "L", "L")
+	if _, p, _ := m.shown(); p.ID != "new" {
+		t.Errorf("L L showed %q, want the newest", p.ID)
+	}
+}
+
+func TestThePrintingCaptionWrapsRatherThanBeingCut(t *testing.T) {
+	m := printingView(t, 160)
+	body := stripANSI(strings.Join(m.infoImageLines(16), "\n"))
+	if strings.Contains(body, "…") {
+		t.Errorf("the caption was cut:\n%s", body)
+	}
+	if !strings.Contains(body, "Masters (CMM)") {
+		t.Errorf("the caption lost its set code:\n%s", body)
+	}
+}
+
+func TestJScrollsThePrintingView(t *testing.T) {
+	m := printingView(t, 160)
+	m = drive(m, "J")
+	if m.info.offset == 0 {
+		t.Error("J didn't scroll the printing view")
 	}
 }
