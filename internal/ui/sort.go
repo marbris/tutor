@@ -331,7 +331,7 @@ func sortKey(s cardSort, members map[string]membership, dc deck.Card) (float64, 
 	c := dc.Card
 	switch s {
 	case sortMana:
-		return c.CMC, true
+		return manaSortValue(c), true
 	case sortType:
 		return float64(typeRank(c.TypeLine)), true
 	case sortColor:
@@ -355,6 +355,22 @@ func sortKey(s cardSort, members map[string]membership, dc deck.Card) (float64, 
 		return float64(inEditing - members[markKey(dc)]), true
 	}
 	return 0, true
+}
+
+// xHigh lifts a spell with X in its cost above every fixed cost. Its mana
+// value counts X as zero, which is what it is in the library and never what
+// it is when you cast it: Fireball is not a one-drop.
+const xHigh = 100
+
+// manaSortValue is the mana value an order by mana value ranks a card by,
+// with X spells above the rest.
+func manaSortValue(c mtg.Card) float64 {
+	for _, f := range c.Faces() {
+		if strings.Contains(strings.ToUpper(f.ManaCost), "{X}") {
+			return c.CMC + xHigh
+		}
+	}
+	return c.CMC
 }
 
 // innerCmp is what an order does within one of its own groups, before the

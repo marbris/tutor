@@ -57,6 +57,19 @@ func TestSortingByManaValue(t *testing.T) {
 	}
 }
 
+func TestSortingByManaValueCountsXHigh(t *testing.T) {
+	// Fireball's mana value is 1, but nobody casts it for one.
+	cards := []deck.Card{
+		{Card: mtg.Card{Name: "Fireball", ManaCost: "{X}{R}", CMC: 1}},
+		{Card: mtg.Card{Name: "Hoof", ManaCost: "{5}{G}{G}{G}", CMC: 8}},
+		{Card: mtg.Card{Name: "Bolt", ManaCost: "{R}", CMC: 1}},
+	}
+	l := newCardList2(cards, sortMana)
+	if got := strings.Join(names(l), ","); got != "Bolt,Hoof,Fireball" {
+		t.Errorf("by mana value: %s, want the X spell above the eight-drop", got)
+	}
+}
+
 func TestSortingByUSDPutsTheDearestFirst(t *testing.T) {
 	cards := []deck.Card{
 		{Card: mtg.Card{Name: "Cheap", Prices: mtg.Prices{USD: "0.10"}}},
