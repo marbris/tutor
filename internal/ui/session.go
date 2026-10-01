@@ -68,6 +68,10 @@ type session struct {
 	LastTag string `json:"lastTag,omitempty"`
 	// TagsByName is the statistics' tags in alphabetical order (tab).
 	TagsByName bool `json:"tagsByName,omitempty"`
+	// Info is the information panel's view, when it is one worth coming
+	// back to: "printing" for gx's. The others are put up for a moment —
+	// the statistics are s away, a printed history is about one card.
+	Info string `json:"info,omitempty"`
 }
 
 func sessionPath() string { return filepath.Join(paths.State(), sessionFile) }
@@ -89,6 +93,9 @@ func loadSession() session {
 // cost more.
 func (m Model) saveSession() {
 	s := session{Focused: m.ws.focused, Editing: -1, LastTag: m.lastTag, TagsByName: m.stats.tagsByName}
+	if m.info.mode == infoImage {
+		s.Info = infoImage.String()
+	}
 
 	for i, p := range m.ws.panels {
 		ps := panelSession{Kind: p.kind.String()}
@@ -159,6 +166,9 @@ func (m *Model) restore() tea.Cmd {
 
 	m.lastTag = s.LastTag
 	m.stats.tagsByName = s.TagsByName
+	if s.Info == infoImage.String() && kittyGraphics() {
+		m.info.mode = infoImage
+	}
 
 	var cmds []tea.Cmd
 	for _, ps := range s.Panels {

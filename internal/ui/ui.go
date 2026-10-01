@@ -192,7 +192,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if id := focusedID(synced); id != synced.hovered && id != "" {
 			synced.hovered = id
 			hover := synced.hover()
-			cmd = tea.Batch(cmd, hover)
+			// And its picture, when the printing view is up — a session
+			// restored into it has no key press to ask.
+			img := synced.imageHover()
+			cmd = tea.Batch(cmd, hover, img)
 		}
 		return synced, cmd
 	}

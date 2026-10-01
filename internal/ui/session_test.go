@@ -211,3 +211,30 @@ func TestALayoutNoLongerKnownIsLeftOut(t *testing.T) {
 		t.Errorf("guessed: order %v, filter %v", l.order, l.statFilter.String())
 	}
 }
+
+func TestThePrintingViewComesBack(t *testing.T) {
+	withKitty(t, true)
+	m := withCards(sized(140, 30), "f", sample(), sortArrival)
+	m.ws.current().title = "t:elf"
+	m.info.mode = infoImage
+	m.saveSession()
+
+	back, _ := NewRestored()
+	if back.info.mode != infoImage {
+		t.Errorf("came back in %v, want the printing view", back.info.mode)
+	}
+
+	// And not in a terminal that can't draw it.
+	withKitty(t, false)
+	if back, _ := NewRestored(); back.info.mode == infoImage {
+		t.Error("came back to pictures in a terminal without them")
+	}
+
+	// Leaving it, it stays left.
+	withKitty(t, true)
+	m.info.mode = infoCard
+	m.saveSession()
+	if back, _ := NewRestored(); back.info.mode != infoCard {
+		t.Errorf("came back in %v after leaving the printing view", back.info.mode)
+	}
+}
