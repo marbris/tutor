@@ -83,3 +83,30 @@ func TestPreferPassesOverRetroFrames(t *testing.T) {
 		t.Errorf("chose %q, want the modern frame", got.Set)
 	}
 }
+
+func TestPreferTakesARealOldPrintingOverPromos(t *testing.T) {
+	// Phyrexian Dreadnought: an MTGO promo, a judge gift, and Mirage. The
+	// first two are newer; only Mirage is the card as printed.
+	newestFirst := []mtg.Card{
+		printing("prm", "promo", func(c *mtg.Card) { c.Promo, c.Digital, c.Frame = true, true, "2003" }),
+		printing("g10", "promo", func(c *mtg.Card) { c.Promo, c.Frame = true, "2003" }),
+		printing("mir", "expansion", func(c *mtg.Card) { c.Frame = "1997" }),
+	}
+	if got, _ := Prefer(newestFirst, "2026-10-01"); got.Set != "mir" {
+		t.Errorf("chose %q, want Mirage", got.Set)
+	}
+}
+
+func TestPaperOnlyKeepsDigitalWhenThatIsAll(t *testing.T) {
+	mixed := []mtg.Card{
+		printing("prm", "promo", func(c *mtg.Card) { c.Digital = true }),
+		printing("mir", "expansion", nil),
+	}
+	if got := paperOnly(mixed); len(got) != 1 || got[0].Set != "mir" {
+		t.Errorf("paperOnly kept %v", got)
+	}
+	arena := []mtg.Card{printing("ymid", "alchemy", func(c *mtg.Card) { c.Digital = true })}
+	if got := paperOnly(arena); len(got) != 1 {
+		t.Error("an Arena-only card lost its only printing")
+	}
+}

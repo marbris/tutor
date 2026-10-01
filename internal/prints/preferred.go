@@ -8,15 +8,18 @@ import (
 
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
+	"ttr/internal/scryfall"
 )
 
 // The printing gx shows.
 //
 // "The card" as a picture is a question with a hundred answers for a staple,
 // and most of them are not what you picture: promos, borderless showcases,
-// Secret Lair oddities. What you picture is the card as it was most recently
-// printed in an ordinary set — so that is the one chosen, and the newest
-// printing of any kind only when there is no ordinary one to be had.
+// Secret Lair oddities, MTGO's own renderings. What you picture is the card
+// as it was printed in an ordinary set — the most recent such printing,
+// since its wording is the one in force, but a real and normal printing
+// comes before a recent one. A card last printed in 1996 is shown as it was
+// printed in 1996, not as a judge promo with its type line cut short.
 
 // ordinarySets are the kinds of set whose printings look like the card.
 var ordinarySets = map[string]bool{
@@ -41,6 +44,14 @@ var specialFrames = map[string]bool{
 // Ordinary reports whether a printing looks like the card: in paper, in
 // English, in an ordinary set, with an ordinary frame.
 func Ordinary(c mtg.Card) bool {
+	// A reprint in an old frame — the retro-frame versions of a remastered
+	// set — is a throwback, not the card as it looks now.
+	return (c.Frame == "" || c.Frame == "2015") && OrdinaryAnyFrame(c)
+}
+
+// OrdinaryAnyFrame is Ordinary in whichever frame the card was printed in:
+// a card last printed in Mirage looks like Mirage printed it.
+func OrdinaryAnyFrame(c mtg.Card) bool {
 	if c.Digital || (c.Lang != "" && c.Lang != "en") {
 		return false
 	}
@@ -48,11 +59,6 @@ func Ordinary(c mtg.Card) bool {
 		return false
 	}
 	if c.BorderColor == "borderless" || c.BorderColor == "gold" || c.BorderColor == "silver" {
-		return false
-	}
-	// A reprint in an old frame — the retro-frame versions of a remastered
-	// set — is a throwback, not the card as it looks now.
-	if c.Frame != "" && c.Frame != "2015" {
 		return false
 	}
 	for _, f := range c.FrameEffects {
@@ -63,24 +69,40 @@ func Ordinary(c mtg.Card) bool {
 	return ordinarySets[c.SetType] && !oddSets[c.Set]
 }
 
-// Prefer picks from printings listed newest first: the first ordinary one,
-// or else the first one with a picture at all. A printing from a set not
-// out yet by today — "2006-01-02" — is a preview, not the card as printed,
-// and is passed over while there is anything else.
+// Prefer picks from printings listed newest first, the most normal one
+// there is: an ordinary printing in today's frame, then an ordinary one in
+// an older frame, then any paper printing that isn't a promo, then
+// anything. A printing from a set not out yet by today — "2006-01-02" — is
+// a preview, not the card as printed, and is passed over while there is
+// anything else.
 func Prefer(printings []mtg.Card, today string) (mtg.Card, bool) {
+	i, ok := PreferIndex(printings, today)
+	if !ok {
+		return mtg.Card{}, false
+	}
+	return printings[i], true
+}
+
+// PreferIndex is Prefer, as where in the list the choice sits.
+func PreferIndex(printings []mtg.Card, today string) (int, bool) {
 	out := func(c mtg.Card) bool { return c.ReleasedAt == "" || c.ReleasedAt <= today }
+	paper := func(c mtg.Card) bool {
+		return !c.Digital && !c.Promo && (c.Lang == "" || c.Lang == "en")
+	}
 	for _, want := range []func(mtg.Card) bool{
 		func(c mtg.Card) bool { return out(c) && Ordinary(c) },
+		func(c mtg.Card) bool { return out(c) && OrdinaryAnyFrame(c) },
+		func(c mtg.Card) bool { return out(c) && paper(c) },
 		out,
 		func(mtg.Card) bool { return true },
 	} {
-		for _, c := range printings {
+		for i, c := range printings {
 			if want(c) && c.Image("normal") != "" {
-				return c, true
+				return i, true
 			}
 		}
 	}
-	return mtg.Card{}, false
+	return 0, false
 }
 
 // printsQuery is the search for every printing of a card, newest first: by
@@ -97,31 +119,60 @@ func printsQuery(c mtg.Card) string {
 	return "https://api.scryfall.com/cards/search?" + v.Encode()
 }
 
-// Preferred finds the printing gx should show for a card. A couple of pages
-// is plenty: the newest printings come first, and an ordinary one turns up
-// long before the old ones would.
-func Preferred(c mtg.Card) (mtg.Card, error) {
-	today := time.Now().Format("2006-01-02")
+// All is every paper printing of a card, newest first, and how many bytes
+// it took to find out. MTGO's and Arena's own printings are left out — they
+// aren't cards anyone holds — unless they are all the card has.
+func All(c mtg.Card) ([]mtg.Card, int, error) {
 	var all []mtg.Card
-	for page, next := 0, printsQuery(c); next != "" && page < 2; page++ {
+	size := 0
+	for page, next := 0, printsQuery(c); next != ""; page++ {
+		if page > 0 {
+			time.Sleep(scryfall.PageDelay)
+		}
 		body, err := fetch.Get(next)
 		if err != nil {
-			return mtg.Card{}, err
+			return nil, size, err
 		}
+		size += len(body)
 		var sr mtg.SearchResponse
 		if err := json.Unmarshal(body, &sr); err != nil {
-			return mtg.Card{}, err
+			return nil, size, err
 		}
 		all = append(all, sr.Data...)
-		if best, ok := Prefer(all, today); ok && Ordinary(best) {
-			return best, nil
-		}
 		if !sr.HasMore {
 			break
 		}
 		next = sr.NextPage
 	}
-	if best, ok := Prefer(all, today); ok {
+	paper := paperOnly(all)
+	if len(paper) == 0 {
+		return nil, size, fmt.Errorf("no printings of %s", c.Name)
+	}
+	return paper, size, nil
+}
+
+// paperOnly drops the printings that exist only on a screen, unless that is
+// all there is: an Alchemy card is still a card to look at.
+func paperOnly(all []mtg.Card) []mtg.Card {
+	var paper []mtg.Card
+	for _, p := range all {
+		if !p.Digital {
+			paper = append(paper, p)
+		}
+	}
+	if len(paper) == 0 {
+		return all
+	}
+	return paper
+}
+
+// Preferred finds the printing gx should show for a card.
+func Preferred(c mtg.Card) (mtg.Card, error) {
+	list, _, err := All(c)
+	if err != nil {
+		return mtg.Card{}, err
+	}
+	if best, ok := Prefer(list, time.Now().Format("2006-01-02")); ok {
 		return best, nil
 	}
 	return mtg.Card{}, fmt.Errorf("no picture of %s", c.Name)
