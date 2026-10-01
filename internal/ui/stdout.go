@@ -51,12 +51,12 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 	}
 
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
-	if facts := printingFacts(c); len(facts) > 0 {
+	if facts := printingFacts(c, width); len(facts) > 0 {
 		if !endsInStats {
 			fmt.Println()
 		}
 		for _, line := range facts {
-			fmt.Println(dim.Render(line))
+			fmt.Println(strings.TrimRight(line, " "))
 		}
 	}
 

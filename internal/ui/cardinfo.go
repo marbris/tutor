@@ -9,6 +9,7 @@ import (
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
 	"ttr/internal/rules"
+	"ttr/internal/stats"
 	"ttr/internal/theme"
 )
 
@@ -369,11 +370,9 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		out = append(out, "", lipgloss.NewStyle().MaxWidth(width).Render(line))
 	}
 
-	if facts := printingFacts(c.Card); len(facts) > 0 {
+	if facts := printingFacts(c.Card, width); len(facts) > 0 {
 		out = append(out, "")
-		for _, line := range facts {
-			out = append(out, wrapStyled(line, width, muted)...)
-		}
+		out = append(out, facts...)
 	}
 
 	if legal := legalities(c.Card, width); len(legal) > 0 {
@@ -451,8 +450,32 @@ func statsRow(f mtg.Card, width int) string {
 // printingFacts is the bookkeeping under a card's text, a line per kind:
 // which printing it is (set · rarity), then what it's worth to you
 // (edhrec rank · price). Whatever a card lacks is left out, and so is a
-// line left with nothing on it.
-func printingFacts(c mtg.Card) []string {
+// line left with nothing on it. Wrapped to width and styled: muted, with
+// the rarity in its own colour, the one the statistics draw it in.
+func printingFacts(c mtg.Card, width int) []string {
+	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
+	var out []string
+	for _, line := range factLines(c) {
+		wrapped := wrap(line, width)
+		for i, w := range wrapped {
+			w = fit(w, width)
+			text := strings.TrimRight(w, " ")
+			pad := w[len(text):]
+			// The rarity ends the printing line, and is one word, so it
+			// ends the last line that line wraps to.
+			if r := c.Rarity; r != "" && i == len(wrapped)-1 && strings.HasSuffix(line, r) && strings.HasSuffix(text, r) {
+				out = append(out, muted.Render(text[:len(text)-len(r)])+
+					lipgloss.NewStyle().Foreground(stats.RarityColour(r)).Render(r)+pad)
+				continue
+			}
+			out = append(out, muted.Render(w))
+		}
+	}
+	return out
+}
+
+// factLines are printingFacts' lines before they are wrapped and styled.
+func factLines(c mtg.Card) []string {
 	var printing, worth []string
 	if c.SetName != "" {
 		printing = append(printing, c.SetName)
