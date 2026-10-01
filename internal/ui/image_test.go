@@ -196,3 +196,50 @@ func TestJScrollsThePrintingView(t *testing.T) {
 		t.Error("J didn't scroll the printing view")
 	}
 }
+
+func TestGXFetchesEveryPictureFromTheCursorRoundAndCountsTheBytes(t *testing.T) {
+	withKitty(t, true)
+	var asked []string
+	old := loadPrintingsFor
+	loadPrintingsFor = func(c mtg.Card) (imageMsg, int) {
+		asked = append(asked, c.Name)
+		p := mtg.Card{ID: c.Name, Name: c.Name}
+		return imageMsg{key: imageKey(c), list: []mtg.Card{p},
+			picture: picture{state: imgReady, png: []byte("png"), w: 488, h: 680}}, 400_000
+	}
+	t.Cleanup(func() { loadPrintingsFor = old })
+
+	m := withCards(sized(160, 40), "f", sample(), sortArrival)
+	m = drive(m, "j", "j") // on Sol Ring, the third of four
+	m, cmd := press(m, "g")
+	m, cmd = press(m, "X")
+	if m.info.mode != infoImage {
+		t.Fatal("gX didn't open the printing view")
+	}
+	m = settle(m, cmd)
+
+	want := "Sol Ring,Forest,Dwynen, Gilt-Leaf Daen,Llanowar Elves"
+	if got := strings.Join(asked, ","); got != want {
+		t.Errorf("fetched %s, want from the cursor round: %s", got, want)
+	}
+	if !strings.Contains(m.notice, "4 pictures") || !strings.Contains(m.notice, "1.6 MB") {
+		t.Errorf("notice %q", m.notice)
+	}
+
+	// Again, and nothing is fetched twice.
+	asked = nil
+	m, cmd = press(m, "g")
+	m, cmd = press(m, "X")
+	m = settle(m, cmd)
+	if len(asked) != 0 {
+		t.Errorf("a second gX fetched %v again", asked)
+	}
+}
+
+func TestByteText(t *testing.T) {
+	for n, want := range map[int]string{512: "512 B", 2_500: "2 KB", 3_400_000: "3.4 MB"} {
+		if got := byteText(n); got != want {
+			t.Errorf("byteText(%d) = %q, want %q", n, got, want)
+		}
+	}
+}

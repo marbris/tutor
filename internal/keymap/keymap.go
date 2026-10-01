@@ -152,6 +152,7 @@ const (
 	GotoEditing  Action = "editing"
 	GotoVersions Action = "versions"
 	GotoImage    Action = "image"
+	GotoImageAll Action = "image.all"
 
 	TagMoveJoin   Action = "join"
 	TagMoveUpsert Action = "upsert"
@@ -281,6 +282,7 @@ var defaults = []binding{
 	{Goto, GotoEditing, k("d")},
 	{Goto, GotoVersions, k("v")},
 	{Goto, GotoImage, k("x")},
+	{Goto, GotoImageAll, k("X")},
 
 	// After T, the second key is the verb it echoes: t tags only what's
 	// there, a adds what isn't.

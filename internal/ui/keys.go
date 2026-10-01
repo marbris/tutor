@@ -523,6 +523,10 @@ func (m Model) handleGoto(key string) (tea.Model, tea.Cmd) {
 	case keymap.GotoImage:
 		cmd := m.gx(p)
 		return m, cmd
+
+	case keymap.GotoImageAll:
+		cmd := m.gxAll(p)
+		return m, cmd
 	}
 	return m, nil
 }

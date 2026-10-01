@@ -188,7 +188,7 @@ func (m *Model) fetchImage(c mtg.Card) tea.Cmd {
 	}
 	m.images[key] = &cardPrintings{state: imgFetching}
 	return func() tea.Msg {
-		msg, _ := loadPrintings(c)
+		msg, _ := loadPrintingsFor(c)
 		return msg
 	}
 }

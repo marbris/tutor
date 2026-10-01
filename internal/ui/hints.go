@@ -412,6 +412,7 @@ func (m Model) infoKeys(p *panel) [][2]string {
 		hint("half page", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown),
 		[2]string{gotoHint(keymap.GotoVersions), "card history"},
 		[2]string{gotoHint(keymap.GotoImage), "printing"},
+		[2]string{gotoHint(keymap.GotoImageAll), "every card's picture"},
 	)
 }
 

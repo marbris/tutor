@@ -60,6 +60,8 @@ type Model struct {
 	// holding to draw.
 	images   map[string]*cardPrintings
 	pictures map[string]*picture
+	// prefetch is gX, fetching every picture in a list ahead of you.
+	prefetch prefetchState
 	imageSeq int
 	kitty    kittyShown
 
@@ -287,6 +289,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case pictureMsg:
 		return m.handlePicture(msg)
+
+	case prefetchMsg:
+		return m.handlePrefetch(msg)
 
 	case rulingsMsg:
 		return m.handleRulings(msg)
