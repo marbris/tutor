@@ -5,10 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"ttr/internal/diskcache"
 	"ttr/internal/mtg"
+	"ttr/internal/paths"
 )
 
 // pagedServer stands in for Scryfall: a fixed number of cards handed out a
@@ -282,5 +287,47 @@ func TestCollectionAsksInChunksAndKeysByID(t *testing.T) {
 	}
 	if got["id-42"].Name != "Card id-42" {
 		t.Errorf("keyed wrongly: %+v", got["id-42"])
+	}
+}
+
+func TestRulingsAreKeptAndNotAskedForTwice(t *testing.T) {
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		fmt.Fprint(w, `{"object":"list","data":[{"comment":"It does what it says."}]}`)
+	}))
+	defer srv.Close()
+
+	for i := 0; i < 2; i++ {
+		got, err := Rulings(srv.URL + "/cards/kept/rulings")
+		if err != nil || len(got) != 1 {
+			t.Fatalf("got %v, %v", got, err)
+		}
+	}
+	if hits != 1 {
+		t.Errorf("asked %d times, want once", hits)
+	}
+}
+
+func TestStaleRulingsStandInWhenAskingFails(t *testing.T) {
+	up := true
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !up {
+			w.WriteHeader(500)
+			return
+		}
+		fmt.Fprint(w, `{"object":"list","data":[{"comment":"Old but true."}]}`)
+	}))
+	defer srv.Close()
+	uri := srv.URL + "/cards/stale/rulings"
+	Rulings(uri)
+	path := filepath.Join(paths.Cache(), "rulings", diskcache.Key(uri))
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	os.Chtimes(path, old, old)
+
+	up = false
+	got, err := Rulings(uri)
+	if err != nil || len(got) != 1 {
+		t.Errorf("with Scryfall down, got %v, %v; want the kept copy", got, err)
 	}
 }

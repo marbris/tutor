@@ -10,8 +10,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"time"
 
+	"ttr/internal/diskcache"
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 )
@@ -98,12 +100,35 @@ func truncate(cards []mtg.Card, limit int) []mtg.Card {
 	return cards
 }
 
+// rulingsMaxAge is how long a card's rulings are trusted. New rulings come
+// with a set's release, a few times a year; a week is plenty fresh.
+const rulingsMaxAge = 7 * 24 * time.Hour
+
 // Rulings fetches a card's rulings, returning an empty (non-nil) slice when
-// the card simply has none.
+// the card simply has none. They are kept on disk, so a card you have read
+// before has them at once.
 func Rulings(uri string) ([]mtg.Ruling, error) {
 	if uri == "" {
 		return []mtg.Ruling{}, nil
 	}
+	rel := filepath.Join("rulings", diskcache.Key(uri))
+	var kept []mtg.Ruling
+	fresh, have := diskcache.Load(rel, rulingsMaxAge, &kept)
+	if fresh && kept != nil {
+		return kept, nil
+	}
+	got, err := fetchRulings(uri)
+	if err != nil {
+		if have && kept != nil {
+			return kept, nil
+		}
+		return nil, err
+	}
+	diskcache.Save(rel, got)
+	return got, nil
+}
+
+func fetchRulings(uri string) ([]mtg.Ruling, error) {
 	body, err := fetch.Get(uri)
 	if err != nil {
 		return nil, err

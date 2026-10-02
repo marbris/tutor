@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"time"
 
+	"ttr/internal/diskcache"
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 	"ttr/internal/scryfall"
@@ -119,10 +121,35 @@ func printsQuery(c mtg.Card) string {
 	return "https://api.scryfall.com/cards/search?" + v.Encode()
 }
 
+// printingsMaxAge is how long a card's list of printings is trusted: the
+// prices in it change once a day.
+const printingsMaxAge = 24 * time.Hour
+
 // All is every paper printing of a card, newest first, and how many bytes
-// it took to find out. MTGO's and Arena's own printings are left out — they
-// aren't cards anyone holds — unless they are all the card has.
+// it took to find out — none, when the list kept from last time is still
+// good. MTGO's and Arena's own printings are left out — they aren't cards
+// anyone holds — unless they are all the card has.
 func All(c mtg.Card) ([]mtg.Card, int, error) {
+	rel := filepath.Join("printings", diskcache.Key(printsQuery(c)))
+	var kept []mtg.Card
+	fresh, have := diskcache.Load(rel, printingsMaxAge, &kept)
+	if fresh && len(kept) > 0 {
+		return kept, 0, nil
+	}
+	list, size, err := fetchAll(c)
+	if err != nil {
+		// A day-old price beats no picture at all.
+		if have && len(kept) > 0 {
+			return kept, size, nil
+		}
+		return nil, size, err
+	}
+	diskcache.Save(rel, list)
+	return list, size, nil
+}
+
+// fetchAll is All, asked of Scryfall.
+func fetchAll(c mtg.Card) ([]mtg.Card, int, error) {
 	var all []mtg.Card
 	size := 0
 	for page, next := 0, printsQuery(c); next != ""; page++ {
