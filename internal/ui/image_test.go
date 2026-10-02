@@ -1,6 +1,14 @@
 package ui
 
 import (
+	"bytes"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +17,7 @@ import (
 
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
+	"ttr/internal/paths"
 )
 
 // withKitty pretends the terminal can draw pictures, and catches what would
@@ -268,5 +277,38 @@ func TestGXStopsWhenScryfallSaysSlowDown(t *testing.T) {
 	}
 	if _, kept := m.images[imageKey(sample()[0].Card)]; kept {
 		t.Error("the refused card is marked as failed, so it won't be asked for again")
+	}
+}
+
+func TestPicturesAreCachedAsTheJPEGScryfallSent(t *testing.T) {
+	// A small JPEG, served as if from cards.scryfall.io.
+	var jpg bytes.Buffer
+	jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 49, 68)), nil)
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Write(jpg.Bytes())
+	}))
+	defer srv.Close()
+	p := mtg.Card{ID: "jpegtest", ImageURIs: mtg.ImageURIs{Normal: srv.URL + "/x.jpg"}}
+
+	for i, wantGot := range []int{jpg.Len(), 0} {
+		data, w, h, got, err := printingPNG(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := png.DecodeConfig(bytes.NewReader(data)); err != nil || w != 49 || h != 68 {
+			t.Errorf("run %d: not a 49×68 PNG (%d×%d, %v)", i, w, h, err)
+		}
+		if got != wantGot {
+			t.Errorf("run %d: downloaded %d bytes, want %d", i, got, wantGot)
+		}
+	}
+	if hits != 1 {
+		t.Errorf("fetched %d times, want once", hits)
+	}
+	kept, err := os.ReadFile(filepath.Join(paths.Cache(), "images", "jpegtest.jpg"))
+	if err != nil || !bytes.Equal(kept, jpg.Bytes()) {
+		t.Errorf("the cache doesn't hold the JPEG as sent (%v)", err)
 	}
 }

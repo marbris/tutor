@@ -304,35 +304,57 @@ func (m *Model) stepPrinting(older bool) tea.Cmd {
 }
 
 // printingPNG is a printing's picture as a PNG — the one format kitty takes
-// without being told the pixel size — from the cache if it has been fetched
-// before, and how many bytes were downloaded for it (none, from the cache).
-// A variable, so the tests needn't go to Scryfall.
+// without being told the pixel size — and how many bytes were downloaded
+// for it (none, from the cache). A variable, so the tests needn't go to
+// Scryfall.
+//
+// The cache keeps Scryfall's JPEG, not the PNG: a tenth of the size, and
+// turning one into the other takes about 50ms, off the main loop and once a
+// run per picture. Pictures cached as PNGs by older versions are still used
+// as they are.
 var printingPNG = func(p mtg.Card) ([]byte, int, int, int, error) {
-	path := filepath.Join(paths.Cache(), "images", p.ID+".png")
-	if data, err := os.ReadFile(path); err == nil {
+	dir := filepath.Join(paths.Cache(), "images")
+	if data, err := os.ReadFile(filepath.Join(dir, p.ID+".png")); err == nil {
 		if cfg, err := png.DecodeConfig(bytes.NewReader(data)); err == nil {
 			return data, cfg.Width, cfg.Height, 0, nil
 		}
 	}
 
-	raw, err := fetch.GetFile(p.Image("normal"))
+	jpg := filepath.Join(dir, p.ID+".jpg")
+	raw, err := os.ReadFile(jpg)
+	got := 0
 	if err != nil {
-		return nil, 0, 0, 0, err
+		raw, err = fetch.GetFile(p.Image("normal"))
+		if err != nil {
+			return nil, 0, 0, 0, err
+		}
+		got = len(raw)
+		// The cache is a convenience: failing to keep a copy loses nothing.
+		if os.MkdirAll(dir, 0755) == nil {
+			os.WriteFile(jpg, raw, 0644)
+		}
 	}
+	data, w, h, err := toPNG(raw)
+	if err != nil {
+		os.Remove(jpg) // a broken copy would only fail again next time
+		return nil, 0, 0, got, err
+	}
+	return data, w, h, got, nil
+}
+
+// toPNG turns a picture in any format the image package reads into a PNG,
+// with its size in pixels.
+func toPNG(raw []byte) ([]byte, int, int, error) {
 	img, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
-		return nil, 0, 0, len(raw), err
+		return nil, 0, 0, err
 	}
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
-		return nil, 0, 0, len(raw), err
-	}
-	// The cache is a convenience: failing to keep a copy loses nothing.
-	if os.MkdirAll(filepath.Dir(path), 0755) == nil {
-		os.WriteFile(path, buf.Bytes(), 0644)
+		return nil, 0, 0, err
 	}
 	b := img.Bounds()
-	return buf.Bytes(), b.Dx(), b.Dy(), len(raw), nil
+	return buf.Bytes(), b.Dx(), b.Dy(), nil
 }
 
 // openPrintingInBrowser finds the printing gx would show, and opens its
