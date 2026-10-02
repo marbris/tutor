@@ -26,19 +26,14 @@ You still can — Tutor reads from both. It just fixes the parts of that workflo
 
 - **Search and decklist, side by side.** Any number of panels in one window: several Scryfall searches, several decklists, the rules — all open at once, all keyboard-navigable.
 - **Add cards with a keystroke.** Scroll a search, press `a`, and the card lands in the deck you're editing. `x` takes it back out.
-- **Rulings where you're looking.** A card's oracle text, rulings, and legalities show in the panel beside the list — not buried below a wall of buttons.
-- **Denser lists, no card art.** Rows instead of tiles, so you see more of the search at once.
-- **Tag cards in bulk.** Select a whole theme with one key and tag them together — then filter and sort by those tags.
-- **Statistics you can drill into.** Filter a list by tag or category and watch the histograms recompute for exactly that subset.
-- **Version-controlled decks.** Every deck is a plain file in a git repository, so every change is kept and `git log` works on your decks like anything else.
-- **Sync across machines.** Because that repository is ordinary git, Tutor can mirror your whole collection to a private remote you own — GitHub, Codeberg, GitLab, self-hosted — and pull it back anywhere else. Set it up once, then `s` in the decks panel keeps both ends in step.
+- **The whole card, where you're looking.** Oracle text, rulings and legalities sit in the panel beside the list, not below a wall of buttons. `gx` swaps in the card's picture with its price, and `H`/`L` page through every printing it has had.
+- **Dense lists.** Rows instead of tiles, so you see more of a search at once. The art is a key away when you want it, not in the way when you don't.
+- **Tags that do the work.** Tag a whole theme in one stroke, or tag a deck by Scryfall's oracle tags. Keep tag lists whose tags count in every deck, and move tags from one list to another. Then filter, sort and count by them.
+- **Statistics you can drill into.** Filter a list by tag or category and watch the histograms recompute for exactly that subset, or ask the odds of each one turning up in your opening hand.
+- **Every change kept, on every machine.** Every deck is a plain file in a git repository, so nothing you change is lost and `git log` works on your decks. Point Tutor at a private remote you own and `space s` keeps your whole collection in step everywhere.
 - **Moxfield built in.** Follow a deck by URL, or browse someone's decks by username, and pull a copy in to edit.
+- **Quick answers from the shell.** `ttr <card name>` prints the card — text, rulings, legality, price — and gets out of the way.
 - **A couple of extras I find handy:** the comprehensive rules are searchable and drive keyword highlighting in card text, and you can see how a card's wording has changed across printings.
-
-What it **doesn't** do (yet):
-
-- It can't save decks back to Moxfield — though you can mirror them to a private git remote of your own instead (see [Sync across machines](#every-change-kept)).
-- A Scryfall search returns the first 175 results, not the entire set.
 
 ## A quick tour
 
@@ -81,7 +76,7 @@ Narrow a list with `/`, select what's left with `V`, and tag them together with 
 
 ### Statistics that answer questions
 
-Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Build a filter from the categories with AND (`a`), OR (`o`) and NOT (`n`) — *ramp and not lands*, *removal or counterspells* — and the list and the histograms narrow to that subset as you go. Moxfield shows you stats; here you can interrogate them.
+Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Tags, types and colours lead with the commonest; on a tag, `tab` sorts the tags by name instead, which keeps families like `otag-…` together. Build a filter from the categories with AND (`a`), OR (`o`) and NOT (`n`) — *ramp and not lands*, *removal or counterspells* — and the list and the histograms narrow to that subset as you go. Moxfield shows you stats; here you can interrogate them.
 
 ![The statistics panel: histograms of the deck, filtered to a combination of categories](screenshots/stats-filter.png)
 
@@ -91,7 +86,7 @@ Open the statistics panel and walk the breakdown — tags, types, colours, the c
 
 ### The card as printed
 
-Press `gx` on a card to see it as printed: its most recent ordinary printing, not a promo or a borderless showcase, in the info panel. The picture follows the cursor as you move. In kitty, Ghostty and WezTerm it's drawn right in the terminal; anywhere else, `gx` opens it in your browser. `gx` on a Moxfield deck in the decks panel opens it on Moxfield.
+Press `gx` on a card to see it as printed: an ordinary printing, not a promo or a borderless showcase, in the info panel. Under the picture are the card's tags, its price in that printing, where it's legal and its rulings — `K`/`J` scroll down to them. `H` and `L` step to older and newer printings. The picture follows the cursor as you move, and `gX` fetches every card's picture in the list ahead of you, so walking it is instant. Tutor comes back to this view if you quit in it. In kitty, Ghostty and WezTerm it's drawn right in the terminal; anywhere else, `gx` opens it in your browser. `gx` on a Moxfield deck in the decks panel opens it on Moxfield.
 
 ![A search with the highlighted card's printing drawn in the info panel](screenshots/printing.png)
 
@@ -274,6 +269,7 @@ The bottom of the screen shows `?` and `q`. Press `?` and each panel shows its o
 | `j` `k` | up / down in the list |
 | `gg` `G` | first / last row |
 | `K` `J` | scroll the info panel half a screen |
+| `H` `L` | in the printing view: an older / newer printing |
 | `b` `B` | clear this list's filters · clear every list's filters |
 | `space` | the menu · `?` show keys in the panels · `q` quit |
 
@@ -296,6 +292,7 @@ The bottom of the screen shows `?` and `q`. Press `?` and each panel shows its o
 | `s` `S` | statistics for this list · for the editing deck |
 | `gv` | how this card's printed text has changed |
 | `gx` | the card as printed, in the info panel (or the browser) |
+| `gX` | the same, and fetch every card's picture in the list ahead of you |
 | `w` `W` | commit this deck · save a search or remote deck as a deck of yours (here / in a new panel) |
 
 **In the decks panel**
