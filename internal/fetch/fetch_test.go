@@ -202,3 +202,53 @@ func TestA429HoldsBackEveryRequestUntilTheHostSaysSo(t *testing.T) {
 		t.Errorf("a request went out during the cool-off (%d hits)", hits)
 	}
 }
+
+func TestSearchesAreHeldToTheirOwnTighterPace(t *testing.T) {
+	var mu sync.Mutex
+	var searches, others []time.Time
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if strings.HasPrefix(r.URL.Path, "/cards/search") {
+			searches = append(searches, time.Now())
+		} else {
+			others = append(others, time.Now())
+		}
+	}))
+	defer srv.Close()
+	paced(t, srv, 5*time.Millisecond)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	pathLimiters[host] = []pathLimiter{{"/cards/search", &limiter{gap: 60 * time.Millisecond}}}
+	t.Cleanup(func() { delete(pathLimiters, host) })
+
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(2)
+		go func() { defer wg.Done(); Get(srv.URL + "/cards/search?q=x") }()
+		go func() { defer wg.Done(); Get(srv.URL + "/cards/abc/rulings") }()
+	}
+	wg.Wait()
+	sort.Slice(searches, func(i, j int) bool { return searches[i].Before(searches[j]) })
+	if len(searches) != 3 || searches[2].Sub(searches[0]) < 115*time.Millisecond {
+		t.Errorf("three searches came within %v, want two search gaps", searches[2].Sub(searches[0]))
+	}
+	sort.Slice(others, func(i, j int) bool { return others[i].Before(others[j]) })
+	if len(others) != 3 || others[2].Sub(others[0]) > 100*time.Millisecond {
+		t.Errorf("the rulings waited on the searches: %v", others[2].Sub(others[0]))
+	}
+}
+
+func TestScryfallsLimitsAreKeptWithAMargin(t *testing.T) {
+	// The documented limits: 10/s overall, 2/s for the searches.
+	if scryfallGap <= 100*time.Millisecond || searchGap <= 500*time.Millisecond || manifestGap <= 6*time.Second {
+		t.Error("a gap is at or under Scryfall's limit")
+	}
+	for _, p := range []string{"/cards/search", "/cards/named", "/cards/random", "/cards/collection"} {
+		if l := pathLimiterFor("api.scryfall.com", p); l == nil || l.gap != searchGap {
+			t.Errorf("%s isn't paced as a search", p)
+		}
+	}
+	if pathLimiterFor("api.scryfall.com", "/cards/abc/rulings") != nil {
+		t.Error("rulings are paced as a search")
+	}
+}

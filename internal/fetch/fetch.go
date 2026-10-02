@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"strconv"
 	"strings"
@@ -73,7 +74,34 @@ func GetFile(u string) ([]byte, error) {
 func do(client *http.Client, req *http.Request, u string) ([]byte, error) {
 	lim := limiterFor(req.URL.Host)
 	if lim != nil {
-		if err := lim.wait(); err != nil {
+		if err := lim.check(); err != nil {
+			return nil, err
+		}
+		// A search waits its turn among the searches, then among everything
+		// — always in that order, so two requests can't each hold the turn
+		// the other is waiting for.
+		turns := []*limiter{lim}
+		if path := pathLimiterFor(req.URL.Host, req.URL.Path); path != nil {
+			turns = []*limiter{path, lim}
+		}
+		for _, l := range turns {
+			l.take()
+		}
+		var once sync.Once
+		sent := func() {
+			once.Do(func() {
+				for i := len(turns) - 1; i >= 0; i-- {
+					turns[i].sent()
+				}
+			})
+		}
+		// The turn passes on once this request is on the wire, not when it
+		// was let go: a new connection's handshake can hold one back while
+		// the next goes straight out, and the two would land together.
+		req = req.WithContext(httptrace.WithClientTrace(req.Context(),
+			&httptrace.ClientTrace{WroteRequest: func(httptrace.WroteRequestInfo) { sent() }}))
+		defer sent() // for a request that never got as far as writing
+		if err := lim.check(); err != nil {
 			return nil, err
 		}
 	}
@@ -112,21 +140,36 @@ func Host(u string) string {
 
 // ── Rate limits ─────────────────────────────────────────────────
 
-// Scryfall's API asks for fewer than ten requests a second, and answers a
-// client that ignores it with a 429 and then a block. Every caller pausing
-// between its own pages wasn't enough: the picture under the cursor, its
-// rulings, a search and gX each paced themselves and none of them knew about
-// the others. So the pacing is here, where every request passes, and shared.
+// Scryfall's API has hard rate limits, and answers a client that breaks
+// them with a 429, thirty seconds locked out, and then a block
+// (https://scryfall.com/docs/api/rate-limits):
 //
-// The pictures come from cards.scryfall.io, which has no such limit.
+//	/cards/search, /cards/named, /cards/random, /cards/collection   2 a second
+//	/cards/manifest                                                 10 a minute
+//	everything else                                                 10 a second
+//
+// Every caller pausing between its own pages wasn't enough: the picture
+// under the cursor, its rulings, a search and gX each paced themselves and
+// none of them knew about the others — and a list of printings is a
+// /cards/search, held to two a second, not ten. So the pacing is here, where
+// every request passes, shared, and by endpoint. Each gap has a margin over
+// the limit, so a request delayed on its way out can't bunch up with the
+// next.
+//
+// The pictures come from cards.scryfall.io, which has no limit.
 
-// scryfallGap is the least time between two requests to the API: a little
-// over a tenth of a second, to stay under ten a second rather than on it.
-const scryfallGap = 110 * time.Millisecond
+const (
+	// scryfallGap paces every request to the API: 8 a second.
+	scryfallGap = 125 * time.Millisecond
+	// searchGap paces the card searches: 1.6 a second.
+	searchGap = 625 * time.Millisecond
+	// manifestGap paces /cards/manifest: 8 a minute.
+	manifestGap = 7500 * time.Millisecond
+)
 
 // coolOff is how long to leave the API alone after a 429 that doesn't say.
-// Scryfall's own message asks for 60 seconds.
-const coolOff = 60 * time.Second
+// Scryfall locks a client out for 30 seconds; a little longer, to be sure.
+const coolOff = 35 * time.Second
 
 // limiters are the hosts that are paced, by host name. A variable, so the
 // tests can pace a test server.
@@ -136,12 +179,48 @@ var limiters = map[string]*limiter{
 
 func limiterFor(host string) *limiter { return limiters[host] }
 
-// limiter spaces the requests to one host, and holds them all back for a
-// while once the host has said to.
+// pathLimiter is a tighter pace for some of a host's endpoints, on top of
+// the host's own.
+type pathLimiter struct {
+	prefix string
+	lim    *limiter
+}
+
+// pathLimiters are the endpoints with limits of their own, by host. The
+// four searches share one limit between them.
+var pathLimiters = func() map[string][]pathLimiter {
+	search := &limiter{gap: searchGap}
+	return map[string][]pathLimiter{
+		"api.scryfall.com": {
+			{"/cards/search", search},
+			{"/cards/named", search},
+			{"/cards/random", search},
+			{"/cards/collection", search},
+			{"/cards/manifest", &limiter{gap: manifestGap}},
+		},
+	}
+}()
+
+func pathLimiterFor(host, path string) *limiter {
+	for _, pl := range pathLimiters[host] {
+		if strings.HasPrefix(path, pl.prefix) {
+			return pl.lim
+		}
+	}
+	return nil
+}
+
+// limiter spaces the requests to one host, or one endpoint, and holds them
+// all back for a while once the host has said to.
+//
+// One request has the turn at a time, from when it may go until it has been
+// written to the connection; the next may go a gap after that.
 type limiter struct {
+	gap  time.Duration
+	turn sync.Mutex
+	last time.Time // when the last request went out; under turn
+
 	mu    sync.Mutex
-	gap   time.Duration
-	next  time.Time // the earliest the next request may go
 	until time.Time // after a 429: nothing goes before this
 }
 
@@ -159,28 +238,32 @@ func (e RateLimited) Error() string {
 	return "Scryfall asked ttr to slow down — try again in " + wait.String()
 }
 
-// wait holds a request until its turn, or refuses it while the host is
-// cooling off — a request sent then only lengthens the block.
-func (l *limiter) wait() error {
+// take waits for the turn, and then for a gap after the request before it
+// went out.
+func (l *limiter) take() {
+	l.turn.Lock()
+	time.Sleep(time.Until(l.last.Add(l.gap)))
+}
+
+// sent passes the turn on: the request holding it has gone.
+func (l *limiter) sent() {
+	l.last = time.Now()
+	l.turn.Unlock()
+}
+
+// check refuses a request while the host is cooling off — a request sent
+// then only lengthens the block.
+func (l *limiter) check() error {
 	l.mu.Lock()
-	now := time.Now()
-	if now.Before(l.until) {
-		until := l.until
-		l.mu.Unlock()
-		return RateLimited{Until: until}
+	defer l.mu.Unlock()
+	if time.Now().Before(l.until) {
+		return RateLimited{Until: l.until}
 	}
-	at := l.next
-	if at.Before(now) {
-		at = now
-	}
-	l.next = at.Add(l.gap)
-	l.mu.Unlock()
-	time.Sleep(time.Until(at))
 	return nil
 }
 
 // backOff records a 429: nothing more goes to the host until it said, or
-// for a minute.
+// for coolOff.
 func (l *limiter) backOff(retryAfter string) error {
 	d := coolOff
 	if secs, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && secs > 0 {
