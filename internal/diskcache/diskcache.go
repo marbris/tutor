@@ -43,6 +43,13 @@ func Load(rel string, maxAge time.Duration, v any) (fresh, ok bool) {
 	return time.Since(info.ModTime()) < maxAge, true
 }
 
+// Fresh reports whether there is a copy at rel younger than maxAge, without
+// reading it.
+func Fresh(rel string, maxAge time.Duration) bool {
+	info, err := os.Stat(filepath.Join(paths.Cache(), rel))
+	return err == nil && time.Since(info.ModTime()) < maxAge
+}
+
 // Save keeps v at rel. Failing to is silent: the cache is a convenience, and
 // losing a copy costs only a request.
 func Save(rel string, v any) {

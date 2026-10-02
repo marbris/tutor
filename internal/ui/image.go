@@ -79,6 +79,8 @@ const (
 // have taken it.
 type cardPrintings struct {
 	state imgState
+	// local is a load from disk, which is "loading", not "fetching".
+	local bool
 	list  []mtg.Card
 	at    int
 	err   error
@@ -186,12 +188,15 @@ func (m *Model) fetchImage(c mtg.Card) tea.Cmd {
 	if cp, ok := m.images[key]; ok && cp.state != imgFailed {
 		return m.fetchShown(cp)
 	}
-	m.images[key] = &cardPrintings{state: imgFetching}
+	m.images[key] = &cardPrintings{state: imgFetching, local: keptOnDisk(c)}
 	return func() tea.Msg {
 		msg, _ := loadPrintingsFor(c)
 		return msg
 	}
 }
+
+// keptOnDisk is prints.Kept, as a variable for the tests.
+var keptOnDisk = prints.Kept
 
 // fetchShown asks for the picture of the printing on show, if it isn't in
 // hand or on its way.
@@ -223,6 +228,12 @@ func (m *Model) imageHover() tea.Cmd {
 	key := imageKey((*c))
 	if _, ok := m.images[key]; ok {
 		return nil
+	}
+	// The pause is there to spare Scryfall a request for every card the
+	// cursor passes. A card whose printings are already on disk costs it
+	// nothing, so it is loaded at once.
+	if keptOnDisk(*c) {
+		return m.fetchImage(*c)
 	}
 	m.imageSeq++
 	seq := m.imageSeq
@@ -491,6 +502,9 @@ func (m Model) infoImageLines(width int) []string {
 	cp, p, pic := m.shown()
 	switch {
 	case cp == nil || cp.state == imgFetching:
+		if cp != nil && cp.local {
+			return wrapStyled("loading "+c.Name+"…", width, muted)
+		}
 		return wrapStyled("fetching "+c.Name+"…", width, muted)
 	case cp.state == imgFailed:
 		return wrapStyled("no picture: "+errorText(cp.err), width, muted)

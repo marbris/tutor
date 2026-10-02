@@ -312,3 +312,39 @@ func TestPicturesAreCachedAsTheJPEGScryfallSent(t *testing.T) {
 		t.Errorf("the cache doesn't hold the JPEG as sent (%v)", err)
 	}
 }
+
+func TestACardKeptOnDiskLoadsAtOnceAndSaysLoading(t *testing.T) {
+	withKitty(t, true)
+	oldKept, oldLoad := keptOnDisk, loadPrintingsFor
+	keptOnDisk = func(mtg.Card) bool { return true }
+	loaded := 0
+	loadPrintingsFor = func(c mtg.Card) (imageMsg, int) {
+		loaded++
+		return imageMsg{key: imageKey(c), list: []mtg.Card{{ID: c.Name}},
+			picture: picture{state: imgReady, png: []byte("png"), w: 488, h: 680}}, 0
+	}
+	t.Cleanup(func() { keptOnDisk, loadPrintingsFor = oldKept, oldLoad })
+
+	m := withCards(sized(160, 40), "f", sample(), sortArrival)
+	m.info.mode = infoImage
+	m, cmd := press(m, "j")
+	if c := m.focusedCard(); c == nil || m.images[imageKey(*c)] == nil {
+		t.Fatal("the card on disk wasn't asked for straight away")
+	}
+	if body := stripANSI(strings.Join(m.infoImageLines(40), "\n")); !strings.Contains(body, "loading") {
+		t.Errorf("a load from disk says:\n%s", body)
+	}
+	for _, msg := range messages(cmd) {
+		if _, tick := msg.(imageTickMsg); tick {
+			t.Error("it still waited for the cursor to rest")
+		}
+		next, _ := m.Update(msg)
+		m = next.(Model)
+	}
+	if _, p, pic := m.shown(); pic == nil || p.ID != "Llanowar Elves" {
+		t.Error("the loaded picture isn't on show")
+	}
+	if loaded != 1 {
+		t.Errorf("loaded %d times", loaded)
+	}
+}

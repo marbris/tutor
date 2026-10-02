@@ -3,13 +3,11 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
-	"ttr/internal/scryfall"
 )
 
 // gX: every card's picture in the list, fetched ahead.
@@ -19,6 +17,8 @@ import (
 // up front: the picture gx would show for each card, one card at a time from
 // the one under the cursor to the end and round to the top — so the cards
 // nearest you arrive first — with the notice counting what has come down.
+// A picture already on disk is read and converted to the PNG the terminal
+// takes, so walking the list afterwards is instant either way.
 
 // prefetchState is the gX in progress. seq rises with every gX, so a
 // second one supersedes the first rather than racing it.
@@ -82,13 +82,12 @@ func (m *Model) prefetchNext() tea.Cmd {
 		if cp, ok := m.images[key]; ok && cp.state != imgFailed {
 			continue
 		}
-		m.images[key] = &cardPrintings{state: imgFetching}
+		m.images[key] = &cardPrintings{state: imgFetching, local: keptOnDisk(c)}
 		m.notice = m.prefetchProgress()
 		panel, seq := pf.panel, pf.seq
+		// No pause here: fetch keeps Scryfall's pace, and a card already on
+		// disk needs none — gX over a cached deck just reads and converts.
 		return func() tea.Msg {
-			// Scryfall asks for a pause between requests, and there is no
-			// limiter under fetch to do it for us.
-			time.Sleep(scryfall.PageDelay)
 			img, n := loadPrintingsFor(c)
 			return prefetchMsg{panel: panel, seq: seq, img: img, bytes: n}
 		}

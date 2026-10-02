@@ -148,6 +148,13 @@ func All(c mtg.Card) ([]mtg.Card, int, error) {
 	return list, size, nil
 }
 
+// Kept reports whether All would answer for a card from disk, without
+// asking Scryfall. It only looks at the file, so it is cheap enough to ask
+// on every move of the cursor.
+func Kept(c mtg.Card) bool {
+	return diskcache.Fresh(filepath.Join("printings", diskcache.Key(printsQuery(c))), printingsMaxAge)
+}
+
 // fetchAll is All, asked of Scryfall.
 func fetchAll(c mtg.Card) ([]mtg.Card, int, error) {
 	var all []mtg.Card
