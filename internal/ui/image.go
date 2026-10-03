@@ -319,23 +319,18 @@ func (m *Model) stepPrinting(older bool) tea.Cmd {
 // for it (none, from the cache). A variable, so the tests needn't go to
 // Scryfall.
 //
-// The cache keeps Scryfall's JPEG, not the PNG: a tenth of the size, and
-// turning one into the other takes about 50ms, off the main loop and once a
-// run per picture. Pictures cached as PNGs by older versions are still used
-// as they are.
+// The picture is Scryfall's border crop: the card with its rounded corners
+// cut square, since the corners of the full scan are white and stand out
+// on a dark terminal. The cache keeps Scryfall's JPEG, not the PNG: a tenth
+// of the size, and turning one into the other takes about 50ms, off the
+// main loop and once a run per picture.
 var printingPNG = func(p mtg.Card) ([]byte, int, int, int, error) {
 	dir := filepath.Join(paths.Cache(), "images")
-	if data, err := os.ReadFile(filepath.Join(dir, p.ID+".png")); err == nil {
-		if cfg, err := png.DecodeConfig(bytes.NewReader(data)); err == nil {
-			return data, cfg.Width, cfg.Height, 0, nil
-		}
-	}
-
-	jpg := filepath.Join(dir, p.ID+".jpg")
+	jpg := filepath.Join(dir, p.ID+".crop.jpg")
 	raw, err := os.ReadFile(jpg)
 	got := 0
 	if err != nil {
-		raw, err = fetch.GetFile(p.Image("normal"))
+		raw, err = fetch.GetFile(p.Image("border_crop"))
 		if err != nil {
 			return nil, 0, 0, 0, err
 		}

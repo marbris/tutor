@@ -86,14 +86,21 @@ type ImageURIs struct {
 	Normal string `json:"normal"`
 	Large  string `json:"large"`
 	PNG    string `json:"png"`
+	// BorderCrop is the card with its rounded corners cut off: square, so
+	// nothing shows behind the corners on a dark terminal.
+	BorderCrop string `json:"border_crop"`
 }
 
-// Image is the link to a printing's picture at the size asked for — "normal"
-// or "large" — or its front face's, for a card that has one per face.
+// Image is the link to a printing's picture at the size asked for —
+// "normal", "large" or "border_crop" — or its front face's, for a card that
+// has one per face.
 func (c Card) Image(size string) string {
 	pick := func(u ImageURIs) string {
 		if size == "large" && u.Large != "" {
 			return u.Large
+		}
+		if size == "border_crop" && u.BorderCrop != "" {
+			return u.BorderCrop
 		}
 		return u.Normal
 	}

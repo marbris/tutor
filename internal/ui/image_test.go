@@ -280,17 +280,19 @@ func TestGXStopsWhenScryfallSaysSlowDown(t *testing.T) {
 	}
 }
 
-func TestPicturesAreCachedAsTheJPEGScryfallSent(t *testing.T) {
+func TestPicturesAreTheBorderCropCachedAsTheJPEGScryfallSent(t *testing.T) {
 	// A small JPEG, served as if from cards.scryfall.io.
 	var jpg bytes.Buffer
 	jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 49, 68)), nil)
-	hits := 0
+	hits, asked := 0, ""
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits++
+		asked = r.URL.Path
 		w.Write(jpg.Bytes())
 	}))
 	defer srv.Close()
-	p := mtg.Card{ID: "jpegtest", ImageURIs: mtg.ImageURIs{Normal: srv.URL + "/x.jpg"}}
+	p := mtg.Card{ID: "jpegtest", ImageURIs: mtg.ImageURIs{
+		Normal: srv.URL + "/normal.jpg", BorderCrop: srv.URL + "/crop.jpg"}}
 
 	for i, wantGot := range []int{jpg.Len(), 0} {
 		data, w, h, got, err := printingPNG(p)
@@ -307,7 +309,10 @@ func TestPicturesAreCachedAsTheJPEGScryfallSent(t *testing.T) {
 	if hits != 1 {
 		t.Errorf("fetched %d times, want once", hits)
 	}
-	kept, err := os.ReadFile(filepath.Join(paths.Cache(), "images", "jpegtest.jpg"))
+	if asked != "/crop.jpg" {
+		t.Errorf("asked for %s, want the border crop", asked)
+	}
+	kept, err := os.ReadFile(filepath.Join(paths.Cache(), "images", "jpegtest.crop.jpg"))
 	if err != nil || !bytes.Equal(kept, jpg.Bytes()) {
 		t.Errorf("the cache doesn't hold the JPEG as sent (%v)", err)
 	}
