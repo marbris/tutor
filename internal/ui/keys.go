@@ -340,10 +340,20 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch keymap.Lookup(keymap.Search, key) {
+	// tab finishes an oracle tag being typed — otag:remo — and otherwise
+	// changes what the bar searches.
 	case keymap.SearchNextTarget:
+		if m.canCompleteOtag(p) {
+			m.completeOtag(p, 1)
+			return m, nil
+		}
 		p.setKind(p.kind.next(1))
 		return m, m.previewKind(p)
 	case keymap.SearchPrevTarget:
+		if m.canCompleteOtag(p) {
+			m.completeOtag(p, -1)
+			return m, nil
+		}
 		p.setKind(p.kind.next(-1))
 		return m, m.previewKind(p)
 

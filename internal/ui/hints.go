@@ -337,6 +337,9 @@ func addHints(groups []hintGroup, title string, keys ...[2]string) []hintGroup {
 // to a card query — the bar that follows a Moxfield user has neither.
 func (m Model) barKeys(p *panel) [][2]string {
 	out := [][2]string{hint("another target: scryfall, decks, rules", keymap.Search, keymap.SearchNextTarget)}
+	if m.canCompleteOtag(p) {
+		out[0] = hint("complete the tag", keymap.Search, keymap.SearchNextTarget, keymap.SearchPrevTarget)
+	}
 	if p.kind == KindFind {
 		out = append(out,
 			hint("queries you've run", keymap.Search, keymap.SearchHistoryPrev, keymap.SearchHistoryNext),

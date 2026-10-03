@@ -30,6 +30,7 @@ const fixture = `{"id":"r","label":"removal","parent_ids":[],"child_ids":["ra","
 {"id":"ra","label":"removal-artifact","parent_ids":["r","am"],"child_ids":[],"taggings":[{"oracle_id":"shatter"},{"oracle_id":"disenchant"}]}
 {"id":"re","label":"removal-enchantment","parent_ids":["r"],"child_ids":[],"taggings":[{"oracle_id":"disenchant"}]}
 {"id":"am","label":"artifact-matters","parent_ids":[],"child_ids":["ra"],"taggings":[]}
+{"id":"sr","label":"spot removal","slug":"spot-removal","parent_ids":[],"child_ids":[],"taggings":[{"oracle_id":"shatter"}]}
 {"id":"rp","label":"ramp","parent_ids":[],"child_ids":[],"taggings":[{"oracle_id":"sol"}]}
 `
 
@@ -78,7 +79,7 @@ func TestRootsAndChildren(t *testing.T) {
 	for _, i := range d.Roots() {
 		roots = append(roots, d.Tags[i].Label)
 	}
-	if got := strings.Join(roots, " "); got != "artifact-matters ramp removal" {
+	if got := strings.Join(roots, " "); got != "artifact-matters ramp removal spot-removal" {
 		t.Errorf("roots are %q", got)
 	}
 	removal, _ := d.Find("removal")

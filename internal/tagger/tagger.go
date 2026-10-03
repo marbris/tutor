@@ -32,7 +32,9 @@ import (
 	"ttr/internal/fetch"
 )
 
-// Tag is one Tagger tag. Parents and Children are indexes into Data.Tags.
+// Tag is one Tagger tag. Its Label is the tag's slug — spot-removal, not
+// "spot removal" — since that is the name otag: takes. Parents and Children
+// are indexes into Data.Tags.
 type Tag struct {
 	Label       string `json:"l"`
 	Description string `json:"d,omitempty"`
@@ -120,6 +122,7 @@ func Read(gz []byte) (*Data, error) {
 	type raw struct {
 		ID       string   `json:"id"`
 		Label    string   `json:"label"`
+		Slug     string   `json:"slug"`
 		Desc     string   `json:"description"`
 		Parents  []string `json:"parent_ids"`
 		Children []string `json:"child_ids"`
@@ -139,6 +142,9 @@ func Read(gz []byte) (*Data, error) {
 		var t raw
 		if err := json.Unmarshal(line, &t); err != nil {
 			return nil, err
+		}
+		if t.Slug != "" {
+			t.Label = t.Slug
 		}
 		tags = append(tags, t)
 	}

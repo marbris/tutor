@@ -142,6 +142,8 @@ type panel struct {
 	askInput textinput.Model
 	// tagComp is tab completion under way in the tag prompt.
 	tagComp *tagCompletion
+	// otagComp is tab completion under way of an otag: in the search bar.
+	otagComp *tagCompletion
 	// writeToNewPane remembers whether it was w or W that raised the
 	// save-as prompt, since the answer arrives long after the key.
 	writeToNewPane bool

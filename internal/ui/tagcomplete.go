@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// Tab completion in the tag prompt.
+// Tab completion in the tag prompt, and of otag: in a Scryfall search.
 //
 // Tagging is the one prompt whose answers repeat: the same dozen tags go on
 // card after card, and a tag typed slightly differently — "remova", "Ramp " —
@@ -65,9 +65,24 @@ func (m Model) knownTags() []string {
 // completeTag is tab (delta 1) or shift+tab (delta -1) in the tag prompt.
 func (m *Model) completeTag(p *panel, delta int) {
 	value := p.askInput.Value()
+	// The word being completed is the last one; tags are single words.
+	start := strings.LastIndex(value, " ") + 1
+	before, word := value[:start], value[start:]
+	if strings.HasPrefix(word, "-") {
+		before, word = before+"-", word[1:]
+	}
+	set := func(s string) string { p.setAsk(s); return p.askInput.Value() }
+	m.complete(&p.tagComp, value, set, delta, before, strings.ToLower(word), m.knownTags())
+}
 
+// complete is the shell-style tab over the word at the end of an input:
+// value is what the input holds, before and word that split at the word
+// being completed, and known what it can become. set puts new text in the
+// input and says what it then holds. comp is the walk in progress, if any.
+func (m *Model) complete(comp **tagCompletion, value string, set func(string) string,
+	delta int, before, word string, known []string) {
 	// Still walking: the input is what the last tab left, so step on.
-	if c := p.tagComp; c != nil && c.shown == value && len(c.fits) > 1 {
+	if c := *comp; c != nil && c.shown == value && len(c.fits) > 1 {
 		switch {
 		case c.at < 0 && delta > 0:
 			c.at = 0
@@ -76,22 +91,12 @@ func (m *Model) completeTag(p *panel, delta int) {
 		default:
 			c.at = (c.at + delta + len(c.fits)) % len(c.fits)
 		}
-		p.setAsk(c.before + c.fits[c.at])
-		c.shown = p.askInput.Value()
+		c.shown = set(c.before + c.fits[c.at])
 		m.notice = tagList(c.fits, c.at)
 		return
 	}
-	p.tagComp = nil
+	*comp = nil
 
-	// The word being completed is the last one; tags are single words.
-	start := strings.LastIndex(value, " ") + 1
-	before, word := value[:start], value[start:]
-	if strings.HasPrefix(word, "-") {
-		before, word = before+"-", word[1:]
-	}
-	word = strings.ToLower(word)
-
-	known := m.knownTags()
 	if len(known) == 0 {
 		m.notice = "no tags yet to complete from"
 		return
@@ -107,24 +112,65 @@ func (m *Model) completeTag(p *panel, delta int) {
 		m.notice = `no tag starts with "` + word + `"`
 		return
 	case 1:
-		p.setAsk(before + fits[0] + " ")
+		set(before + fits[0] + " ")
 		return
 	}
 
 	c := &tagCompletion{before: before, fits: fits, at: -1}
 	if common := commonPrefix(fits); len(common) > len(word) {
-		p.setAsk(before + common)
+		c.shown = set(before + common)
 	} else {
 		// Nothing to add: start the walk straight away.
 		c.at = 0
 		if delta < 0 {
 			c.at = len(fits) - 1
 		}
-		p.setAsk(before + fits[c.at])
+		c.shown = set(before + fits[c.at])
 	}
-	c.shown = p.askInput.Value()
-	p.tagComp = c
+	*comp = c
 	m.notice = tagList(fits, c.at)
+}
+
+// otagFields are the search keywords that take an oracle tag.
+var otagFields = []string{"otag:", "oracletag:", "function:"}
+
+// otagWord splits a Scryfall query whose last word is an oracle tag being
+// typed — otag:remo, -otag:ra, (function:card- — into what comes before
+// the tag's name and the name so far.
+func otagWord(value string) (before, word string, ok bool) {
+	start := strings.LastIndex(value, " ") + 1
+	token := value[start:]
+	lead := len(token) - len(strings.TrimLeft(token, "-("))
+	for _, f := range otagFields {
+		if rest := token[lead:]; len(rest) >= len(f) && strings.EqualFold(rest[:len(f)], f) {
+			cut := start + lead + len(f)
+			return value[:cut], strings.ToLower(value[cut:]), true
+		}
+	}
+	return "", "", false
+}
+
+// canCompleteOtag reports whether tab in the search bar would complete an
+// oracle tag rather than change the bar's target.
+func (m Model) canCompleteOtag(p *panel) bool {
+	if p.kind != KindFind || taggerData == nil {
+		return false
+	}
+	_, _, ok := otagWord(p.search.Value())
+	return ok
+}
+
+// completeOtag is tab in the search bar, on an otag: word: the tag's name
+// finished from Scryfall Tagger's tags.
+func (m *Model) completeOtag(p *panel, delta int) {
+	value := p.search.Value()
+	before, word, _ := otagWord(value)
+	set := func(s string) string {
+		p.search.SetValue(s)
+		p.search.CursorEnd()
+		return p.search.Value()
+	}
+	m.complete(&p.otagComp, value, set, delta, before, word, taggerData.Labels(""))
 }
 
 // setAsk replaces what the prompt holds, the cursor at the end of it.

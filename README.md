@@ -412,7 +412,7 @@ Tutor is a client for other people's excellent, freely available data. It wouldn
 - **[MTGJSON](https://mtgjson.com/)** — the printed text of every printing, for the wording history.
 - **Wizards of the Coast** — the [comprehensive rules](https://magic.wizards.com/en/rules), which power the rules browser and the keyword highlighting.
 - **[EDHREC](https://edhrec.com/)** — Commander play-rate rankings (the default search order).
-- **The [Scryfall Tagger](https://tagger.scryfall.com/) community** — the oracle tags behind `otag:` searches.
+- **The [Scryfall Tagger](https://tagger.scryfall.com/) community** — the oracle tags behind `otag:` searches, tab completion of them, and the Tagger statistics.
 
 Built with the **[Charm](https://charm.sh/)** stack — [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles), and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
 
