@@ -441,10 +441,14 @@ func statHeading(groups []stats.Group, row int) int {
 	return 0
 }
 
-// statScroll is where the statistics are scrolled to: far enough to show the
-// highlighted category, and far enough back to show its group's heading
-// too, whenever the two fit together. J and K turn a group to the top and
-// put the highlight on its first category; scrolling only as far as the
+// statScroll is where the statistics are scrolled to, from offset: moved
+// only as far as it takes to keep the highlighted category in view, so the
+// view holds still while the highlight walks inside it and moves only when
+// the highlight reaches an edge.
+//
+// At the top edge it goes far enough back to show the group's heading too,
+// whenever the two fit together. J and K turn a group to the top and put
+// the highlight on its first category; scrolling only as far as the
 // category left the heading — the one line saying what the bars count —
 // just above the top edge.
 func (m Model) statScroll(offset, height, total int) int {
@@ -452,10 +456,26 @@ func (m Model) statScroll(offset, height, total int) int {
 	row := m.statCursor(groups)
 	line := statLine(groups, row)
 	offset = scrollTo(line, offset, height, total)
-	if head := statHeading(groups, row); head < offset && line-head < height {
+	if head := statHeading(groups, row); line == offset && head < offset && line-head < height {
 		offset = head
 	}
 	return offset
+}
+
+// followStats keeps the statistics' scroll position, after anything that
+// may have moved the highlight. The position is kept rather than worked out
+// afresh each frame: worked out afresh, it was always the least scroll that
+// showed the highlight, so walking back up from the bottom dragged the view
+// along a line at a time.
+func (m *Model) followStats() {
+	if m.info.mode != infoStats {
+		return
+	}
+	inner, room, _, ok := m.infoSpan()
+	if !ok {
+		return
+	}
+	m.info.offset = m.statScroll(m.info.offset, room, len(m.renderStats(inner)))
 }
 
 // statOdds is the chance of at least n of a category in the opening hand,
@@ -630,7 +650,7 @@ func (b statBar) render() string {
 // which is the same arithmetic the render does. Exposed so a test can ask
 // without drawing.
 func (m Model) statOffset(height int) int {
-	return m.statScroll(0, maxInt(height, 1), len(m.renderStats(30)))
+	return m.statScroll(m.info.offset, maxInt(height, 1), len(m.renderStats(30)))
 }
 
 // statTitle heads the panel: what's being counted, and how.

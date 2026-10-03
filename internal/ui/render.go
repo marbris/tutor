@@ -273,10 +273,10 @@ func (m Model) viewInfo(width, height int) string {
 	body := m.infoContent(inner)
 	offset := m.info.offset
 	if m.info.mode == infoStats {
-		// The statistics scroll to wherever the highlighted category is,
-		// rather than remembering a position: the category *is* the
-		// position, so deriving it can't drift out of step with it. J past
-		// the bottom used to move a cursor you could no longer see.
+		// Kept by followStats as the highlight moves; checked again here,
+		// so a frame drawn before that — a resize, cards arriving — still
+		// shows the highlighted category. J past the bottom used to move a
+		// cursor you could no longer see.
 		offset = m.statScroll(offset, room, len(body))
 	}
 	// Scrolled with K and J from wherever you are — the panel is read, never

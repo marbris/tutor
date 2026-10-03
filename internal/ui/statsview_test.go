@@ -637,3 +637,37 @@ func TestTabOnATagSortsTheTagsByName(t *testing.T) {
 		t.Error("the tab hint shows off the tags")
 	}
 }
+
+func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
+	m := withCards(sized(90, 16), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	for i := 0; i < 12; i++ {
+		m = drive(m, "j")
+	}
+	bottom := m.info.offset
+	if bottom == 0 {
+		t.Fatal("walking down twelve categories never scrolled")
+	}
+	_, room, _, _ := m.infoSpan()
+	groups := m.statGroups()
+	line := statLine(groups, m.statCursor(groups))
+	// Up through the rows on screen: the view stays where it is.
+	for line-1 > bottom {
+		m = drive(m, "k")
+		groups = m.statGroups()
+		line = statLine(groups, m.statCursor(groups))
+		if line <= bottom {
+			break // a heading or gap passed; the next k reaches the edge
+		}
+		if m.info.offset != bottom {
+			t.Fatalf("k on line %d moved the view from %d to %d (room %d)", line, bottom, m.info.offset, room)
+		}
+	}
+	// Past the top edge it follows.
+	for i := 0; i < 12; i++ {
+		m = drive(m, "k")
+	}
+	if m.info.offset >= bottom {
+		t.Errorf("going on up never scrolled back (%d)", m.info.offset)
+	}
+}

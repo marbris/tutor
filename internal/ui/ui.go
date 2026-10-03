@@ -185,6 +185,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// in that order, here, rather than by every handler that could change it.
 	if updated, ok := next.(Model); ok {
 		updated.resortInclusion()
+		updated.followStats()
 		// And the picture gx put up is the one the terminal holds, at the
 		// size the panel now has room for.
 		synced, imgCmd := updated.syncImage()
