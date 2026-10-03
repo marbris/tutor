@@ -403,7 +403,7 @@ func (m Model) infoKeys(p *panel) [][2]string {
 		keys = append(keys, hint("back", keymap.Global, keymap.GlobalBack))
 	}
 	if m.info.mode == infoImage {
-		keys = append(keys, hint("older/newer printing", keymap.Global,
+		keys = append(keys, hint("older/newer artwork", keymap.Global,
 			keymap.GlobalPrintingOlder, keymap.GlobalPrintingNewer))
 	}
 	return append(keys,

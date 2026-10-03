@@ -56,7 +56,7 @@ func TestADoubleFacedCardShowsItsFront(t *testing.T) {
 
 func TestPrintsQueryAsksNewestFirst(t *testing.T) {
 	got := printsQuery(mtg.Card{Name: "Sol Ring", OracleID: "abc"})
-	want := "https://api.scryfall.com/cards/search?dir=desc&order=released&q=oracleid%3Aabc+unique%3Aprints"
+	want := "https://api.scryfall.com/cards/search?dir=desc&order=released&q=oracleid%3Aabc+unique%3Aart"
 	if got != want {
 		t.Errorf("got %s", got)
 	}
@@ -108,5 +108,42 @@ func TestPaperOnlyKeepsDigitalWhenThatIsAll(t *testing.T) {
 	arena := []mtg.Card{printing("ymid", "alchemy", func(c *mtg.Card) { c.Digital = true })}
 	if got := paperOnly(arena); len(got) != 1 {
 		t.Error("an Arena-only card lost its only printing")
+	}
+}
+
+func TestStartOpensOnTheListsOwnPrinting(t *testing.T) {
+	list := []mtg.Card{
+		printing("msc", "masters", func(c *mtg.Card) { c.ID, c.IllustrationID = "msc", "a1" }),
+		printing("clu", "expansion", func(c *mtg.Card) { c.ID, c.IllustrationID = "clu", "a2" }),
+	}
+	own := printing("msc", "masters", func(c *mtg.Card) { c.ID, c.IllustrationID = "msc", "a1" })
+	if _, at, ok := Start(list, own, "2026-10-02"); !ok || at != 0 {
+		t.Errorf("started at %d, want the card's own printing", at)
+	}
+}
+
+func TestStartPutsTheOwnPrintingInPlaceOfItsArtwork(t *testing.T) {
+	list := []mtg.Card{
+		printing("sld", "box", func(c *mtg.Card) { c.ID, c.IllustrationID = "sld", "a1" }),
+		printing("m10", "core", func(c *mtg.Card) { c.ID, c.IllustrationID = "m10", "a2" }),
+	}
+	own := printing("m11", "core", func(c *mtg.Card) { c.ID, c.IllustrationID = "m11", "a2" })
+	got, at, ok := Start(list, own, "2026-10-02")
+	if !ok || at != 1 || got[1].ID != "m11" {
+		t.Errorf("started at %d on %q, want m11 in m10's place", at, got[at].ID)
+	}
+	if list[1].ID != "m10" {
+		t.Error("Start changed the list it was given")
+	}
+}
+
+func TestStartFallsBackToTheMostNormalPrinting(t *testing.T) {
+	list := []mtg.Card{
+		printing("prm", "promo", func(c *mtg.Card) { c.Promo = true }),
+		printing("mir", "expansion", nil),
+	}
+	got, at, ok := Start(list, mtg.Card{Name: "Phyrexian Dreadnought"}, "2026-10-02")
+	if !ok || got[at].Set != "mir" {
+		t.Errorf("started on %q, want mir", got[at].Set)
 	}
 }

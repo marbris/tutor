@@ -74,9 +74,9 @@ const (
 	imgFailed
 )
 
-// cardPrintings is every printing of one card, newest first, and which of
-// them is up: the most normal one to start with, then wherever H and L
-// have taken it.
+// cardPrintings is one printing for each of a card's artworks, newest
+// first, and which of them is up: the card's own printing to start with,
+// then wherever H and L have taken it.
 type cardPrintings struct {
 	state imgState
 	// local is a load from disk, which is "loading", not "fetching".
@@ -164,7 +164,7 @@ func loadPrintings(c mtg.Card) (imageMsg, int) {
 	if err != nil {
 		return imageMsg{key: key, err: err}, size
 	}
-	at, ok := prints.PreferIndex(list, time.Now().Format("2006-01-02"))
+	list, at, ok := prints.Start(list, c, time.Now().Format("2006-01-02"))
 	if !ok {
 		return imageMsg{key: key, err: fmt.Errorf("no picture of %s", c.Name)}, size
 	}
@@ -289,7 +289,7 @@ func (m Model) shown() (*cardPrintings, mtg.Card, *picture) {
 	return cp, p, m.pictures[p.ID]
 }
 
-// stepPrinting is H and L in the printing view: an older printing of the
+// stepPrinting is H and L in the printing view: an older artwork of the
 // card, or a newer one. The list is newest first, so older is further on.
 func (m *Model) stepPrinting(older bool) tea.Cmd {
 	if m.info.mode != infoImage {
@@ -301,10 +301,10 @@ func (m *Model) stepPrinting(older bool) tea.Cmd {
 	}
 	switch {
 	case older && cp.at >= len(cp.list)-1:
-		m.notice = "that's the oldest printing"
+		m.notice = "that's the oldest artwork"
 		return nil
 	case !older && cp.at <= 0:
-		m.notice = "that's the newest printing"
+		m.notice = "that's the newest artwork"
 		return nil
 	case older:
 		cp.at++
@@ -368,13 +368,16 @@ func toPNG(raw []byte) ([]byte, int, int, error) {
 	return buf.Bytes(), b.Dx(), b.Dy(), nil
 }
 
-// openPrintingInBrowser finds the printing gx would show, and opens its
-// picture in the browser.
+// openPrintingInBrowser opens the picture of the printing gx would show —
+// the card's own — in the browser.
 func openPrintingInBrowser(c mtg.Card) tea.Cmd {
 	return func() tea.Msg {
-		p, err := prints.Preferred(c)
-		if err != nil {
-			return noticeMsg{err: err}
+		p := c
+		if p.Image("large") == "" {
+			var err error
+			if p, err = prints.Preferred(c); err != nil {
+				return noticeMsg{err: err}
+			}
 		}
 		if err := browser.Open(p.Image("large")); err != nil {
 			return noticeMsg{err: err}
@@ -535,7 +538,7 @@ func (m Model) infoImageLines(width int) []string {
 	lines = append(lines, "")
 	lines = append(lines, wrapStyled(caption, width, lipgloss.NewStyle().Foreground(theme.TextDim))...)
 	if len(cp.list) > 1 {
-		lines = append(lines, wrapStyled("printing "+itoa(cp.at+1)+" of "+itoa(len(cp.list))+", newest first", width, muted)...)
+		lines = append(lines, wrapStyled("artwork "+itoa(cp.at+1)+" of "+itoa(len(cp.list))+", newest first", width, muted)...)
 	}
 
 	if l := m.ws.current().cardsView(); l != nil {

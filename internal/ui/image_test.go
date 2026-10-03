@@ -159,7 +159,7 @@ func printingView(t *testing.T, width int) Model {
 func TestThePrintingViewShowsTheCardsDetailsUnderThePicture(t *testing.T) {
 	m := printingView(t, 160)
 	body := stripANSI(strings.Join(m.infoImageLines(40), "\n"))
-	for _, want := range []string{"Commander Masters (CMM) · 2023", "printing 2 of 3",
+	for _, want := range []string{"Commander Masters (CMM) · 2023", "artwork 2 of 3",
 		"ramp", "$1.50", "uncommon", "legal in", "commander", "rulings", "two colorless mana"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("%q is missing from the printing view:\n%s", want, body)

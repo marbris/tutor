@@ -41,6 +41,9 @@ type Card struct {
 	FullArt      bool      `json:"full_art"`
 	Variation    bool      `json:"variation"`
 	Games        []string  `json:"games"`
+	// IllustrationID names the artwork, which printings share when they
+	// reprint the same picture. A double-faced card has one per face.
+	IllustrationID string `json:"illustration_id"`
 
 	Name          string            `json:"name"`
 	ManaCost      string            `json:"mana_cost"`
@@ -74,7 +77,8 @@ type Face struct {
 	Toughness  string   `json:"toughness"`
 	Loyalty    string   `json:"loyalty"`
 	// A double-faced card has an image per face and none of its own.
-	ImageURIs ImageURIs `json:"image_uris"`
+	ImageURIs      ImageURIs `json:"image_uris"`
+	IllustrationID string    `json:"illustration_id"`
 }
 
 // ImageURIs are the sizes Scryfall renders a printing at.
@@ -102,6 +106,14 @@ func (c Card) Image(size string) string {
 		}
 	}
 	return ""
+}
+
+// Artwork is the printing's artwork, or its front face's.
+func (c Card) Artwork() string {
+	if c.IllustrationID != "" || len(c.CardFaces) == 0 {
+		return c.IllustrationID
+	}
+	return c.CardFaces[0].IllustrationID
 }
 
 // Faces returns a card's printed faces as cards in their own right, so

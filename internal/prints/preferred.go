@@ -107,7 +107,32 @@ func PreferIndex(printings []mtg.Card, today string) (int, bool) {
 	return 0, false
 }
 
-// printsQuery is the search for every printing of a card, newest first: by
+// Start is where the printing view opens on a card: the printing the list
+// holds. An unpinned card is the printing Scryfall itself shows for the
+// name, and a pinned one is the printing you chose. The list has one
+// printing per artwork, so when the printing held isn't the one standing for
+// its artwork, it takes that one's place. A list without its artwork — the
+// card came from somewhere that didn't say — falls back to Prefer.
+func Start(list []mtg.Card, own mtg.Card, today string) ([]mtg.Card, int, bool) {
+	for i, p := range list {
+		if own.ID != "" && p.ID == own.ID {
+			return list, i, true
+		}
+	}
+	if art := own.Artwork(); art != "" && own.Image("normal") != "" {
+		for i, p := range list {
+			if p.Artwork() == art {
+				out := append([]mtg.Card(nil), list...)
+				out[i] = own
+				return out, i, true
+			}
+		}
+	}
+	i, ok := PreferIndex(list, today)
+	return list, i, ok
+}
+
+// printsQuery is the search for every artwork of a card, newest first: by
 // its oracle id where it has one, which is exact, otherwise by exact name.
 func printsQuery(c mtg.Card) string {
 	q := fmt.Sprintf("!%q", c.Name)
@@ -115,7 +140,7 @@ func printsQuery(c mtg.Card) string {
 		q = "oracleid:" + c.OracleID
 	}
 	v := url.Values{}
-	v.Set("q", q+" unique:prints")
+	v.Set("q", q+" unique:art")
 	v.Set("order", "released")
 	v.Set("dir", "desc")
 	return "https://api.scryfall.com/cards/search?" + v.Encode()
@@ -125,9 +150,9 @@ func printsQuery(c mtg.Card) string {
 // prices in it change once a day.
 const printingsMaxAge = 24 * time.Hour
 
-// All is every paper printing of a card, newest first, and how many bytes
-// it took to find out — none, when the list kept from last time is still
-// good. MTGO's and Arena's own printings are left out — they aren't cards
+// All is a paper printing of each of a card's artworks, newest first, and
+// how many bytes it took to find out — none, when the list kept from last
+// time is still good. MTGO's and Arena's own printings are left out — they aren't cards
 // anyone holds — unless they are all the card has.
 func All(c mtg.Card) ([]mtg.Card, int, error) {
 	rel := filepath.Join("printings", diskcache.Key(printsQuery(c)))
@@ -200,7 +225,8 @@ func paperOnly(all []mtg.Card) []mtg.Card {
 	return paper
 }
 
-// Preferred finds the printing gx should show for a card.
+// Preferred finds the most normal printing of a card, for a card that
+// doesn't carry a printing of its own.
 func Preferred(c mtg.Card) (mtg.Card, error) {
 	list, _, err := All(c)
 	if err != nil {
