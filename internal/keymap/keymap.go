@@ -68,6 +68,7 @@ const (
 	// H and L only do anything while the printing view is up.
 	GlobalPrintingOlder Action = "printing.older"
 	GlobalPrintingNewer Action = "printing.newer"
+	GlobalPrintingFace  Action = "printing.face"
 	GlobalHelp          Action = "help"
 	GlobalBack          Action = "back"
 	GlobalClearFilter   Action = "clear-filters"
@@ -191,6 +192,7 @@ var defaults = []binding{
 	{Global, GlobalFetchSets, k("y")},
 	{Global, GlobalPrintingOlder, k("H")},
 	{Global, GlobalPrintingNewer, k("L")},
+	{Global, GlobalPrintingFace, k("f")},
 	{Global, GlobalStats, k("s")},
 	{Global, GlobalStatsEdit, k("S")},
 	{Global, GlobalHelp, k("?")},

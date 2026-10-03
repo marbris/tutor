@@ -256,6 +256,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.stepPrinting(true)
 	case keymap.GlobalPrintingNewer:
 		return m, m.stepPrinting(false)
+	case keymap.GlobalPrintingFace:
+		return m, m.flipPrinting()
 	case keymap.GlobalStats:
 		m.toggleStats(false)
 	case keymap.GlobalStatsEdit:

@@ -157,3 +157,23 @@ func TestSectionsAndPrecedenceAgree(t *testing.T) {
 		t.Error("nothing catches the types that match nothing")
 	}
 }
+
+func TestFaceImageIsEachSideOfADoubleFacedCard(t *testing.T) {
+	dfc := Card{CardFaces: []Face{
+		{Name: "Front", ImageURIs: ImageURIs{Normal: "f.jpg", BorderCrop: "fc.jpg"}},
+		{Name: "Back", ImageURIs: ImageURIs{Normal: "b.jpg", BorderCrop: "bc.jpg"}},
+	}}
+	if n := dfc.PictureFaces(); n != 2 {
+		t.Errorf("a double-faced card has %d pictures", n)
+	}
+	if got := dfc.FaceImage(1, "border_crop"); got != "bc.jpg" {
+		t.Errorf("back face is %q", got)
+	}
+	if got := dfc.FaceImage(0, "border_crop"); got != "fc.jpg" {
+		t.Errorf("front face is %q", got)
+	}
+	adventure := Card{ImageURIs: ImageURIs{Normal: "a.jpg"}, CardFaces: []Face{{Name: "Giant"}, {Name: "Stomp"}}}
+	if n := adventure.PictureFaces(); n != 1 {
+		t.Errorf("an adventure card has %d pictures", n)
+	}
+}

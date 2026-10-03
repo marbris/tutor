@@ -83,7 +83,9 @@ type cardPrintings struct {
 	local bool
 	list  []mtg.Card
 	at    int
-	err   error
+	// face is which side of a double-faced printing is up, for f.
+	face int
+	err  error
 }
 
 // current is the printing on show, if the list is in.
@@ -92,6 +94,23 @@ func (cp *cardPrintings) current() (mtg.Card, bool) {
 		return mtg.Card{}, false
 	}
 	return cp.list[cp.at], true
+}
+
+// pictureKey is what a picture is filed under: the printing, and for the
+// back of a double-faced card, which face.
+func pictureKey(id string, face int) string {
+	if face <= 0 {
+		return id
+	}
+	return id + "." + itoa(face)
+}
+
+// shownFace is the face on show of a printing, kept to the faces it has.
+func (cp *cardPrintings) shownFace(p mtg.Card) int {
+	if cp == nil || cp.face >= p.PictureFaces() {
+		return 0
+	}
+	return cp.face
 }
 
 // picture is one printing's picture, and how far along getting it is.
@@ -111,18 +130,20 @@ type kittyShown struct {
 }
 
 // imageMsg is a card's printings and the picture of the one chosen, fetched
-// together since the one is no use without the other.
+// together since the one is no use without the other — and its back, when
+// it has one, so f has it at once.
 type imageMsg struct {
 	key     string
 	list    []mtg.Card
 	at      int
 	picture picture
+	back    *picture
 	err     error
 }
 
-// pictureMsg is one printing's picture, for H and L.
+// pictureMsg is one picture of a printing, for H, L and f.
 type pictureMsg struct {
-	id      string
+	key     string
 	picture picture
 }
 
@@ -168,13 +189,19 @@ func loadPrintings(c mtg.Card) (imageMsg, int) {
 	if !ok {
 		return imageMsg{key: key, err: fmt.Errorf("no picture of %s", c.Name)}, size
 	}
-	pic, got := loadPicture(list[at])
-	return imageMsg{key: key, list: list, at: at, picture: pic}, size + got
+	pic, got := loadPicture(list[at], 0)
+	msg := imageMsg{key: key, list: list, at: at, picture: pic}
+	if list[at].PictureFaces() > 1 {
+		back, more := loadPicture(list[at], 1)
+		msg.back = &back
+		got += more
+	}
+	return msg, size + got
 }
 
-// loadPicture is one printing's picture, and the bytes downloaded for it.
-func loadPicture(p mtg.Card) (picture, int) {
-	data, w, h, got, err := printingPNG(p)
+// loadPicture is one picture of a printing, and the bytes downloaded for it.
+func loadPicture(p mtg.Card, face int) (picture, int) {
+	data, w, h, got, err := printingPNG(p, face)
 	if err != nil {
 		return picture{state: imgFailed, err: err}, got
 	}
@@ -198,20 +225,22 @@ func (m *Model) fetchImage(c mtg.Card) tea.Cmd {
 // keptOnDisk is prints.Kept, as a variable for the tests.
 var keptOnDisk = prints.Kept
 
-// fetchShown asks for the picture of the printing on show, if it isn't in
-// hand or on its way.
+// fetchShown asks for the picture on show, if it isn't in hand or on its
+// way.
 func (m *Model) fetchShown(cp *cardPrintings) tea.Cmd {
 	p, ok := cp.current()
 	if !ok {
 		return nil
 	}
-	if pic, ok := m.pictures[p.ID]; ok && pic.state != imgFailed {
+	face := cp.shownFace(p)
+	key := pictureKey(p.ID, face)
+	if pic, ok := m.pictures[key]; ok && pic.state != imgFailed {
 		return nil
 	}
-	m.pictures[p.ID] = &picture{state: imgFetching}
+	m.pictures[key] = &picture{state: imgFetching}
 	return func() tea.Msg {
-		pic, _ := loadPicture(p)
-		return pictureMsg{id: p.ID, picture: pic}
+		pic, _ := loadPicture(p, face)
+		return pictureMsg{key: key, picture: pic}
 	}
 }
 
@@ -265,12 +294,16 @@ func (m *Model) storeImage(msg imageMsg) {
 	}
 	m.images[msg.key] = &cardPrintings{state: imgReady, list: msg.list, at: msg.at}
 	pic := msg.picture
-	m.pictures[msg.list[msg.at].ID] = &pic
+	id := msg.list[msg.at].ID
+	m.pictures[id] = &pic
+	if msg.back != nil {
+		m.pictures[pictureKey(id, 1)] = msg.back
+	}
 }
 
 func (m Model) handlePicture(msg pictureMsg) (tea.Model, tea.Cmd) {
 	pic := msg.picture
-	m.pictures[msg.id] = &pic
+	m.pictures[msg.key] = &pic
 	return m, nil
 }
 
@@ -286,7 +319,31 @@ func (m Model) shown() (*cardPrintings, mtg.Card, *picture) {
 	if !ok {
 		return cp, mtg.Card{}, nil
 	}
-	return cp, p, m.pictures[p.ID]
+	return cp, p, m.pictures[pictureKey(p.ID, cp.shownFace(p))]
+}
+
+// shownKey is what the picture on show is filed under.
+func (m Model) shownKey() string {
+	cp, p, _ := m.shown()
+	return pictureKey(p.ID, cp.shownFace(p))
+}
+
+// canFlip reports whether f would turn the card on show over.
+func (m Model) canFlip() bool {
+	_, p, _ := m.shown()
+	return m.info.mode == infoImage && p.PictureFaces() > 1
+}
+
+// flipPrinting is f in the printing view: the other side of a double-faced
+// card. Stepping to another printing keeps the side, so you can walk the
+// backs.
+func (m *Model) flipPrinting() tea.Cmd {
+	if !m.canFlip() {
+		return nil
+	}
+	cp, p, _ := m.shown()
+	cp.face = (cp.shownFace(p) + 1) % p.PictureFaces()
+	return m.fetchShown(cp)
 }
 
 // stepPrinting is H and L in the printing view: an older artwork of the
@@ -324,13 +381,13 @@ func (m *Model) stepPrinting(older bool) tea.Cmd {
 // on a dark terminal. The cache keeps Scryfall's JPEG, not the PNG: a tenth
 // of the size, and turning one into the other takes about 50ms, off the
 // main loop and once a run per picture.
-var printingPNG = func(p mtg.Card) ([]byte, int, int, int, error) {
+var printingPNG = func(p mtg.Card, face int) ([]byte, int, int, int, error) {
 	dir := filepath.Join(paths.Cache(), "images")
-	jpg := filepath.Join(dir, p.ID+".crop.jpg")
+	jpg := filepath.Join(dir, pictureKey(p.ID, face)+".crop.jpg")
 	raw, err := os.ReadFile(jpg)
 	got := 0
 	if err != nil {
-		raw, err = fetch.GetFile(p.Image("border_crop"))
+		raw, err = fetch.GetFile(p.FaceImage(face, "border_crop"))
 		if err != nil {
 			return nil, 0, 0, 0, err
 		}
@@ -415,11 +472,11 @@ func (m Model) syncImage() (Model, tea.Cmd) {
 	want := kittyShown{}
 	var img *picture
 	if m.info.mode == infoImage {
-		if _, p, pic := m.shown(); pic != nil && pic.state == imgReady {
+		if _, _, pic := m.shown(); pic != nil && pic.state == imgReady {
 			if inner, room, _, ok := m.infoSpan(); ok {
 				cols, rows := imageFit(pic.w, pic.h, inner, room-imageCaptionRows, cellAspect())
 				if cols > 0 && rows > 0 && rows <= len(placeholderDiacritics) {
-					want = kittyShown{p.ID, cols, rows}
+					want = kittyShown{m.shownKey(), cols, rows}
 					img = pic
 				}
 			}
@@ -514,7 +571,7 @@ func (m Model) infoImageLines(width int) []string {
 		lines = wrapStyled("fetching the "+p.SetName+" printing…", width, muted)
 	case pic.state == imgFailed:
 		lines = wrapStyled("no picture: "+errorText(pic.err), width, muted)
-	case m.kitty.key != p.ID:
+	case m.kitty.key != m.shownKey():
 		lines = wrapStyled("drawing…", width, muted)
 	default:
 		lines = placeholderRows(m.kitty.cols, m.kitty.rows)
@@ -532,6 +589,9 @@ func (m Model) infoImageLines(width int) []string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, wrapStyled(caption, width, lipgloss.NewStyle().Foreground(theme.TextDim))...)
+	if cp.shownFace(p) > 0 {
+		lines = append(lines, wrapStyled("back face", width, muted)...)
+	}
 	if len(cp.list) > 1 {
 		lines = append(lines, wrapStyled("artwork "+itoa(cp.at+1)+" of "+itoa(len(cp.list))+", newest first", width, muted)...)
 	}

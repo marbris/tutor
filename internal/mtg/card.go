@@ -115,6 +115,24 @@ func (c Card) Image(size string) string {
 	return ""
 }
 
+// PictureFaces is how many pictures a printing has: one per face for a
+// card printed on both sides, one for everything else — split, flip and
+// adventure cards share one picture between their faces.
+func (c Card) PictureFaces() int {
+	if c.ImageURIs.Normal != "" || len(c.CardFaces) < 2 || c.CardFaces[1].ImageURIs.Normal == "" {
+		return 1
+	}
+	return len(c.CardFaces)
+}
+
+// FaceImage is Image for one face's picture, face 0 being the front.
+func (c Card) FaceImage(face int, size string) string {
+	if face <= 0 || face >= c.PictureFaces() {
+		return c.Image(size)
+	}
+	return Card{ImageURIs: c.CardFaces[face].ImageURIs}.Image(size)
+}
+
 // Artwork is the printing's artwork, or its front face's.
 func (c Card) Artwork() string {
 	if c.IllustrationID != "" || len(c.CardFaces) == 0 {

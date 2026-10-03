@@ -406,6 +406,9 @@ func (m Model) infoKeys(p *panel) [][2]string {
 		keys = append(keys, hint("older/newer artwork", keymap.Global,
 			keymap.GlobalPrintingOlder, keymap.GlobalPrintingNewer))
 	}
+	if m.canFlip() {
+		keys = append(keys, hint("other face", keymap.Global, keymap.GlobalPrintingFace))
+	}
 	return append(keys,
 		hint("stats", keymap.Global, keymap.GlobalStats),
 		hint("editing deck stats", keymap.Global, keymap.GlobalStatsEdit),

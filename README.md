@@ -26,7 +26,7 @@ You still can — Tutor reads from both. It just fixes the parts of that workflo
 
 - **Search and decklist, side by side.** Any number of panels in one window: several Scryfall searches, several decklists, the rules — all open at once, all keyboard-navigable.
 - **Add cards with a keystroke.** Scroll a search, press `a`, and the card lands in the deck you're editing. `x` takes it back out.
-- **The whole card, where you're looking.** Oracle text, rulings and legalities sit in the panel beside the list, not below a wall of buttons. `gx` swaps in the card's picture with its price, and `H`/`L` page through every printing it has had.
+- **The whole card, where you're looking.** Oracle text, rulings and legalities sit in the panel beside the list, not below a wall of buttons. `gx` swaps in the card's picture with its price, `H`/`L` page through every artwork it has had, and `f` turns a double-faced card over.
 - **Dense lists.** Rows instead of tiles, so you see more of a search at once. The art is a key away when you want it, not in the way when you don't.
 - **Tags that do the work.** Tag a whole theme in one stroke, or tag a deck by Scryfall's oracle tags. Keep tag lists whose tags count in every deck, and move tags from one list to another. Then filter, sort and count by them.
 - **Statistics you can drill into.** Filter a list by tag or category and watch the histograms recompute for exactly that subset, or ask the odds of each one turning up in your opening hand.
@@ -86,7 +86,7 @@ Open the statistics panel and walk the breakdown — tags, types, colours, the c
 
 ### The card as printed
 
-Press `gx` on a card to see it as printed: an ordinary printing, not a promo or a borderless showcase, in the info panel. Under the picture are the card's tags, its price in that printing, where it's legal and its rulings — `K`/`J` scroll down to them. `H` and `L` step to older and newer printings. The picture follows the cursor as you move, and `gX` fetches every card's picture in the list ahead of you, so walking it is instant. Tutor comes back to this view if you quit in it. In kitty, Ghostty and WezTerm it's drawn right in the terminal; anywhere else, `gx` opens it in your browser. `gx` on a Moxfield deck in the decks panel opens it on Moxfield.
+Press `gx` on a card to see it as printed, in the info panel: the printing your list holds, which is the one Scryfall shows unless you pinned another. Under the picture are the card's tags, its price in that printing, where it's legal and its rulings — `K`/`J` scroll down to them. `H` and `L` step to older and newer artworks, and `f` shows the other face of a double-faced card. The picture follows the cursor as you move, and `gX` fetches every card's picture in the list ahead of you, so walking it is instant. Tutor comes back to this view if you quit in it. In kitty, Ghostty and WezTerm it's drawn right in the terminal; anywhere else, `gx` opens it in your browser. `gx` on a Moxfield deck in the decks panel opens it on Moxfield.
 
 ![A search with the highlighted card's printing drawn in the info panel](screenshots/printing.png)
 
@@ -269,7 +269,8 @@ The bottom of the screen shows `?` and `q`. Press `?` and each panel shows its o
 | `j` `k` | up / down in the list |
 | `gg` `G` | first / last row |
 | `K` `J` | scroll the info panel half a screen |
-| `H` `L` | in the printing view: an older / newer printing |
+| `H` `L` | in the printing view: an older / newer artwork |
+| `f` | in the printing view: the other face of a double-faced card |
 | `b` `B` | clear this list's filters · clear every list's filters |
 | `space` | the menu · `?` show keys in the panels · `q` quit |
 

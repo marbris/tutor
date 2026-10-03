@@ -295,7 +295,7 @@ func TestPicturesAreTheBorderCropCachedAsTheJPEGScryfallSent(t *testing.T) {
 		Normal: srv.URL + "/normal.jpg", BorderCrop: srv.URL + "/crop.jpg"}}
 
 	for i, wantGot := range []int{jpg.Len(), 0} {
-		data, w, h, got, err := printingPNG(p)
+		data, w, h, got, err := printingPNG(p, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -351,5 +351,35 @@ func TestACardKeptOnDiskLoadsAtOnceAndSaysLoading(t *testing.T) {
 	}
 	if loaded != 1 {
 		t.Errorf("loaded %d times", loaded)
+	}
+}
+
+func TestFTurnsADoubleFacedCardOver(t *testing.T) {
+	m := printingView(t, 160)
+	if m.canFlip() {
+		t.Fatal("f offered on a single-faced card")
+	}
+	if m = drive(m, "f"); m.shownKey() != "mid" {
+		t.Errorf("f turned a single-faced card to %q", m.shownKey())
+	}
+
+	cp, _, _ := m.shown()
+	cp.list[1].CardFaces = []mtg.Face{
+		{Name: "Delver of Secrets", ImageURIs: mtg.ImageURIs{Normal: "f.jpg"}},
+		{Name: "Insectile Aberration", ImageURIs: mtg.ImageURIs{Normal: "b.jpg"}},
+	}
+	m.pictures["mid.1"] = &picture{state: imgReady, png: []byte("back"), w: 488, h: 680}
+	if !m.canFlip() {
+		t.Fatal("f not offered on a double-faced card")
+	}
+	m = drive(m, "f")
+	if m.shownKey() != "mid.1" || m.kitty.key != "mid.1" {
+		t.Errorf("f showed %q (terminal holds %q), want the back", m.shownKey(), m.kitty.key)
+	}
+	if body := stripANSI(strings.Join(m.infoImageLines(40), "\n")); !strings.Contains(body, "back face") {
+		t.Errorf("the caption doesn't say it's the back:\n%s", body)
+	}
+	if m = drive(m, "f"); m.shownKey() != "mid" {
+		t.Errorf("a second f showed %q, want the front again", m.shownKey())
 	}
 }
