@@ -382,6 +382,13 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 		out = append(out, "", lipgloss.NewStyle().MaxWidth(width).Render(line))
 	}
 
+	// What Scryfall Tagger says the card does: its own tags, not the
+	// families they belong to, in a colour apart from yours.
+	if tags := taggerData.Of(c.Card.OracleID); len(tags) > 0 {
+		out = append(out, "", head.Render(fit("scryfall tagger", width)))
+		out = append(out, wrapStyled(strings.Join(tags, " "), width, lipgloss.NewStyle().Foreground(theme.Info))...)
+	}
+
 	// EDHREC ranks the card, not the printing; a printing that doesn't carry
 	// the rank still has it.
 	if p.EDHRECRank == 0 {
