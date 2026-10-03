@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"ttr/internal/diskcache"
@@ -107,32 +108,57 @@ func PreferIndex(printings []mtg.Card, today string) (int, bool) {
 	return 0, false
 }
 
-// Start is where the printing view opens on a card: the printing the list
+// Start is the printing view's list for a card — one printing for each of
+// its artworks, newest first — and where it opens: on the printing the list
 // holds. An unpinned card is the printing Scryfall itself shows for the
-// name, and a pinned one is the printing you chose. The list has one
-// printing per artwork, so when the printing held isn't the one standing for
-// its artwork, it takes that one's place. A list without its artwork — the
-// card came from somewhere that didn't say — falls back to Prefer.
-func Start(list []mtg.Card, own mtg.Card, today string) ([]mtg.Card, int, bool) {
-	for i, p := range list {
-		if own.ID != "" && p.ID == own.ID {
-			return list, i, true
+// name, and a pinned one is the printing you chose.
+//
+// A reprint of the same picture is the same thing to look at, so each
+// artwork is shown once: by the printing held, where that is one of its
+// printings, and otherwise by its most normal printing (PreferIndex). The
+// printing held is found by id, so a card kept from before Scryfall's
+// artwork ids were read still finds itself. A printing that names no
+// artwork stands alone.
+func Start(printings []mtg.Card, own mtg.Card, today string) ([]mtg.Card, int, bool) {
+	var order []string
+	groups := map[string][]mtg.Card{}
+	for i, p := range printings {
+		art := p.Artwork()
+		if art == "" {
+			art = "#" + strconv.Itoa(i)
 		}
+		if groups[art] == nil {
+			order = append(order, art)
+		}
+		groups[art] = append(groups[art], p)
 	}
-	if art := own.Artwork(); art != "" && own.Image("normal") != "" {
-		for i, p := range list {
-			if p.Artwork() == art {
-				out := append([]mtg.Card(nil), list...)
-				out[i] = own
-				return out, i, true
+
+	var list []mtg.Card
+	at := -1
+	for _, art := range order {
+		group := groups[art]
+		pick := -1
+		for i, p := range group {
+			if own.ID != "" && p.ID == own.ID {
+				pick = i
+				at = len(list)
 			}
 		}
+		if pick < 0 {
+			pick, _ = PreferIndex(group, today)
+		}
+		list = append(list, group[pick])
 	}
-	i, ok := PreferIndex(list, today)
-	return list, i, ok
+	if at < 0 {
+		var ok bool
+		if at, ok = PreferIndex(list, today); !ok {
+			return list, 0, false
+		}
+	}
+	return list, at, true
 }
 
-// printsQuery is the search for every artwork of a card, newest first: by
+// printsQuery is the search for every printing of a card, newest first: by
 // its oracle id where it has one, which is exact, otherwise by exact name.
 func printsQuery(c mtg.Card) string {
 	q := fmt.Sprintf("!%q", c.Name)
@@ -140,7 +166,7 @@ func printsQuery(c mtg.Card) string {
 		q = "oracleid:" + c.OracleID
 	}
 	v := url.Values{}
-	v.Set("q", q+" unique:art")
+	v.Set("q", q+" unique:prints")
 	v.Set("order", "released")
 	v.Set("dir", "desc")
 	return "https://api.scryfall.com/cards/search?" + v.Encode()
@@ -150,12 +176,12 @@ func printsQuery(c mtg.Card) string {
 // prices in it change once a day.
 const printingsMaxAge = 24 * time.Hour
 
-// All is a paper printing of each of a card's artworks, newest first, and
-// how many bytes it took to find out — none, when the list kept from last
+// All is every paper printing of a card, newest first, and how many bytes
+// it took to find out — none, when the list kept from last
 // time is still good. MTGO's and Arena's own printings are left out — they aren't cards
 // anyone holds — unless they are all the card has.
 func All(c mtg.Card) ([]mtg.Card, int, error) {
-	rel := filepath.Join("printings", diskcache.Key(printsQuery(c)))
+	rel := printingsFile(c)
 	var kept []mtg.Card
 	fresh, have := diskcache.Load(rel, printingsMaxAge, &kept)
 	if fresh && len(kept) > 0 {
@@ -177,7 +203,13 @@ func All(c mtg.Card) ([]mtg.Card, int, error) {
 // asking Scryfall. It only looks at the file, so it is cheap enough to ask
 // on every move of the cursor.
 func Kept(c mtg.Card) bool {
-	return diskcache.Fresh(filepath.Join("printings", diskcache.Key(printsQuery(c))), printingsMaxAge)
+	return diskcache.Fresh(printingsFile(c), printingsMaxAge)
+}
+
+// printingsFile is where a card's printings are kept. The "2" is the lists
+// that carry each printing's artwork; the lists from before didn't.
+func printingsFile(c mtg.Card) string {
+	return filepath.Join("printings", diskcache.Key("2 "+printsQuery(c)))
 }
 
 // fetchAll is All, asked of Scryfall.

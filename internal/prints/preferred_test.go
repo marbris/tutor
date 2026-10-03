@@ -1,6 +1,7 @@
 package prints
 
 import (
+	"strings"
 	"testing"
 
 	"ttr/internal/mtg"
@@ -56,7 +57,7 @@ func TestADoubleFacedCardShowsItsFront(t *testing.T) {
 
 func TestPrintsQueryAsksNewestFirst(t *testing.T) {
 	got := printsQuery(mtg.Card{Name: "Sol Ring", OracleID: "abc"})
-	want := "https://api.scryfall.com/cards/search?dir=desc&order=released&q=oracleid%3Aabc+unique%3Aart"
+	want := "https://api.scryfall.com/cards/search?dir=desc&order=released&q=oracleid%3Aabc+unique%3Aprints"
 	if got != want {
 		t.Errorf("got %s", got)
 	}
@@ -111,29 +112,43 @@ func TestPaperOnlyKeepsDigitalWhenThatIsAll(t *testing.T) {
 	}
 }
 
-func TestStartOpensOnTheListsOwnPrinting(t *testing.T) {
-	list := []mtg.Card{
-		printing("msc", "masters", func(c *mtg.Card) { c.ID, c.IllustrationID = "msc", "a1" }),
-		printing("clu", "expansion", func(c *mtg.Card) { c.ID, c.IllustrationID = "clu", "a2" }),
+func TestStartShowsEachArtworkOnceAndOpensOnTheOwnPrinting(t *testing.T) {
+	art := func(set, id, illus string, edit func(*mtg.Card)) mtg.Card {
+		return printing(set, "expansion", func(c *mtg.Card) {
+			c.ID, c.IllustrationID = id, illus
+			if edit != nil {
+				edit(c)
+			}
+		})
 	}
-	own := printing("msc", "masters", func(c *mtg.Card) { c.ID, c.IllustrationID = "msc", "a1" })
-	if _, at, ok := Start(list, own, "2026-10-02"); !ok || at != 0 {
-		t.Errorf("started at %d, want the card's own printing", at)
+	newestFirst := []mtg.Card{
+		art("sld", "sld", "a1", nil),
+		art("plst", "plst", "a2", nil),
+		art("m11", "m11", "a2", nil),
+		art("m10", "m10", "a2", nil),
+		art("lea", "lea", "a3", nil),
+	}
+	// Held: M10. Its artwork shows as M10; the others by their most normal.
+	list, at, ok := Start(newestFirst, mtg.Card{ID: "m10"}, "2026-10-02")
+	var got []string
+	for _, p := range list {
+		got = append(got, p.ID)
+	}
+	if !ok || strings.Join(got, " ") != "sld m10 lea" || at != 1 {
+		t.Errorf("got %v at %d, want [sld m10 lea] at 1", got, at)
+	}
+	// Held: none of them. The artwork group is shown by its most normal.
+	list, _, _ = Start(newestFirst, mtg.Card{ID: "elsewhere"}, "2026-10-02")
+	if list[1].ID != "m11" {
+		t.Errorf("artwork a2 shown by %q, want m11 (plst is The List)", list[1].ID)
 	}
 }
 
-func TestStartPutsTheOwnPrintingInPlaceOfItsArtwork(t *testing.T) {
-	list := []mtg.Card{
-		printing("sld", "box", func(c *mtg.Card) { c.ID, c.IllustrationID = "sld", "a1" }),
-		printing("m10", "core", func(c *mtg.Card) { c.ID, c.IllustrationID = "m10", "a2" }),
-	}
-	own := printing("m11", "core", func(c *mtg.Card) { c.ID, c.IllustrationID = "m11", "a2" })
-	got, at, ok := Start(list, own, "2026-10-02")
-	if !ok || at != 1 || got[1].ID != "m11" {
-		t.Errorf("started at %d on %q, want m11 in m10's place", at, got[at].ID)
-	}
-	if list[1].ID != "m10" {
-		t.Error("Start changed the list it was given")
+func TestStartKeepsPrintingsWithoutAnArtworkApart(t *testing.T) {
+	list, _, _ := Start([]mtg.Card{printing("a", "core", nil), printing("b", "core", nil)},
+		mtg.Card{}, "2026-10-02")
+	if len(list) != 2 {
+		t.Errorf("%d printings without artwork ids, want both kept", len(list))
 	}
 }
 
