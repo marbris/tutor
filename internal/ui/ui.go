@@ -172,6 +172,9 @@ func (m Model) Init() tea.Cmd {
 	if rules.Cached() {
 		cmds = append(cmds, loadRules)
 	}
+	// Tagger's tags are asked for every time: they're read from disk while
+	// they're under a week old, and only then downloaded.
+	cmds = append(cmds, loadTagger)
 	return tea.Batch(cmds...)
 }
 
@@ -298,6 +301,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case rulingsMsg:
 		return m.handleRulings(msg)
+
+	case taggerMsg:
+		if msg.data != nil {
+			taggerData = msg.data
+		}
+		return m, nil
 
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)
