@@ -3,11 +3,13 @@ package ui
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"strings"
 	"testing"
 
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
+	"ttr/internal/stats"
 	"ttr/internal/tagger"
 )
 
@@ -28,9 +30,9 @@ func withTagger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old := taggerData
-	taggerData = d
-	t.Cleanup(func() { taggerData = old })
+	old := tagger.Current()
+	tagger.SetCurrent(d)
+	t.Cleanup(func() { tagger.SetCurrent(old) })
 }
 
 func TestTabCompletesAnOracleTagInTheSearchBar(t *testing.T) {
@@ -90,5 +92,58 @@ func TestTheInfoPanelShowsTheCardsTaggerTags(t *testing.T) {
 	plain := deck.Card{Card: mtg.Card{Name: "Island", OracleID: "island"}}
 	if body := stripANSI(strings.Join(cardMeta(plain, plain.Card, 40, nil, nil), "\n")); strings.Contains(body, "scryfall tagger") {
 		t.Errorf("a card Tagger hasn't tagged has a tagger heading:\n%s", body)
+	}
+}
+
+func taggedCards() []deck.Card {
+	var out []deck.Card
+	for _, id := range []string{"shatter", "disenchant", "sol", "island"} {
+		out = append(out, deck.Card{Qty: 1, Card: mtg.Card{Name: id, OracleID: id, TypeLine: "Instant"}})
+	}
+	return out
+}
+
+func TestEnterOpensATaggerTagInTheStatistics(t *testing.T) {
+	withTagger(t)
+	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
+	m = drive(m, "s")
+	if r, _ := m.statUnder(); r.Group != stats.TaggerGroup || r.Label != "removal" {
+		t.Fatalf("the statistics open on %s/%s, want the Tagger group's removal", r.Group, r.Label)
+	}
+	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "show the tags under it") {
+		t.Error("enter isn't offered on removal")
+	}
+	m = drive(m, "enter")
+	body := stripANSI(strings.Join(m.renderStats(60), "\n"))
+	if !strings.Contains(body, "▾ removal") || !strings.Contains(body, "    removal-artifact") {
+		t.Errorf("removal didn't open:\n%s", body)
+	}
+	m = drive(m, "j", "a")
+	l := m.ws.current().cardsView()
+	if len(l.rows) != 2 {
+		t.Errorf("filtering by removal-artifact left %d cards, want 2", len(l.rows))
+	}
+	m = drive(m, "k", "enter")
+	if body := stripANSI(strings.Join(m.renderStats(60), "\n")); strings.Contains(body, "removal-enchantment") {
+		t.Errorf("a second enter didn't close removal:\n%s", body)
+	}
+}
+
+func TestATaggerFilterFromLastSessionWorksOnceTheTagsArrive(t *testing.T) {
+	withTagger(t)
+	d := tagger.Current()
+	tagger.SetCurrent(nil)
+
+	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
+	l := m.ws.current().cardsView()
+	ps := panelSession{Stats: []savedClause{{Op: "and", Group: stats.TaggerGroup, Label: "removal", Path: "removal"}}}
+	ps.applyLayout(l)
+	if len(l.statFilter) != 1 {
+		t.Fatal("the Tagger category wasn't restored")
+	}
+	next, _ := m.Update(taggerMsg{data: d})
+	m = next.(Model)
+	if n := len(m.ws.current().cardsView().rows); n != 2 {
+		t.Errorf("%d cards after the tags arrived, want the 2 removal spells", n)
 	}
 }

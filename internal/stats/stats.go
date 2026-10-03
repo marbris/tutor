@@ -29,6 +29,12 @@ type Row struct {
 	Base  int    // over the whole result set — whether the row exists at all
 	Color lipgloss.Color
 	Match func(deck.Card) bool
+
+	// A row in a tree — the Scryfall Tagger group — has a Path naming it
+	// from the top, how deep it sits, and whether it has rows under it.
+	Path       string
+	Depth      int
+	Expandable bool
 }
 
 type Group struct {
@@ -39,7 +45,7 @@ type Group struct {
 // same reports whether two rows name the same category. The rows carry
 // closures, so they can't be compared directly.
 func (r Row) Same(other *Row) bool {
-	return other != nil && r.Group == other.Group && r.Label == other.Label
+	return other != nil && r.Group == other.Group && r.Label == other.Label && r.Path == other.Path
 }
 
 // ── Building the rows ───────────────────────────────────────────
@@ -372,9 +378,9 @@ func copies(e deck.Card) int {
 }
 
 // Groups builds the category list from rowSource and counts it over
-// counted, the tags commonest first. See GroupsBy.
+// counted, the tags commonest first and Tagger's closed. See GroupsBy.
 func Groups(rowSource, counted []deck.Card) []Group {
-	return GroupsBy(rowSource, counted, false)
+	return GroupsBy(rowSource, counted, false, nil)
 }
 
 // ordered are the groups whose rows have an order of their own — the curve
@@ -382,6 +388,8 @@ func Groups(rowSource, counted []deck.Card) []Group {
 // rest are just names, and the biggest leads.
 var ordered = map[string]bool{
 	"Mana Value (excl. lands)": true, "Price (USD)": true, "Rarity": true,
+	// A tree, ordered level by level as it's built.
+	TaggerGroup: true,
 }
 
 // GroupsBy builds the category list from rowSource and counts it over
@@ -393,11 +401,15 @@ var ordered = map[string]bool{
 // tagsByName puts the tags in alphabetical order rather than commonest
 // first: tags tend to come in families — otag-removal, otag-ramp — which
 // read better side by side.
-func GroupsBy(rowSource, counted []deck.Card, tagsByName bool) []Group {
+//
+// openTags is the Scryfall Tagger rows opened to show their children, by
+// path.
+func GroupsBy(rowSource, counted []deck.Card, tagsByName bool, openTags map[string]bool) []Group {
 	// Most telling first: what the deck's author called their cards, then
 	// what those cards are, and the printing details last.
 	groups := []Group{
 		{Title: "Tags", Rows: tagRows(rowSource)},
+		{Title: TaggerGroup, Rows: taggerRows(rowSource, openTags)},
 		{Title: "Type", Rows: typeRows()},
 		{Title: "Color (excl. lands)", Rows: colorRows()},
 		{Title: "Mana Value (excl. lands)", Rows: cmcRows()},

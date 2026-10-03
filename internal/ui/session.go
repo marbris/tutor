@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -56,6 +57,8 @@ type savedClause struct {
 	Op    string `json:"op"`
 	Group string `json:"group"`
 	Label string `json:"label"`
+	// Path is a Scryfall Tagger row's place in the tree.
+	Path string `json:"path,omitempty"`
 }
 
 type session struct {
@@ -68,6 +71,8 @@ type session struct {
 	LastTag string `json:"lastTag,omitempty"`
 	// TagsByName is the statistics' tags in alphabetical order (tab).
 	TagsByName bool `json:"tagsByName,omitempty"`
+	// OpenTags is the Scryfall Tagger rows opened in the statistics.
+	OpenTags []string `json:"openTags,omitempty"`
 	// Info is the information panel's view, when it is one worth coming
 	// back to: "printing" for gx's. The others are put up for a moment —
 	// the statistics are s away, a printed history is about one card.
@@ -93,6 +98,10 @@ func loadSession() session {
 // cost more.
 func (m Model) saveSession() {
 	s := session{Focused: m.ws.focused, Editing: -1, LastTag: m.lastTag, TagsByName: m.stats.tagsByName}
+	for path := range m.stats.openTags {
+		s.OpenTags = append(s.OpenTags, path)
+	}
+	sort.Strings(s.OpenTags)
 	if m.info.mode == infoImage {
 		s.Info = infoImage.String()
 	}
@@ -166,6 +175,12 @@ func (m *Model) restore() tea.Cmd {
 
 	m.lastTag = s.LastTag
 	m.stats.tagsByName = s.TagsByName
+	if len(s.OpenTags) > 0 {
+		m.stats.openTags = map[string]bool{}
+		for _, path := range s.OpenTags {
+			m.stats.openTags[path] = true
+		}
+	}
 	if s.Info == infoImage.String() && kittyGraphics() {
 		m.info.mode = infoImage
 	}
@@ -244,7 +259,7 @@ func (ps *panelSession) keepLayout(l *cardList) {
 	}
 	ps.Filter = l.filter
 	for _, cl := range l.statFilter {
-		ps.Stats = append(ps.Stats, savedClause{Op: opName(cl.Op), Group: cl.Row.Group, Label: cl.Row.Label})
+		ps.Stats = append(ps.Stats, savedClause{Op: opName(cl.Op), Group: cl.Row.Group, Label: cl.Row.Label, Path: cl.Row.Path})
 	}
 }
 
@@ -263,6 +278,12 @@ func (ps *panelSession) applyLayout(l *cardList) {
 	if len(ps.Stats) > 0 {
 		groups := stats.Groups(l.all, l.all)
 		for _, sc := range ps.Stats {
+			// A Tagger row is found by its path, opened or not, and whether
+			// or not the tags are in yet: it asks for them as it matches.
+			if sc.Group == stats.TaggerGroup && sc.Path != "" {
+				l.statFilter, _ = l.statFilter.Add(parseOp(sc.Op), stats.TaggerRow(sc.Path))
+				continue
+			}
 			if r, ok := findRow(groups, sc.Group, sc.Label); ok {
 				l.statFilter, _ = l.statFilter.Add(parseOp(sc.Op), r)
 			}

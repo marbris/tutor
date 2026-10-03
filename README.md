@@ -76,7 +76,7 @@ Narrow a list with `/`, select what's left with `V`, and tag them together with 
 
 ### Statistics that answer questions
 
-Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Tags, types and colours lead with the commonest; on a tag, `tab` sorts the tags by name instead, which keeps families like `otag-…` together. Build a filter from the categories with AND (`a`), OR (`o`) and NOT (`n`) — *ramp and not lands*, *removal or counterspells* — and the list and the histograms narrow to that subset as you go. Moxfield shows you stats; here you can interrogate them.
+Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Tags, types and colours lead with the commonest; on a tag, `tab` sorts the tags by name instead, which keeps families like `otag-…` together. A *Scryfall Tagger* group counts what [Scryfall Tagger](https://tagger.scryfall.com/) says the cards do, kept apart from your own tags: the families first — removal, ramp, card advantage — and `enter` opens one to show the tags under it, each with its own bar. The info panel lists each card's Tagger tags too, and in a Scryfall search `tab` after `otag:` completes the tag. The tags download once a week, about 6 MB. Build a filter from the categories with AND (`a`), OR (`o`) and NOT (`n`) — *ramp and not lands*, *removal or counterspells* — and the list and the histograms narrow to that subset as you go. Moxfield shows you stats; here you can interrogate them.
 
 ![The statistics panel: histograms of the deck, filtered to a combination of categories](screenshots/stats-filter.png)
 

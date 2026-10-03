@@ -303,10 +303,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRulings(msg)
 
 	case taggerMsg:
-		if msg.data != nil {
-			taggerData = msg.data
-		}
-		return m, nil
+		return m.handleTagger(msg)
 
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)

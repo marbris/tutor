@@ -442,6 +442,13 @@ func (m Model) statsHints() [][2]string {
 		}
 		keys = append(keys, hint(order, keymap.Stats, keymap.StatsTagOrder))
 	}
+	if branch, open := m.onBranch(); branch {
+		what := "show the tags under it"
+		if open {
+			what = "hide the tags under it"
+		}
+		keys = append(keys, hint(what, keymap.Stats, keymap.StatsExpand))
+	}
 	return keys
 }
 

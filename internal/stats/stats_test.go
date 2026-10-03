@@ -191,7 +191,7 @@ func TestNamedGroupsLeadWithTheCommonestAndOrderedOnesKeepTheirOrder(t *testing.
 			t.Errorf("%s = %q, want %q", title, got, want)
 		}
 	}
-	byName := GroupsBy(entries, entries, true)
+	byName := GroupsBy(entries, entries, true, nil)
 	if got := strings.Join(labels(byName, "Tags"), " "); got != "a-wincon b-tribe otag-ramp untagged" {
 		t.Errorf("tags by name = %q", got)
 	}

@@ -35,6 +35,9 @@ type statsState struct {
 	// or swapped for another list's; when the name isn't there any more it
 	// falls back to the first row.
 	group, label string
+	// path is the highlighted row's place in the Scryfall Tagger tree,
+	// where the same tag can sit under two parents.
+	path string
 	// top is the group drawn first. J and K turn the order over, so the
 	// group you want to read sits at the top rather than off the bottom.
 	top string
@@ -46,11 +49,13 @@ type statsState struct {
 	// tagsByName is tab on a tag: the tags alphabetical rather than
 	// commonest first.
 	tagsByName bool
+	// openTags is the Scryfall Tagger rows opened with enter, by path.
+	openTags map[string]bool
 }
 
 // groupOrder is the order the groups are drawn in before J or K turns it.
 var groupOrder = []string{
-	"Tags", "Type", "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)",
+	"Tags", stats.TaggerGroup, "Type", "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)",
 }
 
 const maxOdds = 4
@@ -70,7 +75,7 @@ func statRows(groups []stats.Group) []stats.Row {
 // reads zero rather than vanishing under the cursor.
 func (m Model) statGroups() []stats.Group {
 	counted, source := m.statCards()
-	return rotateGroups(stats.GroupsBy(source, counted, m.stats.tagsByName), m.stats.top)
+	return rotateGroups(stats.GroupsBy(source, counted, m.stats.tagsByName, m.stats.openTags), m.stats.top)
 }
 
 // rotateGroups turns the groups over so top comes first, the rest following
@@ -130,7 +135,7 @@ func (m Model) statList() *cardList {
 // as drawn — the first row when the highlight names one that isn't there.
 func (m Model) statCursor(groups []stats.Group) int {
 	for i, r := range statRows(groups) {
-		if r.Group == m.stats.group && r.Label == m.stats.label {
+		if r.Group == m.stats.group && r.Label == m.stats.label && r.Path == m.stats.path {
 			return i
 		}
 	}
@@ -139,11 +144,12 @@ func (m Model) statCursor(groups []stats.Group) int {
 
 // statUnder is the highlighted category, if there's anything to highlight.
 func (m Model) statUnder() (stats.Row, bool) {
-	rows := statRows(m.statGroups())
+	groups := m.statGroups()
+	rows := statRows(groups)
 	if len(rows) == 0 {
 		return stats.Row{}, false
 	}
-	return rows[m.statCursor(m.statGroups())], true
+	return rows[m.statCursor(groups)], true
 }
 
 // onTags reports whether the highlight is on a tag, where tab reorders them.
@@ -153,7 +159,35 @@ func (m Model) onTags() bool {
 }
 
 func (m *Model) pointAt(r stats.Row) {
-	m.stats.group, m.stats.label = r.Group, r.Label
+	m.stats.group, m.stats.label, m.stats.path = r.Group, r.Label, r.Path
+}
+
+// onBranch reports whether the highlight is on a Scryfall Tagger row with
+// rows under it, and whether they are showing.
+func (m Model) onBranch() (branch, open bool) {
+	r, ok := m.statUnder()
+	if !ok || !r.Expandable {
+		return false, false
+	}
+	return true, m.stats.openTags[r.Path]
+}
+
+// toggleBranch is enter on a Scryfall Tagger row: its children shown under
+// it, or put away again.
+func (m *Model) toggleBranch() bool {
+	r, ok := m.statUnder()
+	if !ok || !r.Expandable {
+		return false
+	}
+	if m.stats.openTags == nil {
+		m.stats.openTags = map[string]bool{}
+	}
+	if m.stats.openTags[r.Path] {
+		delete(m.stats.openTags, r.Path)
+	} else {
+		m.stats.openTags[r.Path] = true
+	}
+	return true
 }
 
 // moveStat walks the categories. Only moving; nothing narrows until you add.
@@ -188,7 +222,7 @@ func (m *Model) moveStat(delta int) {
 // the top, K the one before. The highlight goes with it, to the new top.
 func (m *Model) rotateStat(delta int) {
 	counted, source := m.statCards()
-	groups := stats.GroupsBy(source, counted, m.stats.tagsByName)
+	groups := stats.GroupsBy(source, counted, m.stats.tagsByName, m.stats.openTags)
 	if len(groups) == 0 {
 		return
 	}
@@ -325,6 +359,11 @@ func (m *Model) statsKey(key string) bool {
 		m.stepOdds(-1)
 	case keymap.StatsClose:
 		m.info.mode = infoCard
+	case keymap.StatsExpand:
+		// Only on a tag with tags under it.
+		if !m.toggleBranch() {
+			return false
+		}
 	case keymap.StatsTagOrder:
 		// Only on a tag: elsewhere tab would reorder rows you can't see.
 		if !m.onTags() {
@@ -464,7 +503,7 @@ func (m Model) renderStats(width int) []string {
 	labelWidth := 0
 	for _, g := range groups {
 		for _, r := range g.Rows {
-			if w := textWidth(r.Label); w > labelWidth {
+			if w := textWidth(m.statLabel(r)); w > labelWidth {
 				labelWidth = w
 			}
 		}
@@ -491,7 +530,7 @@ func (m Model) renderStats(width int) []string {
 		}
 		out = append(out, head.Render(fit(g.Title, width)))
 		for _, r := range g.Rows {
-			bar := statBar{row: r, under: at == cursor, mark: statMark(expr, r),
+			bar := statBar{row: r, label: m.statLabel(r), under: at == cursor, mark: statMark(expr, r),
 				labelWidth: labelWidth, barWidth: barWidth, countWidth: countWidth}
 			if m.stats.odds > 0 {
 				bar.fraction = statOdds(r, pop, m.stats.odds)
@@ -517,6 +556,22 @@ func (m Model) renderStats(width int) []string {
 	return out
 }
 
+// statLabel is a row's name as drawn. A row in the Tagger tree is indented
+// by its depth, with ▸ on a tag that has tags under it and ▾ once they show.
+func (m Model) statLabel(r stats.Row) string {
+	if r.Group != stats.TaggerGroup || r.Label == "untagged" {
+		return r.Label
+	}
+	mark := "  "
+	if r.Expandable {
+		mark = "▸ "
+		if m.stats.openTags[r.Path] {
+			mark = "▾ "
+		}
+	}
+	return strings.Repeat("  ", r.Depth) + mark + r.Label
+}
+
 // statMark is the and/or beside a category that's part of the narrowing.
 // The gutter is one cell, so and-not is its ¬ alone — the and goes without
 // saying there — where the header, with room, writes ∧¬ in full. Two cells
@@ -537,6 +592,7 @@ func statMark(expr stats.Expr, r stats.Row) string {
 
 type statBar struct {
 	row                              stats.Row
+	label                            string
 	under                            bool
 	mark                             string
 	fraction                         float64
@@ -552,7 +608,7 @@ func (b statBar) render() string {
 	filled = min(filled, b.barWidth)
 
 	full, empty := strings.Repeat("█", filled), strings.Repeat("─", maxInt(b.barWidth-filled, 0))
-	label, value := fit(b.row.Label, b.labelWidth), pad(b.value, b.countWidth)
+	label, value := fit(b.label, b.labelWidth), pad(b.value, b.countWidth)
 
 	if b.under {
 		// The highlight is the bar's own colour, run under the whole row,

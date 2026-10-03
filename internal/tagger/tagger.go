@@ -54,6 +54,17 @@ type Data struct {
 	has map[string]map[int]bool
 }
 
+// current is the tags in use, once they are in.
+var current *Data
+
+// Current is the tags in use: nil until they have been loaded, or when there
+// were none to be had. Everything that shows them asks here, at the moment
+// it shows them, so whatever was drawn before they arrived fills in after.
+func Current() *Data { return current }
+
+// SetCurrent puts a set of tags in use.
+func SetCurrent(d *Data) { current = d }
+
 // BulkURL is where Scryfall says the current bulk file is. A variable, for
 // the tests.
 var BulkURL = "https://api.scryfall.com/bulk-data/oracle-tags"
@@ -222,8 +233,13 @@ func (d *Data) Find(label string) (int, bool) {
 
 // Has reports whether a card has a tag: the tag itself, or any tag under it.
 func (d *Data) Has(oracleID string, tag int) bool {
+	return d.Closure(oracleID)[tag]
+}
+
+// Closure is every tag a card has: its own, and every tag above them.
+func (d *Data) Closure(oracleID string) map[int]bool {
 	if d == nil {
-		return false
+		return nil
 	}
 	set, ok := d.has[oracleID]
 	if !ok {
@@ -235,7 +251,7 @@ func (d *Data) Has(oracleID string, tag int) bool {
 		}
 		d.has[oracleID] = set
 	}
-	return set[tag]
+	return set
 }
 
 // ancestry is a tag and every tag above it. The tree is a tree by intent;

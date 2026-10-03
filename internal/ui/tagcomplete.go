@@ -4,6 +4,8 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"ttr/internal/tagger"
 )
 
 // Tab completion in the tag prompt, and of otag: in a Scryfall search.
@@ -153,7 +155,7 @@ func otagWord(value string) (before, word string, ok bool) {
 // canCompleteOtag reports whether tab in the search bar would complete an
 // oracle tag rather than change the bar's target.
 func (m Model) canCompleteOtag(p *panel) bool {
-	if p.kind != KindFind || taggerData == nil {
+	if p.kind != KindFind || tagger.Current() == nil {
 		return false
 	}
 	_, _, ok := otagWord(p.search.Value())
@@ -170,7 +172,7 @@ func (m *Model) completeOtag(p *panel, delta int) {
 		p.search.CursorEnd()
 		return p.search.Value()
 	}
-	m.complete(&p.otagComp, value, set, delta, before, word, taggerData.Labels(""))
+	m.complete(&p.otagComp, value, set, delta, before, word, tagger.Current().Labels(""))
 }
 
 // setAsk replaces what the prompt holds, the cursor at the end of it.

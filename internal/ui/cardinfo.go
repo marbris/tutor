@@ -10,6 +10,7 @@ import (
 	"ttr/internal/mtg"
 	"ttr/internal/rules"
 	"ttr/internal/stats"
+	"ttr/internal/tagger"
 	"ttr/internal/theme"
 )
 
@@ -384,7 +385,7 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 
 	// What Scryfall Tagger says the card does: its own tags, not the
 	// families they belong to, in a colour apart from yours.
-	if tags := taggerData.Of(c.Card.OracleID); len(tags) > 0 {
+	if tags := tagger.Current().Of(c.Card.OracleID); len(tags) > 0 {
 		out = append(out, "", head.Render(fit("scryfall tagger", width)))
 		out = append(out, wrapStyled(strings.Join(tags, " "), width, lipgloss.NewStyle().Foreground(theme.Info))...)
 	}
