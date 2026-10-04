@@ -180,10 +180,28 @@ func TestAddingCategoriesFoldsAndAndOr(t *testing.T) {
 	if l.count() != 2 {
 		t.Errorf("creatures ∧ 1: %d cards", l.count())
 	}
-	// b clears the rest.
-	m = drive(m, "b")
+	// X clears the rest: x, only more.
+	m = drive(m, "X")
 	if len(l.statFilter) != 0 || l.count() != 6 {
-		t.Errorf("b left %q, %d cards", l.statFilter.String(), l.count())
+		t.Errorf("X left %q, %d cards", l.statFilter.String(), l.count())
+	}
+}
+
+func TestBInTheStatisticsClearsBothFilters(t *testing.T) {
+	// The statistics leave b to the list: it clears the text filter and the
+	// categories together, as it does with the statistics closed.
+	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
+	l := m.ws.current().cardsView()
+	m = drive(m, "/", "e", "l", "enter", "s", "a")
+	if l.filter == "" || len(l.statFilter) == 0 {
+		t.Fatal("not narrowed both ways")
+	}
+	m = drive(m, "b")
+	if l.filter != "" || len(l.statFilter) != 0 {
+		t.Errorf("b left the filter %q and the categories %q", l.filter, l.statFilter.String())
+	}
+	if m.info.mode != infoStats {
+		t.Error("b closed the statistics")
 	}
 }
 

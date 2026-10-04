@@ -264,7 +264,7 @@ var defaults = []binding{
 	{Stats, StatsOr, k("o")},
 	{Stats, StatsNot, k("n")},
 	{Stats, StatsDrop, k("x")},
-	{Stats, StatsClear, k("b")},
+	{Stats, StatsClear, k("X")},
 	{Stats, StatsOddsNext, k("p")},
 	{Stats, StatsOddsPrev, k("P")},
 	{Stats, StatsClose, k("s")},

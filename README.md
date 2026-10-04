@@ -186,7 +186,7 @@ to the cards that match.
 | `o` | add OR *row* to the filter |
 | `n` | add AND NOT *row* to the filter |
 | `x` | take *row* out of the filter |
-| `b` | clear the filter |
+| `X` | clear the filter |
 | `p` | show the odds of drawing each row in your opening hand |
 
 You can still move between lists with `h` `l` and change the editing list with `e` `E` while the
