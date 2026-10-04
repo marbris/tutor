@@ -252,6 +252,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case otagMsg:
 		return m.handleOtag(msg)
 
+	case deckRefreshedMsg:
+		return m.handleDeckRefreshed(msg)
 	case deckOpenedMsg:
 		return m.handleDeckOpened(msg)
 

@@ -33,7 +33,7 @@ type cacheKind struct {
 }
 
 var cacheKinds = []cacheKind{
-	{"cards", "card data for your decks", func(r string) bool { return r == "cards.json" },
+	{"cards", "card data for your decks", func(r string) bool { return r == "cards.json" || r == "cards.fetched.json" },
 		"decks look their cards up again on opening"},
 	{"pictures", "card pictures (gx)", func(r string) bool { return strings.HasPrefix(r, "images"+string(filepath.Separator)) },
 		"gx downloads each picture again"},

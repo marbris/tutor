@@ -6,6 +6,8 @@ import (
 	"ttr/internal/scryfall"
 
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -148,5 +150,59 @@ func TestSearchableName(t *testing.T) {
 		if got := searchableName(in); got != want {
 			t.Errorf("searchableName(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestRefreshStaleAsksAgainOnlyForCardsOverADayOld(t *testing.T) {
+	// Sol Ring was cached before fetch times were kept, so it's stale;
+	// Smothering Tithe was fetched just now.
+	seedCache(t, map[string]mtg.Card{
+		"sol ring": {ID: "sol-old", Name: "Sol Ring", Prices: mtg.Prices{USD: "1.00"}},
+	})
+	c := loadCardCache()
+	c.put(Entry{Name: "Smothering Tithe"}, mtg.Card{ID: "tithe", Name: "Smothering Tithe"})
+	if err := c.save(); err != nil {
+		t.Fatal(err)
+	}
+	if err := Write("refresh-test", &File{Name: "Refresh Test", Entries: []Entry{
+		{Qty: 1, Name: "Sol Ring", Section: "mainboard"},
+		{Qty: 1, Name: "Smothering Tithe", Section: "mainboard"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	var asked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Identifiers []map[string]string }
+		json.NewDecoder(r.Body).Decode(&req)
+		for _, id := range req.Identifiers {
+			asked = append(asked, id["name"])
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": []mtg.Card{
+			{ID: "sol-new", Name: "Sol Ring", Prices: mtg.Prices{USD: "1.50"}},
+		}})
+	}))
+	defer srv.Close()
+	defer func(u string) { scryfall.CollectionURL = u }(scryfall.CollectionURL)
+	scryfall.CollectionURL = srv.URL
+
+	got, err := RefreshStale("refresh-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(asked) != 1 || asked[0] != "Sol Ring" {
+		t.Errorf("asked Scryfall for %v, want only the stale Sol Ring", asked)
+	}
+	if c, ok := got["sol-old"]; !ok || c.Prices.USD != "1.50" {
+		t.Errorf("refreshed %v, want the new Sol Ring under the old one's id", got)
+	}
+	if cards, _ := ResolveCached([]Entry{{Qty: 1, Name: "Sol Ring"}}); len(cards) != 1 || cards[0].Card.Prices.USD != "1.50" {
+		t.Error("the refreshed card wasn't kept")
+	}
+
+	// Everything is fresh now: nothing is asked.
+	asked = nil
+	if got, err := RefreshStale("refresh-test"); err != nil || len(got) != 0 || len(asked) != 0 {
+		t.Errorf("a second refresh asked for %v and returned %v, %v", asked, got, err)
 	}
 }

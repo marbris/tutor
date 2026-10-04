@@ -431,3 +431,31 @@ func TestAStaleListOfPrintingsShowsAtOnceAndIsAskedForAgainBehindIt(t *testing.T
 		t.Errorf("the refresh moved the view to %q, want it to stay on the printing shown", p.ID)
 	}
 }
+
+func TestADecksRefreshedCardsReplaceTheStaleOnesWithoutAnEdit(t *testing.T) {
+	cards := deckSample()
+	cards[0].Card.ID = "elves-old"
+	m := withCards(sized(120, 30), "d", cards, sortArrival)
+	p := m.ws.current()
+	l := p.cardsView()
+	newer := cards[0].Card
+	newer.ID, newer.Prices.USD = "elves-new", "0.25"
+
+	next, _ := m.handleDeckRefreshed(deckRefreshedMsg{panel: p.id, cards: map[string]mtg.Card{"elves-old": newer}})
+	m = next.(Model)
+	var found bool
+	for _, dc := range l.all {
+		if dc.Card.ID == "elves-new" {
+			found = true
+			if dc.Qty != cards[0].Qty || len(dc.Tags) != 1 {
+				t.Errorf("the refresh changed the deck's own data: qty %d tags %v", dc.Qty, dc.Tags)
+			}
+		}
+	}
+	if !found {
+		t.Error("the refreshed card didn't replace the stale one")
+	}
+	if len(l.undo) != 0 || l.dirty {
+		t.Error("refreshing prices counted as an edit")
+	}
+}

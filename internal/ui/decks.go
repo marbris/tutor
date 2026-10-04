@@ -9,6 +9,7 @@ import (
 
 	"ttr/internal/deck"
 	"ttr/internal/moxfield"
+	"ttr/internal/mtg"
 )
 
 // What the decks panel actually does: opening things, and changing them.
@@ -199,7 +200,54 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	}
 	m.ws.deriveEditingIfUnpinned()
 	// A remote just followed should appear in any decks list on screen.
-	return m, reloadDecks
+	if !msg.info.Local() {
+		return m, reloadDecks
+	}
+	return m, tea.Batch(reloadDecks, refreshDeckCards(p.id, msg.info.Slug))
+}
+
+// deckRefreshedMsg is the cards of a deck that were more than a day old in
+// the cache, asked for again: the new card by the id of the one it replaces.
+type deckRefreshedMsg struct {
+	panel int
+	cards map[string]mtg.Card
+}
+
+// refreshDeckCards asks again, behind the deck that has just opened, for the
+// cards whose prices are over a day old. Quiet: offline, the old prices stay.
+func refreshDeckCards(panelID int, slug string) tea.Cmd {
+	return func() tea.Msg {
+		cards, err := deck.RefreshStale(slug)
+		if err != nil || len(cards) == 0 {
+			return nil
+		}
+		return deckRefreshedMsg{panel: panelID, cards: cards}
+	}
+}
+
+// handleDeckRefreshed swaps the refreshed cards in. Only the card data
+// changes, not the deck: counts, tags and edits made meanwhile stay, so it is
+// no edit, with nothing to undo or save.
+func (m Model) handleDeckRefreshed(msg deckRefreshedMsg) (tea.Model, tea.Cmd) {
+	p := m.ws.byID(msg.panel)
+	if p == nil {
+		return m, nil
+	}
+	l := p.cardsView()
+	if l == nil {
+		return m, nil
+	}
+	changed := false
+	for i := range l.all {
+		if c, ok := msg.cards[l.all[i].Card.ID]; ok {
+			l.all[i].Card = c
+			changed = true
+		}
+	}
+	if changed {
+		l.refresh()
+	}
+	return m, nil
 }
 
 // ── Changing things ─────────────────────────────────────────────

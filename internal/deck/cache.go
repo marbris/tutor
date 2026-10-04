@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Deck files name their cards instead of holding Scryfall ids, which keeps
@@ -27,9 +28,19 @@ import (
 
 const cardCacheFile = "cards.json"
 
+// cardFetchedFile is when each card in the cache was fetched, by the same
+// key, in seconds. Kept beside the cards rather than in them, so a cache
+// from before it still reads: a card with no time is simply stale.
+const cardFetchedFile = "cards.fetched.json"
+
+// cardMaxAge is how long a card's price is trusted. Past it the card is
+// still used, at once, and asked for again in the background.
+const cardMaxAge = 24 * time.Hour
+
 type cardCache struct {
-	cards map[string]mtg.Card
-	dirty bool
+	cards   map[string]mtg.Card
+	fetched map[string]int64
+	dirty   bool
 }
 
 func CachePath() string {
@@ -59,7 +70,12 @@ func searchableName(name string) string {
 }
 
 func loadCardCache() *cardCache {
-	c := &cardCache{cards: map[string]mtg.Card{}}
+	c := &cardCache{cards: map[string]mtg.Card{}, fetched: map[string]int64{}}
+	if body, err := os.ReadFile(filepath.Join(paths.Cache(), cardFetchedFile)); err == nil {
+		if json.Unmarshal(body, &c.fetched) != nil {
+			c.fetched = map[string]int64{}
+		}
+	}
 
 	body, err := os.ReadFile(CachePath())
 	if err != nil {
@@ -80,7 +96,15 @@ func (c *cardCache) get(e Entry) (mtg.Card, bool) {
 
 func (c *cardCache) put(e Entry, card mtg.Card) {
 	c.cards[entryKey(e)] = card
+	c.fetched[entryKey(e)] = time.Now().Unix()
 	c.dirty = true
+}
+
+// stale reports whether a cached card is older than cardMaxAge, or of no
+// known age.
+func (c *cardCache) stale(e Entry) bool {
+	at, ok := c.fetched[entryKey(e)]
+	return !ok || time.Since(time.Unix(at, 0)) > cardMaxAge
 }
 
 // save writes the cache back, atomically, and only when something changed.
@@ -112,6 +136,14 @@ func (c *cardCache) save() error {
 	}
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return err
+	}
+	// The times are a convenience on the convenience: lost, every card is
+	// stale and asked for again once.
+	if body, err := json.Marshal(c.fetched); err == nil {
+		at := filepath.Join(paths.Cache(), cardFetchedFile)
+		if os.WriteFile(at+".tmp", body, 0644) == nil {
+			os.Rename(at+".tmp", at)
+		}
 	}
 	c.dirty = false
 	return nil
@@ -205,6 +237,55 @@ func Resolve(entries []Entry) ([]Card, error) {
 		return cards, UnresolvedError{Names: missing}
 	}
 	return cards, nil
+}
+
+// RefreshStale asks Scryfall again for the cards of a deck whose cached copy
+// is over a day old, keeps the answers, and returns them by the id of the
+// card they replace. Decks open from the cache at once, stale or not, and
+// this runs behind, so a price is never worth a wait. Nothing stale, nothing
+// asked.
+func RefreshStale(slug string) (map[string]mtg.Card, error) {
+	d, err := Read(slug)
+	if err != nil {
+		return nil, err
+	}
+	cache := loadCardCache()
+	var stale []Entry
+	var idents []map[string]string
+	asked := map[string]bool{}
+	for _, e := range d.MainEntries() {
+		key := entryKey(e)
+		if _, ok := cache.get(e); !ok || !cache.stale(e) || asked[key] {
+			continue
+		}
+		asked[key] = true
+		stale = append(stale, e)
+		if e.Set != "" && e.Collector != "" {
+			idents = append(idents, map[string]string{"set": e.Set, "collector_number": e.Collector})
+		} else {
+			idents = append(idents, map[string]string{"name": searchableName(e.Name)})
+		}
+	}
+	if len(idents) == 0 {
+		return nil, nil
+	}
+	found, _, err := scryfall.Identifiers(idents)
+	if err != nil {
+		return nil, err
+	}
+	index := indexCards(found)
+	out := map[string]mtg.Card{}
+	for _, e := range stale {
+		card, ok := index.lookup(e)
+		if !ok {
+			continue
+		}
+		old, _ := cache.get(e)
+		out[old.ID] = card
+		cache.put(e, card)
+	}
+	_ = cache.save()
+	return out, nil
 }
 
 // cardIndex matches fetched cards back to the entries that asked for them.
