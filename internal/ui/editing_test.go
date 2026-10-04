@@ -116,7 +116,7 @@ func TestWithTwoDecksOpenNothingIsChosenForYou(t *testing.T) {
 func TestClosingTheEditingDeckLetsGoOfIt(t *testing.T) {
 	m, _, _ := twoDecks(t)
 	m.ws.editing = 2
-	m = drive(m, "space", "c")
+	m = drive(m, "space", "x")
 
 	if m.ws.editing == 2 {
 		t.Error("the target still points at the panel that closed")

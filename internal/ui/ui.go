@@ -172,13 +172,10 @@ func (m Model) Init() tea.Cmd {
 	if rules.Cached() {
 		cmds = append(cmds, loadRules)
 	}
-	// Tagger's tags are asked for every time: they're read from disk while
-	// they're under a week old, and only then downloaded.
-	cmds = append(cmds, loadTagger)
-	// Scryfall's catalogs likewise, read from disk while under a week old.
-	cmds = append(cmds, loadCatalog)
-	// And Scryfall's rulings, so a card's rulings are read, not asked for.
-	cmds = append(cmds, loadRulingsFile)
+	// The bulk downloads that are on (Tagger's tags, Scryfall's rulings and
+	// catalogs): read from disk while under a week old, and only then
+	// downloaded again, behind. The settings panel turns them on and off.
+	cmds = append(cmds, downloadLoads()...)
 	return tea.Batch(cmds...)
 }
 
@@ -317,6 +314,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleCatalog(msg)
 	case rulingsLoadedMsg:
 		return m.handleRulingsLoaded(msg)
+	case settingsDoneMsg:
+		return m.handleSettingsDone(msg)
 
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)

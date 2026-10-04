@@ -31,8 +31,8 @@ func refreshCatalog() tea.Msg {
 // handleCatalog puts the catalogs in use, and folds their keywords into the
 // rules every list and panel already holds.
 func (m Model) handleCatalog(msg catalogMsg) (tea.Model, tea.Cmd) {
-	if msg.data == nil {
-		return m, nil
+	if msg.data == nil || downloadsOff()["catalogs"] {
+		return m, nil // none, or turned off while they were on their way
 	}
 	catalog.SetCurrent(msg.data)
 	m.rules.AddCatalog(msg.data)

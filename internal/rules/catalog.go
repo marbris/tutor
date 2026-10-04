@@ -63,9 +63,15 @@ func kwKey(name string) string {
 
 // AddCatalog folds Scryfall's keyword catalogs into the keywords, for this
 // Data and every copy of it. Folding in the same catalogs again does
-// nothing; newer ones replace the old.
+// nothing; newer ones replace the old; nil takes them out again, back to
+// the rules text's own.
 func (d Data) AddCatalog(c *catalog.Data) {
-	if d.kw == nil || c == nil || d.kw.from == c {
+	if d.kw == nil || d.kw.from == c {
+		return
+	}
+	if c == nil {
+		d.kw.set(d.keywords)
+		d.kw.from = nil
 		return
 	}
 	all := make(map[string]Keyword, len(d.keywords)+300)

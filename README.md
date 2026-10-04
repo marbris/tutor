@@ -159,7 +159,7 @@ To see a list's history:
 ![A deck's version history, with the diff of the selected version in the info panel](screenshots/deck-git.png)
 
 To sync, make an empty **private** repository on any git host (GitHub, Codeberg, GitLab, your own
-server) and connect it once:
+server) and connect it once: in the settings (`space c`), `enter` on *git remote*, or from the shell:
 
 ```bash
 ttr sync remote git@github.com:you/mtg-decks.git
@@ -521,7 +521,8 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 | `gd` | jump to the editing list |
 | `space f` `space d` `space r` | new search / lists / rules panel |
 | `space n` | new panel |
-| `space c` `space o` | close this panel / close the others |
+| `space x` `space o` | close this panel / close the others |
+| `space c` | the settings |
 | `space u` | bring back the last closed panel |
 | `space w` | commit every list with changes |
 | `space s` | sync with the git remote |
@@ -530,7 +531,16 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 
 ## Settings
 
-`ttr init` writes every settings file with the defaults commented out. They change nothing until you
+`space c` opens the settings panel:
+
+- **sync**: the git remote your lists mirror to. `enter` sets it, `d` disconnects.
+- **downloads**: the files Tutor keeps from Scryfall: the Tagger tags, every card's rulings, and its
+  lists of keywords, types and card names. Each has its size, and `enter` turns it off or on. Off,
+  Tutor does without it: rulings are fetched a card at a time, for instance.
+- **cache**: what's downloaded, by kind, and how much room each takes. `d` clears one. Everything
+  there can be downloaded again.
+
+The rest is in files. `ttr init` writes every settings file with the defaults commented out. They change nothing until you
 uncomment a line.
 
 - `~/.config/ttr/keys.json`: rebind any key. `ttr keys --defaults` prints the whole keymap. A clash

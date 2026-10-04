@@ -146,8 +146,8 @@ func refreshRulingsFile() tea.Msg {
 }
 
 func (m Model) handleRulingsLoaded(msg rulingsLoadedMsg) (tea.Model, tea.Cmd) {
-	if msg.store == nil {
-		return m, nil
+	if msg.store == nil || downloadsOff()["rulings"] {
+		return m, nil // none, or turned off while it was on its way
 	}
 	rulings.SetCurrent(msg.store)
 	cmd := m.hover() // the card under the cursor needn't wait for a move

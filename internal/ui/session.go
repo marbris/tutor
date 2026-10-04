@@ -128,6 +128,8 @@ func (m Model) saveSession() {
 			ps.Query = v.name
 		case *deckList:
 			ps.Kind = "decks"
+		case *settingsView:
+			ps.Kind = "settings"
 		case nil:
 			// A search still in flight has no view yet but does have a
 			// query, and that is the part worth keeping. A panel with
@@ -208,6 +210,9 @@ func (m *Model) restore() tea.Cmd {
 			l := newDeckList()
 			m.ws.open(KindDecks).show(l)
 			cmds = append(cmds, loadDecks(l))
+
+		case "settings":
+			m.openSettings()
 
 		case "rules":
 			p := m.ws.open(KindRules)

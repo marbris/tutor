@@ -122,7 +122,7 @@ func TestClosingAPanelFocusesItsLeftNeighbour(t *testing.T) {
 	m := openPanel(sized(200, 40), "f", "angel")
 	m = openPanel(m, "d", "marbri")
 	m = openPanel(m, "r", "flying")
-	m = drive(m, "space", "c")
+	m = drive(m, "space", "x")
 	if m.ws.count() != 2 {
 		t.Fatalf("closed to %d panels, want 2", m.ws.count())
 	}
@@ -214,7 +214,7 @@ func TestSpaceUReopensAClosedPanelWhereItWas(t *testing.T) {
 	}
 
 	m = focusOn(m, 0)
-	m = drive(m, "space", "c") // close the first panel
+	m = drive(m, "space", "x") // close the first panel
 	if m.ws.count() != 1 {
 		t.Fatalf("close left %d panels", m.ws.count())
 	}

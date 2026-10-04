@@ -132,7 +132,7 @@ func TestAnAnswerToAClosedPanelIsDropped(t *testing.T) {
 	m, p := typed(sized(120, 30), "t:elf")
 	m = drive(m, "enter")
 	id := p.id
-	m = drive(m, "space", "c")
+	m = drive(m, "space", "x")
 
 	// Must not panic, and must not resurrect anything.
 	next, _ := m.handleSearchDone(searchDoneMsg{panel: id, query: "t:elf", cards: sample()})

@@ -29,6 +29,8 @@ const (
 	KindDecks
 	KindRules
 	KindCards
+	// KindSettings is the settings panel, space c. Not a search target.
+	KindSettings
 )
 
 // kinds is the cycle tab walks, leaving out the two that aren't a search
@@ -46,6 +48,8 @@ func (k Kind) String() string {
 		return "rules"
 	case KindCards:
 		return "cards"
+	case KindSettings:
+		return "settings"
 	}
 	return "new"
 }

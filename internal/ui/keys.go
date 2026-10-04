@@ -43,6 +43,7 @@ var leaderMenu = []leaderCmd{
 	{keymap.LeaderNew, "new", func(m *Model) { m.ws.open(KindNew) }},
 	{keymap.LeaderSync, "git push", nil},              // hands back a command, so it is run below
 	{keymap.LeaderCommitAll, "commit all lists", nil}, // so does this
+	{keymap.LeaderSettings, "settings", func(m *Model) { m.openSettings() }},
 	{keymap.LeaderClose, "close", func(m *Model) { m.ws.close() }},
 	{keymap.LeaderUndoClose, "undo close", func(m *Model) { m.ws.restoreClosed() }},
 	{keymap.LeaderOnly, "only", func(m *Model) { m.ws.only() }},
@@ -228,6 +229,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// On a deck, i fetches a card into it: the panel's own bar would
 		// follow a Moxfield user, which is the decks panel's business and
 		// not something you reach for from inside a deck.
+		if p.kind == KindSettings {
+			return m, nil // nothing to search here
+		}
 		if l := p.cardsView(); l != nil && l.deck != nil {
 			if !l.deck.Local() {
 				m.notice = "that deck isn't yours — " + keymap.Hint(keymap.Cards, keymap.CardsWrite) + " takes a copy you can add to"

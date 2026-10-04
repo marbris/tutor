@@ -34,6 +34,8 @@ const (
 	// askOtag is tab from askAddCard: oracle tags whose cards in the deck
 	// in front of you get tagged otag-<tag>.
 	askOtag
+	// askRemote is enter on the git remote in the settings panel.
+	askRemote
 )
 
 // Labels of the two sides of the i bar, which tab swaps between.
@@ -149,6 +151,9 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		case askAddCard:
 			return m, runAddCard(p.id, answer)
+
+		case askRemote:
+			return m, connectRemote(p.id, answer)
 
 		case askOtag:
 			l := p.cardsView()

@@ -267,6 +267,9 @@ func withoutTaken(groups []hintGroup) []hintGroup {
 
 // iHint is what i does in this panel, or false where it does nothing.
 func (m Model) iHint(p *panel) (string, bool) {
+	if p.kind == KindSettings {
+		return "", false
+	}
 	if l := p.cardsView(); l != nil && l.deck != nil {
 		if !l.deck.Local() {
 			return "", false

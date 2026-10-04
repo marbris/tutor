@@ -36,8 +36,8 @@ func refreshTagger() tea.Msg {
 // before they arrived — a session restored — is narrowed again now that
 // the category can match.
 func (m Model) handleTagger(msg taggerMsg) (tea.Model, tea.Cmd) {
-	if msg.data == nil {
-		return m, nil
+	if msg.data == nil || downloadsOff()["tagger"] {
+		return m, nil // none, or turned off while it was on its way
 	}
 	tagger.SetCurrent(msg.data)
 	for _, p := range m.ws.panels {

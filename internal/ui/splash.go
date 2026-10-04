@@ -28,6 +28,7 @@ func (m Model) viewSplash() string {
 		{leaderHint(keymap.LeaderFind), "find cards on Scryfall"},
 		{leaderHint(keymap.LeaderDecks), "your decks, and Moxfield"},
 		{leaderHint(keymap.LeaderRules), "the comprehensive rules"},
+		{leaderHint(keymap.LeaderSettings), "settings: sync, downloads, cache"},
 	}
 
 	var lines []string

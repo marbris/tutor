@@ -43,6 +43,7 @@ const (
 	Decks    Scope = "decks"    // the decks panel
 	Rules    Scope = "rules"    // the rules panel
 	Versions Scope = "versions" // a deck's git versions
+	Settings Scope = "settings" // the settings panel
 	Stats    Scope = "stats"    // the statistics, while they're up
 	Leader   Scope = "leader"   // after the leader
 	Goto     Scope = "goto"     // after g
@@ -137,8 +138,11 @@ const (
 	StatsOddsPrev  Action = "odds.prev"
 	StatsClose     Action = "close"
 	StatsBack      Action = "back"
-	StatsTagOrder  Action = "tag.order"
-	StatsExpand    Action = "expand"
+	SettingsChange Action = "change"
+	SettingsClear  Action = "clear"
+
+	StatsTagOrder Action = "tag.order"
+	StatsExpand   Action = "expand"
 
 	LeaderFind      Action = "find"
 	LeaderDecks     Action = "decks"
@@ -147,6 +151,7 @@ const (
 	LeaderSync      Action = "sync"
 	LeaderCommitAll Action = "commit-all"
 	LeaderClose     Action = "close"
+	LeaderSettings  Action = "settings"
 	LeaderUndoClose Action = "undo-close"
 	LeaderOnly      Action = "only"
 
@@ -256,6 +261,9 @@ var defaults = []binding{
 	{Versions, VersionsRevert, k("r")},
 	{Versions, VersionsCopy, k("c")},
 
+	{Settings, SettingsChange, k("enter")},
+	{Settings, SettingsClear, k("d")},
+
 	{Stats, StatsDown, k("j", "down")},
 	{Stats, StatsUp, k("k", "up")},
 	{Stats, StatsNextGroup, k("J", "shift+down")},
@@ -278,7 +286,8 @@ var defaults = []binding{
 	{Leader, LeaderNew, k("n")},
 	{Leader, LeaderSync, k("s")},
 	{Leader, LeaderCommitAll, k("w")},
-	{Leader, LeaderClose, k("c")},
+	{Leader, LeaderClose, k("x")},
+	{Leader, LeaderSettings, k("c")},
 	{Leader, LeaderUndoClose, k("u")},
 	{Leader, LeaderOnly, k("o")},
 
