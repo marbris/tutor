@@ -45,7 +45,7 @@ const (
 // askAdd raises the i bar: a card to add, or with tab, oracle tags.
 func (p *panel) askAdd(initial string) {
 	p.ask(askAddCard, addCardLabel, initial)
-	p.askInput.Placeholder = "a card · tab: tag this list by otag"
+	p.askInput.Placeholder = "a card name, tab completes it · tab here: tag this list by otag"
 }
 
 // swapAddOtag turns the i bar from adding a card to tagging by otag and
@@ -54,12 +54,12 @@ func (p *panel) swapAddOtag() {
 	if p.asking == askAddCard {
 		p.asking = askOtag
 		p.askInput.Prompt = otagLabel + ": "
-		p.askInput.Placeholder = "removal ramp … · tab: add a card"
+		p.askInput.Placeholder = "removal ramp …, tab completes · tab here: add a card"
 		return
 	}
 	p.asking = askAddCard
 	p.askInput.Prompt = addCardLabel + ": "
-	p.askInput.Placeholder = "a card · tab: tag this list by otag"
+	p.askInput.Placeholder = "a card name, tab completes it · tab here: tag this list by otag"
 }
 
 // ask raises the prompt.
@@ -95,8 +95,12 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.completeTag(p, delta)
 		return m, nil
 	}
-	if (p.asking == askAddCard || p.asking == askOtag) && key == "tab" {
-		p.swapAddOtag()
+	if (p.asking == askAddCard || p.asking == askOtag) && (key == "tab" || key == "shift+tab") {
+		delta := 1
+		if key == "shift+tab" {
+			delta = -1
+		}
+		m.tabInAddBar(p, delta)
 		return m, nil
 	}
 	// Anything but tab ends a walk through the tags that fit.

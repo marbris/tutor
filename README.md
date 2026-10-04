@@ -463,7 +463,7 @@ ttr cache clear [kind]          # delete it, all of it or one kind
 | `.` `>` | next / previous first sort |
 | `,` `<` | next / previous second sort |
 | `alt+.` `alt+,` | reverse the first / second sort |
-| `i` | edit the search; on your own list, add a card (`tab`: tag by otag) |
+| `i` | edit the search; on your own list, add a card (`tab` completes its name; on an empty bar, `tab` tags by otag instead) |
 | `v` `V` | select one / select all |
 | `a` `A` | add to the editing list / add and tag with the last tag |
 | `x` | remove a copy from the editing list |

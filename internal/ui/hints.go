@@ -125,6 +125,10 @@ func (m Model) hintGroups() []hintGroup {
 	if p.searchOpen && p.search.Focused() {
 		return dropUnbound([]hintGroup{{"search", m.barKeys(p)}})
 	}
+	// The i bar likewise, whose tab means what's being typed allows.
+	if p.asking == askAddCard || p.asking == askOtag {
+		return []hintGroup{{"", addBarKeys(p)}}
+	}
 
 	groups := m.panelHintGroups(p)
 	if keys := m.editHints(); len(keys) > 0 {
@@ -351,6 +355,23 @@ func (m Model) barKeys(p *panel) [][2]string {
 		hint(p.kind.prompt(), keymap.Search, keymap.SearchRun),
 		hint("leave the bar", keymap.Search, keymap.SearchBack),
 	)
+}
+
+// addBarKeys is the i bar's keys. Its keys are the prompt's own, not the
+// keymap's, like every one-line prompt's: tab, enter and esc.
+func addBarKeys(p *panel) [][2]string {
+	tab, enter := "tag by otag instead", "add the card"
+	if p.asking == askOtag {
+		tab, enter = "add a card instead", "tag the list"
+	}
+	if addBarTyping(p) {
+		tab = "complete the name"
+		if p.asking == askOtag {
+			tab = "complete the tag"
+		}
+		return [][2]string{{"tab shift+tab", tab}, {"enter", enter}, {"esc", "leave"}}
+	}
+	return [][2]string{{"tab", tab}, {"enter", enter}, {"esc", "leave"}}
 }
 
 // editHints is the keys that change the editing deck, drawn at the bottom

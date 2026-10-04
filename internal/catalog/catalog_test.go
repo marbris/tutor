@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"ttr/internal/diskcache"
 	"ttr/internal/paths"
 )
 
@@ -99,5 +100,19 @@ func TestASubtypeBelongsToItsType(t *testing.T) {
 	var none *Data
 	if _, ok := none.SubtypeOf("Elf"); ok {
 		t.Error("no catalogs, but Elf was known")
+	}
+}
+
+func TestACopyMissingACatalogIsStale(t *testing.T) {
+	serve(t)
+	if _, err := Refresh(); err != nil {
+		t.Fatal(err)
+	}
+	// Drop one, as a copy from an older Tutor would lack it.
+	d := Kept()
+	delete(d.Lists, CardNames)
+	diskcache.Save(cacheFile, d)
+	if _, stale, _ := Load(); !stale {
+		t.Error("a copy without card names isn't stale")
 	}
 }

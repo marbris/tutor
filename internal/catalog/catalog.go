@@ -26,6 +26,9 @@ const (
 	AbilityWords     = "ability-words"
 	CardTypes        = "card-types"
 	Supertypes       = "supertypes"
+	// CardNames is every card's name, 35,000 of them in 0.7 MB: enough to
+	// complete a name as it's typed, without the cards themselves.
+	CardNames = "card-names"
 )
 
 // SubtypeCatalogs is each card type's list of subtypes. The type decides
@@ -45,7 +48,7 @@ var SubtypeCatalogs = map[string]string{
 
 // names is every catalog fetched.
 func names() []string {
-	out := []string{KeywordAbilities, KeywordActions, AbilityWords, CardTypes, Supertypes}
+	out := []string{KeywordAbilities, KeywordActions, AbilityWords, CardTypes, Supertypes, CardNames}
 	seen := map[string]bool{}
 	for _, c := range SubtypeCatalogs {
 		if !seen[c] {
@@ -115,10 +118,22 @@ const cacheFile = "catalogs.json"
 func Load() (d *Data, stale bool, err error) {
 	var kept Data
 	if fresh, have := diskcache.Load(cacheFile, maxAge, &kept); have && len(kept.Lists) > 0 {
-		return &kept, !fresh, nil
+		// A copy from before a catalog was added is stale too, so the new
+		// one arrives without waiting out the week.
+		return &kept, !fresh || !kept.complete(), nil
 	}
 	d, err = Refresh()
 	return d, false, err
+}
+
+// complete reports whether every catalog Tutor asks for is here.
+func (d *Data) complete() bool {
+	for _, name := range names() {
+		if _, ok := d.Lists[name]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // Kept is the catalogs on disk, of any age, without fetching: nil when
