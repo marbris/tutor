@@ -152,3 +152,36 @@ func TestATaggerFilterFromLastSessionWorksOnceTheTagsArrive(t *testing.T) {
 		t.Errorf("%d cards after the tags arrived, want the 2 removal spells", n)
 	}
 }
+
+func TestKBringsTheTaggerGroupAboveTheRestInTheirOrder(t *testing.T) {
+	// The ring J and K turn is the order the groups are drawn in: K from the
+	// top brings the last group, Tagger, above the rest, and they follow in
+	// the same order as before. Tagger isn't shown twice or in the middle.
+	withTagger(t)
+	// A tag of your own, so the Tags group leads: the case the ring got
+	// wrong, putting Tagger right under Tags as well as last.
+	cards := taggedCards()
+	cards[0].Tags = []string{"wincon"}
+	m := withCards(sized(140, 50), "f", cards, sortArrival)
+	m = drive(m, "s")
+	titles := func() []string {
+		var out []string
+		for _, g := range m.statGroups() {
+			out = append(out, g.Title)
+		}
+		return out
+	}
+	before := titles()
+	if before[len(before)-1] != stats.TaggerGroup {
+		t.Fatalf("groups %v, want Tagger last", before)
+	}
+	m = drive(m, "K")
+	want := append([]string{stats.TaggerGroup}, before[:len(before)-1]...)
+	if got := titles(); fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("after K the groups are %v, want %v", got, want)
+	}
+	m = drive(m, "J")
+	if got := titles(); fmt.Sprint(got) != fmt.Sprint(before) {
+		t.Errorf("J didn't turn them back: %v, want %v", got, before)
+	}
+}

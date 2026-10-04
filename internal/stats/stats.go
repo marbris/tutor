@@ -407,6 +407,15 @@ var ordered = map[string]bool{
 	TaggerGroup: true,
 }
 
+// GroupOrder is the order the groups are built and drawn in, before J or K
+// turns it. Most telling first: what the deck's author called their cards,
+// then what those cards are, and the printing details. Scryfall Tagger's
+// tree is long, so it goes last, where it doesn't push the rest down, and K
+// reaches it in one step up from the top, wrapping round.
+var GroupOrder = []string{
+	"Tags", "Type", "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)", TaggerGroup,
+}
+
 // GroupsBy builds the category list from rowSource and counts it over
 // counted. The two differ once you're filtering by a category: which rows
 // exist, their order and their positions all come from the whole result set
@@ -420,22 +429,19 @@ var ordered = map[string]bool{
 // openTags is the Scryfall Tagger rows opened to show their children, by
 // path.
 func GroupsBy(rowSource, counted []deck.Card, tagsByName bool, openTags map[string]bool) []Group {
-	// Most telling first: what the deck's author called their cards, then
-	// what those cards are, and the printing details. Scryfall Tagger's tree
-	// is long, so it goes last, where it doesn't push the rest down and K
-	// reaches it in one step up from the tags, wrapping round.
-	groups := []Group{
-		{Title: "Tags", Rows: tagRows(rowSource)},
-		{Title: "Type", Rows: typeRows()},
-		{Title: "Color (excl. lands)", Rows: colorRows()},
-		{Title: "Mana Value (excl. lands)", Rows: cmcRows()},
-		{Title: "Rarity", Rows: rarityRows(rowSource)},
-		{Title: "Price (USD)", Rows: priceRows()},
-		{Title: TaggerGroup, Rows: taggerRows(rowSource, openTags)},
+	built := map[string][]Row{
+		"Tags":                     tagRows(rowSource),
+		"Type":                     typeRows(),
+		"Color (excl. lands)":      colorRows(),
+		"Mana Value (excl. lands)": cmcRows(),
+		"Rarity":                   rarityRows(rowSource),
+		"Price (USD)":              priceRows(),
+		TaggerGroup:                taggerRows(rowSource, openTags),
 	}
 
-	out := make([]Group, 0, len(groups))
-	for _, g := range groups {
+	out := make([]Group, 0, len(GroupOrder))
+	for _, title := range GroupOrder {
+		g := Group{Title: title, Rows: built[title]}
 		kept := make([]Row, 0, len(g.Rows))
 		for _, r := range g.Rows {
 			for _, e := range rowSource {

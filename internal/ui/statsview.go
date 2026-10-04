@@ -53,11 +53,6 @@ type statsState struct {
 	openTags map[string]bool
 }
 
-// groupOrder is the order the groups are drawn in before J or K turns it.
-var groupOrder = []string{
-	"Tags", stats.TaggerGroup, "Type", "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)",
-}
-
 const maxOdds = 4
 
 // statRows flattens the groups into the rows j and k step through.
@@ -90,8 +85,8 @@ func rotateGroups(groups []stats.Group, top string) []stats.Group {
 		return groups
 	}
 	var out []stats.Group
-	for i := range groupOrder {
-		title := groupOrder[(start+i)%len(groupOrder)]
+	for i := range stats.GroupOrder {
+		title := stats.GroupOrder[(start+i)%len(stats.GroupOrder)]
 		for _, g := range groups {
 			if g.Title == title {
 				out = append(out, g)
@@ -102,7 +97,7 @@ func rotateGroups(groups []stats.Group, top string) []stats.Group {
 }
 
 func groupIndex(title string) int {
-	for i, t := range groupOrder {
+	for i, t := range stats.GroupOrder {
 		if t == title {
 			return i
 		}
