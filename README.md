@@ -173,8 +173,9 @@ The people and decks you follow stay under a `moxfield` folder at the top of the
 ## Statistics
 
 The statistics panel shows bar charts of a list: your tags, card types, colors, mana values (X
-spells get a row of their own), rarity, price, and last the Scryfall Tagger tags. Build a filter from the rows, and the list and the bars narrow
-to the cards that match.
+spells get a row of their own), rarity, price, and last the Scryfall Tagger tags. `enter` on a card
+type opens it into the subtypes in the list: the creature types under Creature, Equipment under
+Artifact. Build a filter from the rows, and the list and the bars narrow to the cards that match.
 
 | Key | Does |
 | --- | --- |
@@ -317,9 +318,10 @@ the wording changes over the years. The text comes from [MTGJSON](https://mtgjso
 
 ## Comprehensive rules
 
-Tutor downloads the comprehensive rules from Wizards of the Coast and parses them. The keyword
-abilities, keyword actions and glossary terms it finds there are used to highlight the oracle text
-and to look up rules.
+Tutor downloads the comprehensive rules from Wizards of the Coast and parses them. Scryfall's lists
+of keywords add the ones the rules don't name on their own, like Forestwalk and Plainscycling, which
+are forms of landwalk and cycling. Together they highlight keywords in the oracle text, and each
+keyword leads to its rule.
 
 `space r` opens the rules panel. With a card highlighted, it lists the rules that card uses: its
 keywords and the terms in its text. Scroll the list, and the info panel shows the full rule. `/`

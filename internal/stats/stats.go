@@ -253,21 +253,6 @@ func cmcRows() []Row {
 // isLand reports whether a card's front face is a land, which is what
 // decides where it's counted.
 
-func typeRows() []Row {
-	types := []string{"Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land"}
-	rows := make([]Row, 0, len(types))
-	for _, t := range types {
-		cardType := t
-		rows = append(rows, Row{
-			Group: "Type", Label: cardType, Color: TypeColour(cardType),
-			Match: func(ci deck.Card) bool {
-				return strings.Contains(ci.Card.TypeLine, cardType)
-			},
-		})
-	}
-	return rows
-}
-
 // priceRows is the spread of what the cards cost, in the dollar bands a
 // collection tends to clump into: a wall of commons under a dollar, a handful
 // of staples in the tens, the odd reserved-list card off on its own. A card
@@ -403,8 +388,8 @@ func Groups(rowSource, counted []deck.Card) []Group {
 // rest are just names, and the biggest leads.
 var ordered = map[string]bool{
 	"Mana Value (excl. lands)": true, "Price (USD)": true, "Rarity": true,
-	// A tree, ordered level by level as it's built.
-	TaggerGroup: true,
+	// Trees, ordered level by level as they're built.
+	TaggerGroup: true, TypeGroup: true,
 }
 
 // GroupOrder is the order the groups are built and drawn in, before J or K
@@ -413,7 +398,7 @@ var ordered = map[string]bool{
 // tree is long, so it goes last, where it doesn't push the rest down, and K
 // reaches it in one step up from the top, wrapping round.
 var GroupOrder = []string{
-	"Tags", "Type", "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)", TaggerGroup,
+	"Tags", TypeGroup, "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)", TaggerGroup,
 }
 
 // GroupsBy builds the category list from rowSource and counts it over
@@ -431,7 +416,7 @@ var GroupOrder = []string{
 func GroupsBy(rowSource, counted []deck.Card, tagsByName bool, openTags map[string]bool) []Group {
 	built := map[string][]Row{
 		"Tags":                     tagRows(rowSource),
-		"Type":                     typeRows(),
+		TypeGroup:                  typeRows(rowSource, openTags),
 		"Color (excl. lands)":      colorRows(),
 		"Mana Value (excl. lands)": cmcRows(),
 		"Rarity":                   rarityRows(rowSource),

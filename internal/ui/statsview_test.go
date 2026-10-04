@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -723,5 +724,36 @@ func TestTheBarsAreCountedOnceUntilSomethingTheyCountChanges(t *testing.T) {
 	m.View()
 	if &m.stats.memo.groups[0] == &before[0] {
 		t.Error("an edit didn't count the bars again")
+	}
+}
+
+func TestEnterOpensATypeIntoItsSubtypesToFilterBy(t *testing.T) {
+	m := withCards(sized(120, 50), "d", deckSample(), sortArrival)
+	l := m.ws.current().cardsView()
+	m = drive(m, "s")
+	m = pointStat(t, m, "Type", "Creature")
+	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "show the types under it") {
+		t.Errorf("enter isn't offered on Creature: %s", hints)
+	}
+	m = drive(m, "enter")
+	body := stripANSI(strings.Join(m.renderStats(60), "\n"))
+	if !strings.Contains(body, "▾ Creature") || !strings.Contains(body, "    Elf") || !strings.Contains(body, "    Beast") {
+		t.Fatalf("Creature didn't open into its subtypes:\n%s", body)
+	}
+
+	// Elf is a filter like any other.
+	m = pointStat(t, m, "Type", "Elf")
+	m = drive(m, "a")
+	if l.count() != 2 {
+		t.Errorf("filtering by Elf left %d cards, want the two elves", l.count())
+	}
+
+	// And it comes back next session, whether or not Creature is open.
+	var saved panelSession
+	saved.keepLayout(l)
+	fresh := newCardList(deckSample(), sortArrival, "decklist")
+	saved.applyLayout(fresh)
+	if fresh.count() != 2 {
+		t.Errorf("the Elf filter came back with %d cards, want 2", fresh.count())
 	}
 }

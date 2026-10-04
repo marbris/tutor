@@ -135,7 +135,7 @@ func TestNumericAndTypeBarsTakeTheCardListsColours(t *testing.T) {
 			t.Errorf("price %s: bar %q, want %q", r.Label, r.Color, PriceColour(i))
 		}
 	}
-	for _, g := range [][]Row{cmcRows(), priceRows(), typeRows()} {
+	for _, g := range [][]Row{cmcRows(), priceRows(), everyType()} {
 		seen := map[string]string{}
 		for _, r := range g {
 			if prev, ok := seen[string(r.Color)]; ok {

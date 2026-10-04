@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"ttr/internal/keymap"
+	"ttr/internal/stats"
 )
 
 // What works right now.
@@ -443,9 +444,13 @@ func (m Model) statsHints() [][2]string {
 		keys = append(keys, hint(order, keymap.Stats, keymap.StatsTagOrder))
 	}
 	if branch, open := m.onBranch(); branch {
-		what := "show the tags under it"
+		kind := "tags"
+		if r, _ := m.statUnder(); r.Group == stats.TypeGroup {
+			kind = "types"
+		}
+		what := "show the " + kind + " under it"
 		if open {
-			what = "hide the tags under it"
+			what = "hide the " + kind + " under it"
 		}
 		keys = append(keys, hint(what, keymap.Stats, keymap.StatsExpand))
 	}

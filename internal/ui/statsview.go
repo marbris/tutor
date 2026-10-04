@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"ttr/internal/catalog"
 	"ttr/internal/deck"
 	"ttr/internal/keymap"
 	"ttr/internal/stats"
@@ -68,6 +69,7 @@ type statsKey struct {
 	gen        int // the list's refreshes: its cards and filters
 	tagGen     int // the tag lists' rebuilds
 	tagger     *tagger.Data
+	catalog    *catalog.Data // where each subtype counts
 	tagsByName bool
 	open       int // openGen
 	openLen    int
@@ -121,7 +123,7 @@ func (m Model) statGroups() []stats.Group {
 func (m Model) countedGroups() []stats.Group {
 	l := m.statList()
 	key := statsKey{
-		list: l, tagGen: globalTags.gen, tagger: tagger.Current(),
+		list: l, tagGen: globalTags.gen, tagger: tagger.Current(), catalog: catalog.Current(),
 		tagsByName: m.stats.tagsByName, open: m.stats.openGen, openLen: len(m.stats.openTags),
 	}
 	if l != nil {
@@ -676,7 +678,7 @@ func (m *statsMemo) highlight(row int) []string {
 // statLabel is a row's name as drawn. A row in the Tagger tree is indented
 // by its depth, with ▸ on a tag that has tags under it and ▾ once they show.
 func (m Model) statLabel(r stats.Row) string {
-	if r.Group != stats.TaggerGroup || r.Label == "untagged" {
+	if (r.Group != stats.TaggerGroup && r.Group != stats.TypeGroup) || r.Label == "untagged" {
 		return r.Label
 	}
 	mark := "  "

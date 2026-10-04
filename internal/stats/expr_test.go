@@ -22,8 +22,8 @@ func find(t *testing.T, rows []Row, label string) Row {
 func TestExprFoldsFromTheLeftInTheOrderItWasBuilt(t *testing.T) {
 	// The example from the notes: a creature, a black, an artifact (or), a
 	// mana value of five — artifacts and black creatures, all costing five.
-	creature := find(t, typeRows(), "Creature")
-	artifact := find(t, typeRows(), "Artifact")
+	creature := find(t, everyType(), "Creature")
+	artifact := find(t, everyType(), "Artifact")
 	black := find(t, colorRows(), "Black")
 	five := find(t, cmcRows(), "5")
 
@@ -76,7 +76,7 @@ func TestWithoutDropsOnlyThatCategory(t *testing.T) {
 	var e Expr
 	e, _ = e.Add(And, find(t, cmcRows(), "1"))
 	e, _ = e.Add(Or, find(t, cmcRows(), "2"))
-	e, _ = e.Add(And, find(t, typeRows(), "Creature"))
+	e, _ = e.Add(And, find(t, everyType(), "Creature"))
 	e = e.Without(find(t, cmcRows(), "1"))
 	if got := e.String(); got != "2 ∧ Creature" {
 		t.Errorf("after dropping 1: %q", got)
@@ -113,7 +113,7 @@ func TestAtLeast(t *testing.T) {
 }
 
 func TestAndNotDropsTheCategory(t *testing.T) {
-	creature := find(t, typeRows(), "Creature")
+	creature := find(t, everyType(), "Creature")
 	black := find(t, colorRows(), "Black")
 	card := func(tl string, colors ...string) deck.Card {
 		return deck.Card{Card: mtg.Card{Name: tl, TypeLine: tl, Colors: colors}, Qty: 1}
@@ -151,4 +151,13 @@ func TestAndNotDropsTheCategory(t *testing.T) {
 	if !n.Match(blackElf) || n.Match(blackSpell) {
 		t.Error("NOT black OR creature matched the wrong cards")
 	}
+}
+
+// everyType is a row for each card type, shown or not.
+func everyType() []Row {
+	var out []Row
+	for _, t := range cardTypes {
+		out = append(out, TypeRow(typePathPrefix+t))
+	}
+	return out
 }
