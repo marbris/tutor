@@ -27,6 +27,8 @@ type tagIndex struct {
 	// tags is each card's tags across the lists, by lowercased name — and
 	// by its front face too, for a list that names a two-faced card by it.
 	tags map[string][]string
+	// gen counts rebuilds, for the statistics to know the tags have moved.
+	gen int
 }
 
 // globalTags is the one index, shared by every list, because the lists
@@ -103,6 +105,7 @@ func (x *tagIndex) of(name string) []string {
 // rebuild reads the lists again. A list open on screen is read from there,
 // since its latest edit may not have reached the file yet.
 func (x *tagIndex) rebuild(open map[string][]deck.Card) {
+	x.gen++
 	x.tags = map[string][]string{}
 	add := func(name string, tags []string) {
 		if len(tags) == 0 {

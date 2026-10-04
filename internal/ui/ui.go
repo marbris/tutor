@@ -93,7 +93,7 @@ func New() Model {
 	return Model{
 		ws:        newWorkspace(),
 		history:   LoadQueryHistory(),
-		stats:     statsState{},
+		stats:     statsState{memo: &statsMemo{}},
 		histories: map[string]*cardHistory{},
 		images:    map[string]*cardPrintings{},
 		pictures:  map[string]*picture{},

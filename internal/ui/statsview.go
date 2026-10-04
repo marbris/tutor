@@ -9,6 +9,7 @@ import (
 	"ttr/internal/deck"
 	"ttr/internal/keymap"
 	"ttr/internal/stats"
+	"ttr/internal/tagger"
 	"ttr/internal/theme"
 )
 
@@ -25,10 +26,13 @@ import (
 // group to its own widest bar would make a deck with two of something look
 // like a deck full of it.
 
-// statsState is only the facts a frame can't work out for itself. The bars
-// themselves are derived when they are drawn, never stored: they are a
-// function of the cards, and a stored copy goes stale the moment a search
-// finishes.
+// statsState is only the facts a frame can't work out for itself, and the
+// bars as last counted. The bars are a function of the cards, the tags and
+// how they're narrowed, so they're kept only under a key naming all of
+// those (statsKey): j and k, which change none of it, draw from the kept
+// bars instead of counting the whole list, Tagger tree and all, several
+// times a key — which, with a key held down, queued keys faster than they
+// were drawn, and the highlight ran on after the key came up.
 type statsState struct {
 	// group and label name the highlighted category. A name rather than an
 	// index, so the highlight survives the rows being recounted, reordered
@@ -51,6 +55,46 @@ type statsState struct {
 	tagsByName bool
 	// openTags is the Scryfall Tagger rows opened with enter, by path.
 	openTags map[string]bool
+	// openGen counts enter on a Tagger row, which changes the rows in place.
+	openGen int
+	// memo is the bars as last counted. A pointer, so every copy of the
+	// Model shares it; nil counts afresh every time.
+	memo *statsMemo
+}
+
+// statsKey is everything the bars are counted from.
+type statsKey struct {
+	list       *cardList
+	gen        int // the list's refreshes: its cards and filters
+	tagGen     int // the tag lists' rebuilds
+	tagger     *tagger.Data
+	tagsByName bool
+	open       int // openGen
+	openLen    int
+}
+
+type statsMemo struct {
+	key    statsKey
+	groups []stats.Group
+	ok     bool
+
+	// The bars as last drawn, with no row highlighted: drawing them is most
+	// of what a frame costs, and walking them changes only two rows.
+	drawnKey drawKey
+	drawn    []string
+	bars     []statBar // each row's bar, to draw the highlighted one
+	barLine  []int     // which line of drawn each row is on
+	drawnOK  bool
+}
+
+// drawKey is everything the drawn bars depend on beyond the counting.
+type drawKey struct {
+	counted statsKey
+	top     string
+	width   int
+	odds    int
+	expr    string
+	hints   bool
 }
 
 const maxOdds = 4
@@ -69,8 +113,30 @@ func statRows(groups []stats.Group) []stats.Row {
 // numbers describe, so a category the narrowing has emptied stays put and
 // reads zero rather than vanishing under the cursor.
 func (m Model) statGroups() []stats.Group {
+	return rotateGroups(m.countedGroups(), m.stats.top)
+}
+
+// countedGroups is the groups in their own order, before J or K turns them:
+// the kept count when nothing it was counted from has changed.
+func (m Model) countedGroups() []stats.Group {
+	l := m.statList()
+	key := statsKey{
+		list: l, tagGen: globalTags.gen, tagger: tagger.Current(),
+		tagsByName: m.stats.tagsByName, open: m.stats.openGen, openLen: len(m.stats.openTags),
+	}
+	if l != nil {
+		key.gen = l.gen
+	}
+	memo := m.stats.memo
+	if memo != nil && memo.ok && memo.key == key {
+		return memo.groups
+	}
 	counted, source := m.statCards()
-	return rotateGroups(stats.GroupsBy(source, counted, m.stats.tagsByName, m.stats.openTags), m.stats.top)
+	groups := stats.GroupsBy(source, counted, m.stats.tagsByName, m.stats.openTags)
+	if memo != nil && l != nil {
+		memo.key, memo.groups, memo.ok = key, groups, true
+	}
+	return groups
 }
 
 // rotateGroups turns the groups over so top comes first, the rest following
@@ -182,6 +248,7 @@ func (m *Model) toggleBranch() bool {
 	} else {
 		m.stats.openTags[r.Path] = true
 	}
+	m.stats.openGen++
 	return true
 }
 
@@ -216,8 +283,7 @@ func (m *Model) moveStat(delta int) {
 // rotateStat turns the group order over by one: J brings the next group to
 // the top, K the one before. The highlight goes with it, to the new top.
 func (m *Model) rotateStat(delta int) {
-	counted, source := m.statCards()
-	groups := stats.GroupsBy(source, counted, m.stats.tagsByName, m.stats.openTags)
+	groups := m.countedGroups()
 	if len(groups) == 0 {
 		return
 	}
@@ -535,9 +601,18 @@ func (m Model) renderStats(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
-	pop := m.statPop()
 	cursor := m.statCursor(groups)
+	memo := m.stats.memo
+	key := drawKey{counted: memo.keyOrZero(), top: m.stats.top, width: width, odds: m.stats.odds,
+		expr: expr.String(), hints: m.hintsExpanded}
+	if memo != nil && memo.ok && memo.drawnOK && memo.drawnKey == key {
+		return memo.highlight(cursor)
+	}
+
+	pop := m.statPop()
 	var out []string
+	var bars []statBar
+	var barLine []int
 	at := 0
 	for _, g := range groups {
 		if len(out) > 0 {
@@ -545,7 +620,7 @@ func (m Model) renderStats(width int) []string {
 		}
 		out = append(out, head.Render(fit(g.Title, width)))
 		for _, r := range g.Rows {
-			bar := statBar{row: r, label: m.statLabel(r), under: at == cursor, mark: statMark(expr, r),
+			bar := statBar{row: r, label: m.statLabel(r), mark: statMark(expr, r),
 				labelWidth: labelWidth, barWidth: barWidth, countWidth: countWidth}
 			if m.stats.odds > 0 {
 				bar.fraction = statOdds(r, pop, m.stats.odds)
@@ -554,6 +629,8 @@ func (m Model) renderStats(width int) []string {
 				bar.fraction = float64(r.Count) / float64(widest)
 				bar.value = itoa(r.Count)
 			}
+			bars = append(bars, bar)
+			barLine = append(barLine, len(out))
 			out = append(out, bar.render())
 			at++
 		}
@@ -567,6 +644,31 @@ func (m Model) renderStats(width int) []string {
 	// The short reminder, for when ? isn't drawing the whole keymap below.
 	if !m.hintsExpanded {
 		out = append(out, dim.Render(fit("a/o/n and/or/not · x remove · p odds · s back", width)))
+	}
+	if memo == nil || !memo.ok {
+		d := statsMemo{drawn: out, bars: bars, barLine: barLine}
+		return d.highlight(cursor)
+	}
+	memo.drawnKey, memo.drawn, memo.bars, memo.barLine, memo.drawnOK = key, out, bars, barLine, true
+	return memo.highlight(cursor)
+}
+
+// keyOrZero is the key the groups were counted under, for drawKey.
+func (m *statsMemo) keyOrZero() statsKey {
+	if m == nil {
+		return statsKey{}
+	}
+	return m.key
+}
+
+// highlight is the drawn bars with row at drawn under the cursor: a copy,
+// so the kept lines stay unhighlighted.
+func (m *statsMemo) highlight(row int) []string {
+	out := append([]string(nil), m.drawn...)
+	if row >= 0 && row < len(m.bars) {
+		b := m.bars[row]
+		b.under = true
+		out[m.barLine[row]] = b.render()
 	}
 	return out
 }

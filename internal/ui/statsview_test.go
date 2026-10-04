@@ -689,3 +689,39 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 		t.Errorf("going on up never scrolled back (%d)", m.info.offset)
 	}
 }
+
+func TestTheBarsAreCountedOnceUntilSomethingTheyCountChanges(t *testing.T) {
+	// j and k only move the highlight: they draw from the bars as counted,
+	// rather than counting the list again several times a key.
+	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
+	l := m.ws.current().cardsView()
+	m = drive(m, "s")
+	m.View()
+	counted := m.stats.memo.groups
+	m = drive(m, "j", "j", "k", "J", "K")
+	m.View()
+	if &m.stats.memo.groups[0] != &counted[0] {
+		t.Error("walking the bars counted them again")
+	}
+
+	// Filtering by one changes what they count: counted again.
+	m = pointStat(t, m, "Type", "Creature")
+	m = drive(m, "a")
+	m.View()
+	if &m.stats.memo.groups[0] == &counted[0] {
+		t.Fatal("filtering didn't count the bars again")
+	}
+	if !strings.Contains(stripANSI(m.View()), "Creature") || l.count() != 3 {
+		t.Errorf("after filtering: %d cards", l.count())
+	}
+
+	// So does an edit to the list.
+	before := m.stats.memo.groups
+	m = drive(m, "X")
+	l.all = l.all[:len(l.all)-1]
+	l.refresh()
+	m.View()
+	if &m.stats.memo.groups[0] == &before[0] {
+		t.Error("an edit didn't count the bars again")
+	}
+}

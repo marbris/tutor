@@ -180,6 +180,7 @@ func (m *Model) restore() tea.Cmd {
 		for _, path := range s.OpenTags {
 			m.stats.openTags[path] = true
 		}
+		m.stats.openGen++
 	}
 	if s.Info == infoImage.String() && kittyGraphics() {
 		m.info.mode = infoImage

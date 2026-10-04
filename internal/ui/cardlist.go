@@ -22,7 +22,11 @@ import (
 type cardList struct {
 	// all is every card, in the order it arrived. Nothing reorders this;
 	// the sort and the filter build rows from it, so both can be undone.
-	all   []deck.Card
+	all []deck.Card
+	// gen counts refreshes. Everything that changes the cards or their
+	// narrowing goes through refresh, so the statistics, kept between
+	// frames, know by it when to count again.
+	gen   int
 	order cardSort
 	// order2 breaks order's ties and colours the names — , and <. Arrival
 	// means there is none.
@@ -153,6 +157,7 @@ func (l *cardList) sortsBy(s cardSort) bool {
 // through here, so the filter and the sort can't be applied in the wrong
 // order or one of them forgotten.
 func (l *cardList) refresh() {
+	l.gen++
 	rows := l.narrowed()
 	l.rows = sortCards(rows, l.spec())
 	l.cursor.clamp(len(l.rows))
