@@ -60,6 +60,7 @@ type Card struct {
 	Legalities    map[string]string `json:"legalities"`
 	CMC           float64           `json:"cmc"`
 	EDHRECRank    int               `json:"edhrec_rank"`
+	Keywords      []string          `json:"keywords"`
 	Prices        Prices            `json:"prices"`
 
 	// Transforming and modal double-faced cards carry no top-level oracle

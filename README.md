@@ -114,6 +114,21 @@ marked in the other panels.
 
 ![A search panel beside the editing deck, with cards already in the deck marked](screenshots/add-to-deck.png)
 
+### Filtering
+
+`/` narrows the list in front of you as you type. Plain words match the name, the text, the type
+line and the tags. It also takes some of Scryfall's syntax, worked out on your machine over the
+cards in the list:
+
+```
+t:creature  o:"draw a card"  mv<=3  pow>=4  c:rg  id:gruul  r>=rare  usd<5
+f:commander  kw:flying  set:mh3  otag:ramp  tag:wincon
+-t:land  (t:instant or t:sorcery)
+```
+
+`tag:` is your own tags, including the ones from tag lists. Anything it doesn't know is matched as
+plain text.
+
 ### Sorting
 
 Every list has two sorts. `.` cycles the first one, which fills the column on the right: mana value,
@@ -459,7 +474,7 @@ ttr cache clear [kind]          # delete it, all of it or one kind
 
 | Key | Does |
 | --- | --- |
-| `/` | filter as you type |
+| `/` | filter as you type: plain words, or some of Scryfall's syntax (see *Filtering*) |
 | `.` `>` | next / previous first sort |
 | `,` `<` | next / previous second sort |
 | `alt+.` `alt+,` | reverse the first / second sort |

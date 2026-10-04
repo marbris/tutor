@@ -279,6 +279,7 @@ func (p *panel) openFilter(current string) {
 	p.filterInput.SetValue(current)
 	p.filterInput.CursorEnd()
 	p.filterInput.Focus()
+	p.filterInput.Placeholder = ""
 }
 
 // restyle repaints the search bar. Colours are read at render time rather
@@ -289,6 +290,7 @@ func (p *panel) restyle() {
 	p.search.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.TextMuted)
 	p.filterInput.PromptStyle = lipgloss.NewStyle().Foreground(theme.Highlight)
 	p.filterInput.TextStyle = lipgloss.NewStyle().Foreground(theme.Text)
+	p.filterInput.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.TextMuted)
 }
 
 // setKind retargets a panel, which only means anything while it's empty.

@@ -6,6 +6,7 @@ import (
 	"ttr/internal/deck"
 	"ttr/internal/keymap"
 	"ttr/internal/mtg"
+	"ttr/internal/query"
 	"ttr/internal/rules"
 	"ttr/internal/stats"
 
@@ -177,10 +178,10 @@ func (l *cardList) narrowed() []deck.Card {
 		}
 		rows = kept
 	}
-	if terms := filterTerms(l.filter); len(terms) > 0 {
+	if q := query.Parse(l.filter); !q.Empty() {
 		kept := make([]deck.Card, 0, len(rows))
 		for _, c := range rows {
-			if matches(effective(c), terms) {
+			if q.Match(effective(c)) {
 				kept = append(kept, c)
 			}
 		}
@@ -377,19 +378,6 @@ func (l *cardList) selection() []deck.Card {
 
 // ── Filtering ───────────────────────────────────────────────────
 
-// matches reports whether every term appears in the card's name or its
-// rules text.
-func matches(c deck.Card, terms []string) bool {
-	hay := strings.ToLower(c.Card.Name + "\n" + c.Card.CombinedOracle() + "\n" +
-		c.Card.TypeLine + "\n" + strings.Join(c.Tags, " "))
-	for _, t := range terms {
-		if !strings.Contains(hay, t) {
-			return false
-		}
-	}
-	return true
-}
-
 // filterTerms splits a filter into the substrings that all have to match.
 // Quoting keeps a phrase together: `"first strike"` is one term, where
 // first strike would be two.
@@ -584,6 +572,8 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		l.markAll()
 	case keymap.CardsFilter:
 		p.openFilter(l.filter)
+		// A list of cards takes some of Scryfall's syntax (internal/query).
+		p.filterInput.Placeholder = "words, or t:creature mv<=3 c:rg otag:ramp tag:wincon -t:land …"
 
 	// ── Editing ─────────────────────────────────────────────────
 
