@@ -185,3 +185,36 @@ func TestKBringsTheTaggerGroupAboveTheRestInTheirOrder(t *testing.T) {
 		t.Errorf("J didn't turn them back: %v, want %v", got, before)
 	}
 }
+
+func TestATaggerTagsMeaningShowsUnderItInTheStatistics(t *testing.T) {
+	const lines = `{"id":"r","label":"removal","description":"Get things off the table. See also [spot removal](spot-removal).","parent_ids":[],"child_ids":["ra"],"taggings":[]}
+{"id":"ra","label":"removal-artifact","parent_ids":["r"],"child_ids":[],"taggings":[{"oracle_id":"shatter"}]}
+`
+	var b bytes.Buffer
+	w := gzip.NewWriter(&b)
+	w.Write([]byte(lines))
+	w.Close()
+	d, err := tagger.Read(b.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := tagger.Current()
+	tagger.SetCurrent(d)
+	t.Cleanup(func() { tagger.SetCurrent(old) })
+
+	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
+	m = drive(m, "s", "K") // K from the top: the Tagger group
+	body := stripANSI(strings.Join(m.renderStats(70), "\n"))
+	if !strings.Contains(body, "Get things off the table. See also spot removal.") {
+		t.Errorf("removal's meaning isn't under it, links made plain:\n%s", body)
+	}
+	// One without a description says so.
+	m = drive(m, "enter", "j")
+	body = stripANSI(strings.Join(m.renderStats(70), "\n"))
+	if !strings.Contains(body, "no description on Tagger") {
+		t.Errorf("a tag with no description doesn't say so:\n%s", body)
+	}
+	if strings.Contains(body, "Get things off the table") {
+		t.Error("the meaning stayed with the row the highlight left")
+	}
+}

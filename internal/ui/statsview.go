@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -608,7 +609,7 @@ func (m Model) renderStats(width int) []string {
 	key := drawKey{counted: memo.keyOrZero(), top: m.stats.top, width: width, odds: m.stats.odds,
 		expr: expr.String(), hints: m.hintsExpanded}
 	if memo != nil && memo.ok && memo.drawnOK && memo.drawnKey == key {
-		return memo.highlight(cursor)
+		return memo.highlight(cursor, m.tagMeaning(width))
 	}
 
 	pop := m.statPop()
@@ -649,10 +650,10 @@ func (m Model) renderStats(width int) []string {
 	}
 	if memo == nil || !memo.ok {
 		d := statsMemo{drawn: out, bars: bars, barLine: barLine}
-		return d.highlight(cursor)
+		return d.highlight(cursor, m.tagMeaning(width))
 	}
 	memo.drawnKey, memo.drawn, memo.bars, memo.barLine, memo.drawnOK = key, out, bars, barLine, true
-	return memo.highlight(cursor)
+	return memo.highlight(cursor, m.tagMeaning(width))
 }
 
 // keyOrZero is the key the groups were counted under, for drawKey.
@@ -663,16 +664,55 @@ func (m *statsMemo) keyOrZero() statsKey {
 	return m.key
 }
 
-// highlight is the drawn bars with row at drawn under the cursor: a copy,
-// so the kept lines stay unhighlighted.
-func (m *statsMemo) highlight(row int) []string {
+// highlight is the drawn bars with row at drawn under the cursor, and
+// under it whatever there is to say about it: a copy, so the kept lines
+// stay as they were.
+func (m *statsMemo) highlight(row int, under []string) []string {
 	out := append([]string(nil), m.drawn...)
-	if row >= 0 && row < len(m.bars) {
-		b := m.bars[row]
-		b.under = true
-		out[m.barLine[row]] = b.render()
+	if row < 0 || row >= len(m.bars) {
+		return out
 	}
-	return out
+	b := m.bars[row]
+	b.under = true
+	at := m.barLine[row]
+	out[at] = b.render()
+	if len(under) == 0 {
+		return out
+	}
+	return append(out[:at+1], append(under, out[at+1:]...)...)
+}
+
+// tagMeaning is what Scryfall Tagger says the highlighted tag means, to
+// show under it: a few lines, indented with the row. Most tags have no
+// description, and then it says so.
+func (m Model) tagMeaning(width int) []string {
+	r, ok := m.statUnder()
+	if !ok || r.Group != stats.TaggerGroup || r.Label == "untagged" {
+		return nil
+	}
+	text := "no description on Tagger"
+	tg := tagger.Current()
+	if t, found := tg.Find(r.Label); found && tg.Tags[t].Description != "" {
+		text = plainMarkdown(tg.Tags[t].Description)
+	}
+	indent := strings.Repeat("  ", r.Depth+2)
+	lines := wrapStyled(text, maxInt(width-len(indent), 10), lipgloss.NewStyle().Foreground(theme.TextMuted).Italic(true))
+	if len(lines) > 3 {
+		lines = append(lines[:2], mutedLine("…", width))
+	}
+	for i := range lines {
+		lines[i] = indent + lines[i]
+	}
+	return lines
+}
+
+// mdLink is a Markdown link, which Tagger's descriptions use for related
+// tags: [spot removal](spot-removal).
+var mdLink = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
+
+// plainMarkdown is a description with its links reduced to their text.
+func plainMarkdown(s string) string {
+	return strings.TrimSpace(mdLink.ReplaceAllString(s, "$1"))
 }
 
 // statLabel is a row's name as drawn. A row in the Tagger tree is indented

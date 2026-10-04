@@ -287,6 +287,8 @@ The tags show up in three places:
 - The info panel lists the tags of the highlighted card.
 - The statistics have a Scryfall Tagger group. Tags are nested (`removal` holds `removal-creature`,
   `removal-artifact`, `sweeper` and so on), and `enter` opens a tag to show the ones under it.
+  What a tag means shows under the highlighted one, where Tagger describes it (about a third of the
+  tags have a description).
 - In a Scryfall search, `tab` after `otag:` completes the tag name.
 
 There are two ways to turn Tagger tags into tags of your own on a local list.
