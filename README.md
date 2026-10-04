@@ -327,7 +327,10 @@ other terminals `gx` opens the card in your browser.
 ### Card history
 
 `gv` on a card shows its printed text on every printing it has had, so you can see the errata and
-the wording changes over the years. The text comes from [MTGJSON](https://mtgjson.com/).
+the wording changes over the years. The text comes from [MTGJSON](https://mtgjson.com/), one file
+per set, about 1.5 MB each. The sets you don't have yet download straight away, newest first, and the
+history fills in as they arrive. Each set is kept, so a card reprinted in many sets is slow only the
+first time.
 
 ![A card's text compared across its printings](screenshots/text-history.png)
 

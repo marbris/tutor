@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -42,53 +43,56 @@ func TestACardWithNoPrintingsLinkSaysSo(t *testing.T) {
 	}
 }
 
-func TestCachedSetsAreShownWithoutAskingAndTheRestAreOffered(t *testing.T) {
-	// Forty printings is forty multi-megabyte downloads. What is already on
-	// disk costs nothing and is taken; the rest is offered.
+func TestMissingSetsAreFetchedAtOnceNewestFirstOneAtATime(t *testing.T) {
+	// No go-ahead to give: the sets come straight away, the newest first
+	// (the wording in force now matters most), one download at a time.
 	m := withCards(sized(140, 30), "f", []deck.Card{{Card: historyCard()}}, sortArrival)
 	m = drive(m, "g", "v")
 
-	next, _ := m.Update(printingsMsg{card: "oid", printings: []prints.Printing{
+	next, cmd := m.Update(printingsMsg{card: "oid", printings: []prints.Printing{
 		{Name: "Test Bird", Set: "AAA", SetName: "Alpha", Released: "1993-08-05"},
+		{Name: "Test Bird", Set: "CCC", SetName: "Gamma", Released: "2020-01-01"},
 		{Name: "Test Bird", Set: "BBB", SetName: "Beta", Released: "1994-04-11"},
 	}})
 	m = next.(Model)
 
 	h := m.histories["oid"]
-	if h.state != histWaiting {
-		t.Fatalf("state is %v, want it waiting for the go-ahead", h.state)
+	if cmd == nil || h.fetching != "CCC" {
+		t.Fatalf("downloading %q first, want the newest set, CCC", h.fetching)
 	}
-	if len(h.missing) != 2 {
-		t.Errorf("%d sets are missing, want both", len(h.missing))
+	if len(h.queue) != 2 || h.queue[0] != "BBB" {
+		t.Errorf("queued %v, want BBB then AAA", h.queue)
+	}
+	if view := stripANSI(m.View()); !strings.Contains(view, "fetching 3 more sets") {
+		t.Errorf("the panel doesn't say what's coming:\n%s", view)
 	}
 
-	view := stripANSI(m.View())
-	if !strings.Contains(view, "not downloaded") || !strings.Contains(view, "y to fetch") {
-		t.Errorf("the offer is not on screen:\n%s", view)
+	// Each arrival starts the next, and the history fills in as they come.
+	next, cmd = m.Update(setTextMsg{card: "oid", set: "CCC", cards: map[string]string{"test bird": "Flying"}})
+	m = next.(Model)
+	if cmd == nil || h.fetching != "BBB" {
+		t.Errorf("after CCC, downloading %q, want BBB", h.fetching)
+	}
+	if len(h.revisions) == 0 {
+		t.Error("nothing shown until every set is in")
+	}
+	// A set that won't download is left out, and the rest still come.
+	next, _ = m.Update(setTextMsg{card: "oid", set: "BBB", err: errTest})
+	m = next.(Model)
+	next, _ = m.Update(setTextMsg{card: "oid", set: "AAA", cards: map[string]string{"test bird": "Does not tap when attacking."}})
+	m = next.(Model)
+	if h.state != histReady {
+		t.Errorf("state %v after every set came or failed, want ready", h.state)
 	}
 }
 
-func TestYIsTheGoAheadRatherThanAYank(t *testing.T) {
-	// A card list takes y for yank, so the printed-text panel has to claim
-	// it first or the offer could never be accepted.
+func TestYYanksInThePrintedTextPanelNow(t *testing.T) {
+	// y used to be the go-ahead to download; with nothing to ask, it is a
+	// card list's yank again, as everywhere else.
 	m := withCards(sized(140, 30), "f", []deck.Card{{Card: historyCard()}}, sortArrival)
-	m = drive(m, "g", "v")
-	next, _ := m.Update(printingsMsg{card: "oid", printings: []prints.Printing{
-		{Name: "Test Bird", Set: "AAA", SetName: "Alpha"},
-	}})
-	m = next.(Model)
-
-	next, cmd := m.Update(keyMsg("y"))
-	m = next.(Model)
-
-	if cmd == nil {
-		t.Error("y did not start the download")
-	}
-	if len(m.register) > 0 {
-		t.Error("y yanked instead of answering the question")
-	}
-	if m.histories["oid"].state != histFetching {
-		t.Errorf("state is %v", m.histories["oid"].state)
+	m = drive(m, "g", "v", "y")
+	if len(m.register) == 0 {
+		t.Error("y didn't yank")
 	}
 }
 
@@ -103,7 +107,6 @@ func TestRevisionsCollapseIdenticalWordings(t *testing.T) {
 	m = next.(Model)
 
 	h := m.histories["oid"]
-	h.missing = nil // pretend the go-ahead was given
 	for _, s := range []struct{ set, text string }{
 		{"AAA", "Does not tap when attacking."},
 		{"BBB", "Flying"},
@@ -249,3 +252,5 @@ func TestThePrintedTextStaysWhileTheCursorDoes(t *testing.T) {
 		t.Errorf("a key that moved nothing closed the view; mode %v", m.info.mode)
 	}
 }
+
+var errTest = errors.New("no such set")

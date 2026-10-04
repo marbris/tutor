@@ -156,18 +156,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	global := keymap.Lookup(keymap.Global, key)
 
-	// y in the printed-text panel is the go-ahead to download the sets that
-	// aren't cached. It has to be claimed before the view sees it, because
-	// a card list takes y for yank.
-	if global == keymap.GlobalFetchSets && m.info.mode == infoVersions {
-		if c := m.focusedCard(); c != nil {
-			if h, ok := m.histories[c.OracleID]; ok && h.state == histWaiting {
-				cmd := m.fetchAllSets(h)
-				return m, cmd
-			}
-		}
-	}
-
 	// g is a prefix everywhere and never a key on its own, so it has to be
 	// claimed before any view sees it — a list would otherwise take it for
 	// "go to the top" and gd and gv could never be typed. gg still means

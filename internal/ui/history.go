@@ -1,12 +1,12 @@
 package ui
 
 import (
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"ttr/internal/keymap"
 	"ttr/internal/mtg"
 	"ttr/internal/prints"
 	"ttr/internal/theme"
@@ -19,17 +19,17 @@ import (
 // this comes from MTGJSON, which publishes whole sets: a heavily reprinted
 // card means one file per set it appeared in.
 //
-// That is the whole difficulty. Forty printings is forty downloads of a
-// multi-megabyte file each, which is minutes. So what has already been
-// cached is shown immediately, and the rest is offered rather than fetched:
-// you get an answer at once, and a way to get a better one.
+// That is the whole difficulty: a set's file is about 1.5 MB, and a card
+// reprinted in forty sets is forty of them. So the sets already on disk are
+// shown at once, and the rest are fetched straight away, newest first and
+// one at a time, the history filling in as each lands. Each set is kept, and
+// shared by every card printed in it, so the cost falls fast.
 
 type histState int
 
 const (
 	histPrintings histState = iota // finding out where it was printed
-	histWaiting                    // some sets aren't cached; asking first
-	histFetching
+	histFetching                   // sets still coming
 	histReady
 	histFailed
 )
@@ -40,8 +40,12 @@ type cardHistory struct {
 	state     histState
 	card      mtg.Card
 	printings []prints.Printing
-	// missing are the sets whose text hasn't been downloaded yet.
-	missing   []string
+	// queue is the sets still to download, newest first, one at a time;
+	// fetching is the one on its way, and reading the ones being read from
+	// disk.
+	queue     []string
+	fetching  string
+	reading   map[string]bool
 	originals map[string]map[string]string
 	revisions []prints.TextRevision
 	err       error
@@ -96,40 +100,54 @@ func (m Model) handlePrintings(msg printingsMsg) (tea.Model, tea.Cmd) {
 	}
 
 	h.printings = msg.printings
-	// Everything already on disk costs nothing, so take it now and see what
-	// is left to ask about.
-	var missing []string
+	h.reading = map[string]bool{}
+	// Each set once, newest first: the wording in force now matters most.
+	byNew := append([]prints.Printing(nil), msg.printings...)
+	sort.SliceStable(byNew, func(a, b int) bool { return byNew[a].Released > byNew[b].Released })
+	seen := map[string]bool{}
 	var cmds []tea.Cmd
-	for _, p := range msg.printings {
+	for _, p := range byNew {
+		if seen[p.Set] {
+			continue
+		}
+		seen[p.Set] = true
+		// What's on disk costs nothing: read it all now.
 		if prints.IsCached(p.Set) {
+			h.reading[p.Set] = true
 			cmds = append(cmds, fetchSetText(msg.card, p.Set))
 			continue
 		}
-		missing = append(missing, p.Set)
+		h.queue = append(h.queue, p.Set)
 	}
-	h.missing = missing
-
-	switch {
-	case len(missing) == 0:
-		h.state = histFetching
-	default:
-		h.state = histWaiting
-	}
-	if len(cmds) == 0 {
+	cmds = append(cmds, h.fetchNext())
+	h.state = histFetching
+	if h.done() {
 		m.finishHistory(h)
 	}
 	return m, tea.Batch(cmds...)
 }
 
-// fetchAllSets is what y answers: go and get the rest.
-func (m *Model) fetchAllSets(h *cardHistory) tea.Cmd {
-	h.state = histFetching
-	var cmds []tea.Cmd
-	for _, set := range h.missing {
-		cmds = append(cmds, fetchSetText(h.card.OracleID, set))
+// fetchNext starts the next set in the queue downloading, if none is.
+func (h *cardHistory) fetchNext() tea.Cmd {
+	if h.fetching != "" || len(h.queue) == 0 {
+		return nil
 	}
-	h.missing = nil
-	return tea.Batch(cmds...)
+	h.fetching, h.queue = h.queue[0], h.queue[1:]
+	return fetchSetText(h.card.OracleID, h.fetching)
+}
+
+// done reports whether every set has arrived or failed.
+func (h *cardHistory) done() bool {
+	return h.fetching == "" && len(h.queue) == 0 && len(h.reading) == 0
+}
+
+// remaining is how many sets are still to come.
+func (h *cardHistory) remaining() int {
+	n := len(h.queue) + len(h.reading)
+	if h.fetching != "" {
+		n++
+	}
+	return n
 }
 
 func fetchSetText(oracle, set string) tea.Cmd {
@@ -139,6 +157,8 @@ func fetchSetText(oracle, set string) tea.Cmd {
 	}
 }
 
+// handleSetText takes one set's text, shows the history as far as it goes,
+// and starts the next download. A set that won't download is left out.
 func (m Model) handleSetText(msg setTextMsg) (tea.Model, tea.Cmd) {
 	h, ok := m.histories[msg.card]
 	if !ok {
@@ -147,30 +167,23 @@ func (m Model) handleSetText(msg setTextMsg) (tea.Model, tea.Cmd) {
 	if msg.err == nil {
 		h.originals[msg.set] = msg.cards
 	}
-
-	// Done when every set that is going to arrive has.
-	want := 0
-	for _, p := range h.printings {
-		if _, have := h.originals[p.Set]; have {
-			continue
-		}
-		if contains(h.missing, p.Set) {
-			continue
-		}
-		want++
+	delete(h.reading, msg.set)
+	var next tea.Cmd
+	if h.fetching == msg.set {
+		h.fetching = ""
+		next = h.fetchNext()
 	}
-	if want == 0 {
-		m.finishHistory(h)
-	}
-	return m, nil
+	m.finishHistory(h)
+	return m, next
 }
 
+// finishHistory works the wordings out from what has arrived so far.
 func (m *Model) finishHistory(h *cardHistory) {
 	h.revisions = prints.BuildRevisions(h.card, h.printings, h.originals)
-	if len(h.missing) > 0 {
-		h.state = histWaiting
-	} else {
+	if h.done() {
 		h.state = histReady
+	} else {
+		h.state = histFetching
 	}
 }
 
@@ -226,18 +239,14 @@ func (m Model) renderHistory(c mtg.Card, width int) []string {
 		out = append(out, highlightOracle(rev.Text, c, width, m.rules)...)
 	}
 
-	if len(h.revisions) == 0 && h.state != histWaiting {
+	if len(h.revisions) == 0 && h.state == histReady {
 		out = append(out, muted.Render(fit("no printed text on record", width)))
 	}
 
-	switch h.state {
-	case histFetching:
-		out = append(out, "", muted.Render(fit("fetching…", width)))
-	case histWaiting:
-		out = append(out, "")
-		out = append(out, dim.Render(fit(itoa(len(h.missing))+" more "+
-			plural("set", len(h.missing))+" not downloaded", width)))
-		out = append(out, muted.Render(fit(keymap.Hint(keymap.Global, keymap.GlobalFetchSets)+" to fetch them", width)))
+	if h.state == histFetching {
+		n := h.remaining()
+		out = append(out, "", dim.Render(fit("fetching "+itoa(n)+" more "+plural("set", n)+
+			" from MTGJSON, newest first…", width)))
 	}
 	return out
 }

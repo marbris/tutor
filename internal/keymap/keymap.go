@@ -63,7 +63,6 @@ const (
 	GlobalEditPrev  Action = "editing.prev"
 	GlobalInfoUp    Action = "info.half-page-up"
 	GlobalInfoDown  Action = "info.half-page-down"
-	GlobalFetchSets Action = "info.fetch-sets"
 	GlobalStats     Action = "stats"
 	GlobalStatsEdit Action = "stats.editing"
 	// H and L only do anything while the printing view is up.
@@ -195,7 +194,6 @@ var defaults = []binding{
 	{Global, GlobalEditPrev, k("E")},
 	{Global, GlobalInfoUp, k("K", "shift+up")},
 	{Global, GlobalInfoDown, k("J", "shift+down")},
-	{Global, GlobalFetchSets, k("y")},
 	{Global, GlobalPrintingOlder, k("H")},
 	{Global, GlobalPrintingNewer, k("L")},
 	{Global, GlobalPrintingFace, k("f")},
