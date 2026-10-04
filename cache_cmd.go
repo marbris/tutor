@@ -2,17 +2,17 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"ttr/internal/cache"
 	"ttr/internal/paths"
 )
 
 // ttr cache: what's been downloaded and kept, and how much room it takes.
 // Everything in the cache can be fetched again, so all of it is safe to
-// clear — the only cost is the next fetch.
+// clear — the only cost is the next fetch. The kinds are internal/cache's,
+// which the settings panel shows too.
 
 const cacheUsage = `Usage:
   ttr cache                 What's in the cache, and how much room it takes
@@ -22,51 +22,10 @@ Everything in %s
 can be downloaded again, so clearing it loses nothing but time: the next
 time something is needed, it is fetched.`
 
-// cacheKind is one kind of thing the cache holds, and how to recognise its
-// files by their path inside the cache directory.
-type cacheKind struct {
-	name  string // what `ttr cache clear` calls it
-	what  string // what the listing calls it
-	match func(rel string) bool
-	// refetch is what clearing it costs.
-	refetch string
-}
-
-var cacheKinds = []cacheKind{
-	{"cards", "card data for your decks", func(r string) bool { return r == "cards.json" || r == "cards.fetched.json" },
-		"decks look their cards up again on opening"},
-	{"pictures", "card pictures (gx)", func(r string) bool { return strings.HasPrefix(r, "images"+string(filepath.Separator)) },
-		"gx downloads each picture again"},
-	{"printings", "lists of each card's printings (gx)", func(r string) bool { return strings.HasPrefix(r, "printings"+string(filepath.Separator)) },
-		"gx asks Scryfall for each card's printings again"},
-	{"catalogs", "Scryfall's lists of keywords and types", func(r string) bool { return r == "catalogs.json" },
-		"the lists are fetched again, a dozen small requests"},
-	{"tagger", "Scryfall Tagger's tags", func(r string) bool { return strings.HasPrefix(r, "tagger"+string(filepath.Separator)) },
-		"the tags download again, about 6 MB"},
-	{"rulings", "card rulings", func(r string) bool { return strings.HasPrefix(r, "rulings"+string(filepath.Separator)) },
-		"the rulings file downloads again, about 5 MB"},
-	{"texts", "printed card texts (gv)", func(r string) bool { return strings.HasPrefix(r, "originals"+string(filepath.Separator)) },
-		"gv downloads each set's text again"},
-	{"rules", "comprehensive rules", func(r string) bool { return strings.HasPrefix(r, "comprules") },
-		"the rules download again, and gv in the rules has no older release to compare"},
-	{"decks", "followed Moxfield decks", func(r string) bool { return r == "userdecks.json" },
-		"the decks of people you follow are fetched again"},
-}
-
-// kindOf is the kind a cached file belongs to, or "other".
-func kindOf(rel string) string {
-	for _, k := range cacheKinds {
-		if k.match(rel) {
-			return k.name
-		}
-	}
-	return "other"
-}
-
 func runCache(args []string) {
-	names := make([]string, 0, len(cacheKinds))
-	for _, k := range cacheKinds {
-		names = append(names, k.name)
+	names := make([]string, 0, len(cache.Kinds))
+	for _, k := range cache.Kinds {
+		names = append(names, k.Name)
 	}
 	usage := fmt.Sprintf(cacheUsage, strings.Join(names, ", "), paths.Cache())
 
@@ -77,7 +36,7 @@ func runCache(args []string) {
 		kind := ""
 		if len(args) == 2 {
 			kind = args[1]
-			if !isKind(kind) {
+			if !cache.IsKind(kind) {
 				fmt.Fprintf(os.Stderr, "no kind of cache called %q — %s\n", kind, strings.Join(names, ", "))
 				os.Exit(1)
 			}
@@ -91,124 +50,46 @@ func runCache(args []string) {
 	}
 }
 
-func isKind(name string) bool {
-	for _, k := range cacheKinds {
-		if k.name == name {
-			return true
-		}
-	}
-	return false
-}
-
-// cachedFile is one file in the cache.
-type cachedFile struct {
-	path, rel string
-	size      int64
-}
-
-// cacheFiles is every file in the cache, with its size.
-func cacheFiles() []cachedFile {
-	root := paths.Cache()
-	var out []cachedFile
-	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return nil
-		}
-		rel, _ := filepath.Rel(root, path)
-		out = append(out, cachedFile{path, rel, info.Size()})
-		return nil
-	})
-	return out
-}
-
 func listCache() {
-	size := map[string]int64{}
-	count := map[string]int{}
+	use := cache.Usage()
 	var total int64
-	for _, f := range cacheFiles() {
-		k := kindOf(f.rel)
-		size[k] += f.size
-		count[k]++
-		total += f.size
+	for _, u := range use {
+		total += u.Size
 	}
 
 	fmt.Println(paths.Cache())
 	fmt.Println()
-	for _, k := range cacheKinds {
+	for _, k := range cache.Kinds {
+		u := use[k.Name]
 		files := ""
-		if count[k.name] > 1 {
-			files = fmt.Sprintf("%d files", count[k.name])
+		if u.Files > 1 {
+			files = fmt.Sprintf("%d files", u.Files)
 		}
-		line := fmt.Sprintf("  %-9s %9s  %-26s %s", k.name, humanSize(size[k.name]), k.what, files)
+		line := fmt.Sprintf("  %-9s %9s  %-26s %s", k.Name, cache.Size(u.Size), k.What, files)
 		fmt.Println(strings.TrimRight(line, " "))
 	}
-	if count["other"] > 0 {
-		fmt.Printf("  %-9s %9s  %-26s %d files\n", "other", humanSize(size["other"]), "anything else", count["other"])
+	if o := use[cache.Other]; o.Files > 0 {
+		fmt.Printf("  %-9s %9s  %-26s %d files\n", cache.Other, cache.Size(o.Size), "anything else", o.Files)
 	}
-	fmt.Printf("\n  %-9s %9s\n", "total", humanSize(total))
+	fmt.Printf("\n  %-9s %9s\n", "total", cache.Size(total))
 	fmt.Println("\nttr cache clear empties it, or ttr cache clear <kind> one kind of it.")
 }
 
-// clearCache deletes the cache's files — all of them, or one kind's — and
-// the directories they leave empty.
+// clearCache deletes the cache's files, all of them or one kind's.
 func clearCache(kind string) {
-	var freed int64
-	n := 0
-	for _, f := range cacheFiles() {
-		if kind != "" && kindOf(f.rel) != kind {
-			continue
-		}
-		if err := os.Remove(f.path); err != nil {
-			fmt.Fprintln(os.Stderr, "Error:", err)
-			continue
-		}
-		freed += f.size
-		n++
+	n, freed, err := cache.Clear(kind)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
 	}
-	removeEmptyDirs(paths.Cache())
-
-	what := "the cache"
 	if kind != "" {
-		what = kind
-		for _, k := range cacheKinds {
-			if k.name == kind {
-				fmt.Printf("cleared %s: %d %s, %s — %s\n", k.what, n, plural("file", n), humanSize(freed), k.refetch)
+		for _, k := range cache.Kinds {
+			if k.Name == kind {
+				fmt.Printf("cleared %s: %d %s, %s — %s\n", k.What, n, plural("file", n), cache.Size(freed), k.Refetch)
 				return
 			}
 		}
 	}
-	fmt.Printf("cleared %s: %d %s, %s\n", what, n, plural("file", n), humanSize(freed))
-}
-
-// removeEmptyDirs takes out the directories under root that clearing left
-// empty, deepest first, keeping root itself.
-func removeEmptyDirs(root string) {
-	var dirs []string
-	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err == nil && d.IsDir() && path != root {
-			dirs = append(dirs, path)
-		}
-		return nil
-	})
-	for i := len(dirs) - 1; i >= 0; i-- {
-		os.Remove(dirs[i]) // fails, harmlessly, on one that isn't empty
-	}
-}
-
-func humanSize(n int64) string {
-	switch {
-	case n >= 1<<30:
-		return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
-	case n >= 1<<20:
-		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
-	case n >= 1<<10:
-		return fmt.Sprintf("%.0f KB", float64(n)/(1<<10))
-	}
-	return fmt.Sprintf("%d B", n)
+	fmt.Printf("cleared the cache: %d %s, %s\n", n, plural("file", n), cache.Size(freed))
 }
 
 func plural(word string, n int) string {
