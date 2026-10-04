@@ -156,6 +156,21 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if l == nil || len(tags) == 0 || len(l.all) == 0 {
 				return m, nil
 			}
+			if msg, unknown, ok := localOtag(tags, l.all); ok {
+				msg.panel = p.id
+				next, cmd := m.handleOtag(msg)
+				if len(unknown) > 0 {
+					nm := next.(Model)
+					no := "Scryfall Tagger has no " + strings.Join(unknown, ", ")
+					if len(msg.tags) == 0 {
+						nm.notice = no
+					} else {
+						nm.notice += " · " + no
+					}
+					next = nm
+				}
+				return next, cmd
+			}
 			m.notice = "asking scryfall about " + strings.Join(tags, ", ") + "…"
 			return m, runOtag(p.id, tags, uniqueNames(l.all))
 

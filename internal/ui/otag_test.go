@@ -115,3 +115,57 @@ func TestTabInTheAddBarTagsTheDeckByOtag(t *testing.T) {
 		t.Errorf("notice %q", m.notice)
 	}
 }
+
+func TestOtagTaggingIsWorkedOutLocallyFromTheTaggerTags(t *testing.T) {
+	// No request may go out: the answer is on disk.
+	asked := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	old := scryfall.SearchURL
+	scryfall.SearchURL = srv.URL
+	t.Cleanup(func() { scryfall.SearchURL = old })
+
+	withTagger(t)
+	m, l := ownDeck(sized(160, 30))
+	l.all = taggedCards()
+	l.refresh()
+	m = drive(m, "i", "tab")
+	for _, r := range "removal nosuchtag" {
+		m = drive(m, string(r))
+	}
+	m, cmd := press(m, "enter")
+	if asked != 0 {
+		t.Errorf("asked Scryfall %d times; the tags are local", asked)
+	}
+	if cmd == nil {
+		t.Error("the tagging wasn't saved")
+	}
+
+	// removal has no cards of its own: its children carry them, and it
+	// counts them, as otag: does.
+	tagged := map[string]bool{}
+	for _, c := range l.all {
+		for _, tg := range c.Tags {
+			if tg == "otag-removal" {
+				tagged[c.Card.Name] = true
+			}
+		}
+	}
+	if len(tagged) != 2 || !tagged["shatter"] || !tagged["disenchant"] {
+		t.Errorf("otag-removal went on %v, want shatter and disenchant", tagged)
+	}
+	if !strings.Contains(m.notice, "otag-removal: 2 of 4") || !strings.Contains(m.notice, "no nosuchtag") {
+		t.Errorf("notice %q", m.notice)
+	}
+
+	// One undo takes it all back (u undoes the editing deck, so make it that).
+	m = drive(m, "e", "u")
+	for _, c := range l.all {
+		if len(c.Tags) != 0 {
+			t.Errorf("%s kept %v after undo", c.Card.Name, c.Tags)
+		}
+	}
+}

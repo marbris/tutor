@@ -10,13 +10,20 @@ import (
 	"ttr/internal/deck"
 	"ttr/internal/fetch"
 	"ttr/internal/scryfall"
+	"ttr/internal/tagger"
 )
 
 // tab in the i bar: tag the deck in front of you from Scryfall's oracle tags.
 //
 // Type "removal" and every card in the list that Scryfall tags
-// otag:removal gets the tag otag-removal. It asks Scryfall one question per
-// tag: otag:removal (!"Sol Ring" or !"Rancor" or …), over the list's own
+// otag:removal gets the tag otag-removal.
+//
+// The answer is worked out here, from Scryfall Tagger's tags kept on disk
+// and the oracle id every card in the list carries — at once, with nothing
+// asked. A tag counts the cards under it, as otag: does on Scryfall and as
+// the statistics do: removal finds the artifact removal. Only when the
+// tags aren't in, or a card has no oracle id, does it ask Scryfall instead,
+// one question per tag: otag:removal (!"Sol Ring" or !"Rancor" or …), over the list's own
 // names, and tags whatever comes back. Names go in batches, so no one query
 // grows longer than a URL should. A batch that matches more than a page's
 // worth is paged through, which only happens when the first page came back
@@ -90,6 +97,37 @@ func uniqueNames(cards []deck.Card) []string {
 		}
 	}
 	return out
+}
+
+// localOtag is the answer from the Tagger tags on disk: for each tag, the
+// names in the list it covers, and the tags Tagger doesn't have. ok is
+// false when it can't answer — no tags loaded, or a card with no oracle
+// id to look up — and Scryfall has to be asked.
+func localOtag(tags []string, cards []deck.Card) (msg otagMsg, unknown []string, ok bool) {
+	tg := tagger.Current()
+	if tg == nil {
+		return otagMsg{}, nil, false
+	}
+	for _, c := range cards {
+		if c.Card.OracleID == "" {
+			return otagMsg{}, nil, false
+		}
+	}
+	msg = otagMsg{hits: map[string][]string{}}
+	for _, tag := range tags {
+		t, found := tg.Find(tag)
+		if !found {
+			unknown = append(unknown, tag)
+			continue
+		}
+		msg.tags = append(msg.tags, tag)
+		for _, c := range cards {
+			if tg.Has(c.Card.OracleID, t) {
+				msg.hits[tag] = append(msg.hits[tag], c.Card.Name)
+			}
+		}
+	}
+	return msg, unknown, true
 }
 
 // runOtag asks Scryfall, off the main thread, pausing between requests.
