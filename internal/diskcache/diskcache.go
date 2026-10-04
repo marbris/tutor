@@ -50,6 +50,15 @@ func Fresh(rel string, maxAge time.Duration) bool {
 	return err == nil && time.Since(info.ModTime()) < maxAge
 }
 
+// ModTime is when the copy at rel was saved, and whether there is one.
+func ModTime(rel string) (time.Time, bool) {
+	info, err := os.Stat(filepath.Join(paths.Cache(), rel))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return info.ModTime(), true
+}
+
 // Has reports whether there is a copy at rel, of any age, without reading
 // it.
 func Has(rel string) bool {

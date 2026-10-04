@@ -3,6 +3,7 @@ package ui
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -499,6 +500,20 @@ func printingFacts(c mtg.Card, width int) []string {
 	return out
 }
 
+// priceAge is how old a price is, once it's over a day: " (6 days old)".
+// Prices are for orders of magnitude, so a week-old one is fine — but it
+// says so.
+func priceAge(c mtg.Card, now time.Time) string {
+	if c.PricedAt.IsZero() {
+		return ""
+	}
+	days := int(now.Sub(c.PricedAt).Hours() / 24)
+	if days < 1 {
+		return ""
+	}
+	return " (" + itoa(days) + " " + plural("day", days) + " old)"
+}
+
 // factLines are printingFacts' lines before they are wrapped and styled.
 func factLines(c mtg.Card) []string {
 	var printing, worth []string
@@ -512,7 +527,7 @@ func factLines(c mtg.Card) []string {
 		worth = append(worth, "edhrec #"+itoa(c.EDHRECRank))
 	}
 	if _, ok := c.USD(); ok {
-		worth = append(worth, usdText(c))
+		worth = append(worth, usdText(c)+priceAge(c, time.Now()))
 	}
 	var out []string
 	for _, facts := range [][]string{printing, worth} {

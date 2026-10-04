@@ -8,6 +8,7 @@ package mtg
 import (
 	"strconv"
 	"strings"
+	"time"
 )
 
 // SearchResponse is a page of results from Scryfall's search endpoint.
@@ -62,6 +63,10 @@ type Card struct {
 	EDHRECRank    int               `json:"edhrec_rank"`
 	Keywords      []string          `json:"keywords"`
 	Prices        Prices            `json:"prices"`
+	// PricedAt is when Scryfall was asked for this copy of the card, for a
+	// price read from what Tutor keeps on disk: zero when it was just asked.
+	// Not part of Scryfall's card, so never written with it.
+	PricedAt time.Time `json:"-"`
 
 	// Transforming and modal double-faced cards carry no top-level oracle
 	// text, mana cost or colors at all — it's per face.

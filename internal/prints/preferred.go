@@ -185,6 +185,11 @@ const printingsMaxAge = 24 * time.Hour
 func All(c mtg.Card) (list []mtg.Card, size int, stale bool, err error) {
 	var kept []mtg.Card
 	if fresh, have := diskcache.Load(printingsFile(c), printingsMaxAge, &kept); have && len(kept) > 0 {
+		if at, ok := diskcache.ModTime(printingsFile(c)); ok {
+			for i := range kept {
+				kept[i].PricedAt = at
+			}
+		}
 		return kept, 0, !fresh, nil
 	}
 	list, size, err = Refresh(c)

@@ -91,6 +91,9 @@ func loadCardCache() *cardCache {
 
 func (c *cardCache) get(e Entry) (mtg.Card, bool) {
 	card, ok := c.cards[entryKey(e)]
+	if at, has := c.fetched[entryKey(e)]; ok && has {
+		card.PricedAt = time.Unix(at, 0)
+	}
 	return card, ok
 }
 

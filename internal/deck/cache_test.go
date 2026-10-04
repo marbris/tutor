@@ -1,6 +1,7 @@
 package deck
 
 import (
+	"time"
 	"ttr/internal/mtg"
 
 	"ttr/internal/scryfall"
@@ -204,5 +205,18 @@ func TestRefreshStaleAsksAgainOnlyForCardsOverADayOld(t *testing.T) {
 	asked = nil
 	if got, err := RefreshStale("refresh-test"); err != nil || len(got) != 0 || len(asked) != 0 {
 		t.Errorf("a second refresh asked for %v and returned %v, %v", asked, got, err)
+	}
+}
+
+func TestACachedCardCarriesWhenItWasFetched(t *testing.T) {
+	seedCache(t, map[string]mtg.Card{"sol ring": {Name: "Sol Ring"}})
+	c := loadCardCache()
+	if card, _ := c.get(Entry{Name: "Sol Ring"}); !card.PricedAt.IsZero() {
+		t.Error("a card from before fetch times were kept has a time")
+	}
+	c.put(Entry{Name: "Sol Ring"}, mtg.Card{Name: "Sol Ring"})
+	c.save()
+	if card, _ := loadCardCache().get(Entry{Name: "Sol Ring"}); time.Since(card.PricedAt) > time.Minute {
+		t.Errorf("a card just fetched says %v", card.PricedAt)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -67,5 +68,28 @@ func TestPrintingFactsColourTheRarity(t *testing.T) {
 	narrow := printingFacts(c, 12)
 	if last := narrow[len(narrow)-2]; !strings.HasSuffix(strings.TrimRight(last, " "), want) {
 		t.Errorf("wrapped, the rarity lost its colour: %q", narrow)
+	}
+}
+
+func TestAPriceSaysHowOldItIsOnceItsOverADay(t *testing.T) {
+	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	c := mtg.Card{Prices: mtg.Prices{USD: "2.53"}}
+	for _, tc := range []struct {
+		at   time.Time
+		want string
+	}{
+		{time.Time{}, ""}, // just asked
+		{now.Add(-5 * time.Hour), ""},
+		{now.Add(-30 * time.Hour), " (1 day old)"},
+		{now.Add(-6 * 24 * time.Hour), " (6 days old)"},
+	} {
+		c.PricedAt = tc.at
+		if got := priceAge(c, now); got != tc.want {
+			t.Errorf("priced %v before: %q, want %q", now.Sub(tc.at), got, tc.want)
+		}
+	}
+	c.PricedAt = time.Now().Add(-6 * 24 * time.Hour)
+	if facts := strings.Join(factLines(c), " "); !strings.Contains(facts, "$2.53 (6 days old)") {
+		t.Errorf("the facts line: %q", facts)
 	}
 }
