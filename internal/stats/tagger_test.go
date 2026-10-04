@@ -103,3 +103,12 @@ func TestNoTaggerGroupWithoutTheTags(t *testing.T) {
 		t.Error("a Tagger group with no tags loaded")
 	}
 }
+
+func TestTheTaggerGroupIsLast(t *testing.T) {
+	withTags(t)
+	cards := []deck.Card{oracle("shatter"), oracle("sol")}
+	groups := Groups(cards, cards)
+	if len(groups) == 0 || groups[len(groups)-1].Title != TaggerGroup {
+		t.Errorf("the groups end with %q, want the Tagger group", groups[len(groups)-1].Title)
+	}
+}

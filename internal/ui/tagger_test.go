@@ -107,8 +107,13 @@ func TestEnterOpensATaggerTagInTheStatistics(t *testing.T) {
 	withTagger(t)
 	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
 	m = drive(m, "s")
+	if r, _ := m.statUnder(); r.Group == stats.TaggerGroup {
+		t.Fatal("the statistics open on the Tagger group, want it last")
+	}
+	// The Tagger group is the last, so K from the first wraps round to it.
+	m = drive(m, "K")
 	if r, _ := m.statUnder(); r.Group != stats.TaggerGroup || r.Label != "removal" {
-		t.Fatalf("the statistics open on %s/%s, want the Tagger group's removal", r.Group, r.Label)
+		t.Fatalf("K from the top lands on %s/%s, want the Tagger group's removal", r.Group, r.Label)
 	}
 	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "show the tags under it") {
 		t.Error("enter isn't offered on removal")

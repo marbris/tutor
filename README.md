@@ -172,8 +172,8 @@ The people and decks you follow stay under a `moxfield` folder at the top of the
 
 ## Statistics
 
-The statistics panel shows bar charts of a list: card types, colors, mana values (X spells get a
-row of their own), rarity, your tags, and the Scryfall Tagger tags. Build a filter from the rows, and the list and the bars narrow
+The statistics panel shows bar charts of a list: your tags, card types, colors, mana values (X
+spells get a row of their own), rarity, price, and last the Scryfall Tagger tags. Build a filter from the rows, and the list and the bars narrow
 to the cards that match.
 
 | Key | Does |
@@ -284,7 +284,8 @@ From the `i` bar:
 From the statistics:
 
 1. In your list, press `s` to open the statistics.
-2. `J` to the Scryfall Tagger group, then `j` to the tag you want.
+2. `K` to the Scryfall Tagger group (it's the last group, one step up from the top), then `j` to
+   the tag you want.
 3. `a` to filter the list by it, and `s` to close the statistics.
 4. `V` to select every card left, and `t` to tag them.
 5. Type a name for the tag and press `enter`.

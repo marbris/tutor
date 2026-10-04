@@ -421,15 +421,17 @@ var ordered = map[string]bool{
 // path.
 func GroupsBy(rowSource, counted []deck.Card, tagsByName bool, openTags map[string]bool) []Group {
 	// Most telling first: what the deck's author called their cards, then
-	// what those cards are, and the printing details last.
+	// what those cards are, and the printing details. Scryfall Tagger's tree
+	// is long, so it goes last, where it doesn't push the rest down and K
+	// reaches it in one step up from the tags, wrapping round.
 	groups := []Group{
 		{Title: "Tags", Rows: tagRows(rowSource)},
-		{Title: TaggerGroup, Rows: taggerRows(rowSource, openTags)},
 		{Title: "Type", Rows: typeRows()},
 		{Title: "Color (excl. lands)", Rows: colorRows()},
 		{Title: "Mana Value (excl. lands)", Rows: cmcRows()},
 		{Title: "Rarity", Rows: rarityRows(rowSource)},
 		{Title: "Price (USD)", Rows: priceRows()},
+		{Title: TaggerGroup, Rows: taggerRows(rowSource, openTags)},
 	}
 
 	out := make([]Group, 0, len(groups))
