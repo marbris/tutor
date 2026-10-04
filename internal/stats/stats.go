@@ -133,6 +133,11 @@ func Ramp() []lipgloss.Color {
 	}
 }
 
+// XColour is a spell with X in its cost, off the ramp: it isn't the top of
+// the curve, it's anywhere on it. The X row and a list sorted by mana value
+// paint with it alike.
+func XColour() lipgloss.Color { return theme.TextBright }
+
 // RampColour is step n of the ramp, the top step standing for everything
 // past it — a nine-drop is as hot as a seven.
 func RampColour(n int) lipgloss.Color {
@@ -210,8 +215,12 @@ func rarityRows(entries []deck.Card) []Row {
 // nothing, so counting them buries the curve under a column at zero that
 // says only how many lands the deck runs — which the type breakdown below
 // already says, and better.
+//
+// A spell with X in its cost has a row of its own after 7+, and only that
+// one: its mana value counts X as zero, so it would otherwise sit among the
+// cheap spells it is nothing like. The mana value sort puts it last too.
 func cmcRows() []Row {
-	rows := make([]Row, 0, 8)
+	rows := make([]Row, 0, 9)
 	for i := 0; i <= 7; i++ {
 		n := i
 		label := strconv.Itoa(n)
@@ -221,7 +230,7 @@ func cmcRows() []Row {
 		rows = append(rows, Row{
 			Group: "Mana Value", Label: label, Color: RampColour(n),
 			Match: func(ci deck.Card) bool {
-				if mtg.IsLand(ci.Card) {
+				if mtg.IsLand(ci.Card) || mtg.HasX(ci.Card) {
 					return false
 				}
 				cmc := int(ci.Card.CMC)
@@ -232,6 +241,12 @@ func cmcRows() []Row {
 			},
 		})
 	}
+	rows = append(rows, Row{
+		Group: "Mana Value", Label: "X", Color: XColour(),
+		Match: func(ci deck.Card) bool {
+			return !mtg.IsLand(ci.Card) && mtg.HasX(ci.Card)
+		},
+	})
 	return rows
 }
 

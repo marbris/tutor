@@ -172,8 +172,8 @@ The people and decks you follow stay under a `moxfield` folder at the top of the
 
 ## Statistics
 
-The statistics panel shows bar charts of a list: card types, colors, mana values, rarity, your
-tags, and the Scryfall Tagger tags. Build a filter from the rows, and the list and the bars narrow
+The statistics panel shows bar charts of a list: card types, colors, mana values (X spells get a
+row of their own), rarity, your tags, and the Scryfall Tagger tags. Build a filter from the rows, and the list and the bars narrow
 to the cards that match.
 
 | Key | Does |

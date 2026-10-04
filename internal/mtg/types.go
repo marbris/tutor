@@ -39,3 +39,15 @@ func PrimaryType(typeLine string) string {
 // IsLand is asked often enough, by the curve and the colour spread both, to
 // be worth a name.
 func IsLand(c Card) bool { return PrimaryType(c.TypeLine) == "Land" }
+
+// HasX reports whether X is in the mana cost of any of the card's faces.
+// Its mana value counts X as zero, which is what it is in the library and
+// never what it is when you cast it: Fireball is not a one-drop.
+func HasX(c Card) bool {
+	for _, f := range c.Faces() {
+		if strings.Contains(strings.ToUpper(f.ManaCost), "{X}") {
+			return true
+		}
+	}
+	return false
+}

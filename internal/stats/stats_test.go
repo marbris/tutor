@@ -120,6 +120,12 @@ func TestNumericAndTypeBarsTakeTheCardListsColours(t *testing.T) {
 	// sorted by that category: the curve and the prices on the ramp, each
 	// type in its own colour — not one colour for the whole group.
 	for i, r := range cmcRows() {
+		if r.Label == "X" {
+			if r.Color != XColour() {
+				t.Errorf("mana value X: bar %q, want %q", r.Color, XColour())
+			}
+			continue
+		}
 		if r.Color != RampColour(i) {
 			t.Errorf("mana value %s: bar %q, want ramp step %d %q", r.Label, r.Color, i, RampColour(i))
 		}
@@ -197,5 +203,39 @@ func TestNamedGroupsLeadWithTheCommonestAndOrderedOnesKeepTheirOrder(t *testing.
 	}
 	if got := strings.Join(labels(byName, "Type"), " "); got != "Land Creature Artifact" {
 		t.Errorf("by name reordered the types too: %q", got)
+	}
+}
+
+func TestXSpellsHaveARowOfTheirOwn(t *testing.T) {
+	// Fireball's mana value is 1, counting X as zero, but it is nothing like
+	// a one-drop. It counts under X, after 7+, and not under 1.
+	fireball := deck.Card{Card: mtg.Card{Name: "Fireball", TypeLine: "Sorcery", ManaCost: "{X}{R}", CMC: 1}, Qty: 1}
+	bolt := deck.Card{Card: mtg.Card{Name: "Lightning Bolt", TypeLine: "Instant", ManaCost: "{R}", CMC: 1}, Qty: 1}
+	// X on one face is enough.
+	split := deck.Card{Card: mtg.Card{Name: "Back // Forth", TypeLine: "Sorcery // Sorcery", CMC: 2,
+		CardFaces: []mtg.Face{{Name: "Back", ManaCost: "{1}{U}"}, {Name: "Forth", ManaCost: "{X}{U}"}}}, Qty: 1}
+
+	rows := func(entries []deck.Card) map[string]int {
+		got := map[string]int{}
+		for _, g := range Groups(entries, entries) {
+			if g.Title != "Mana Value (excl. lands)" {
+				continue
+			}
+			for i, r := range g.Rows {
+				got[r.Label] = r.Count
+				if r.Label == "X" && i != len(g.Rows)-1 {
+					t.Error("the X row isn't last")
+				}
+			}
+		}
+		return got
+	}
+
+	got := rows([]deck.Card{fireball, bolt, split})
+	if got["X"] != 2 || got["1"] != 1 || got["2"] != 0 {
+		t.Errorf("mana values %v, want X: 2 (Fireball and the split card), 1: 1 (Bolt)", got)
+	}
+	if _, ok := rows([]deck.Card{bolt})["X"]; ok {
+		t.Error("an X row without an X spell")
 	}
 }

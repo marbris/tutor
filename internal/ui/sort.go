@@ -360,18 +360,15 @@ func sortKey(s cardSort, members map[string]membership, dc deck.Card) (float64, 
 	return 0, true
 }
 
-// xHigh lifts a spell with X in its cost above every fixed cost. Its mana
-// value counts X as zero, which is what it is in the library and never what
-// it is when you cast it: Fireball is not a one-drop.
+// xHigh lifts a spell with X in its cost above every fixed cost (see
+// mtg.HasX).
 const xHigh = 100
 
 // manaSortValue is the mana value an order by mana value ranks a card by,
 // with X spells above the rest.
 func manaSortValue(c mtg.Card) float64 {
-	for _, f := range c.Faces() {
-		if strings.Contains(strings.ToUpper(f.ManaCost), "{X}") {
-			return c.CMC + xHigh
-		}
+	if mtg.HasX(c) {
+		return c.CMC + xHigh
 	}
 	return c.CMC
 }

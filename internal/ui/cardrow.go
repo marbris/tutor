@@ -159,7 +159,10 @@ func sortColour(c mtg.Card, s cardSort) (lipgloss.Color, bool) {
 	case sortRarity:
 		return stats.RarityColour(c.Rarity), true
 	case sortMana:
-		return stats.RampColour(int(manaSortValue(c))), true
+		if mtg.HasX(c) {
+			return stats.XColour(), true
+		}
+		return stats.RampColour(int(c.CMC)), true
 	case sortPower, sortToughness:
 		stat := c.Power
 		if s == sortToughness {
