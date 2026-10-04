@@ -52,8 +52,8 @@ type Data struct {
 	Glossary []GlossaryEntry
 	Index    map[string]int // rule number -> index
 
-	keywords   map[string]Keyword       // lowercased name -> keyword
-	keywordRe  *regexp.Regexp           // alternation of every keyword name
+	keywords   map[string]Keyword       // the rules' own keywords, by kwKey
+	kw         *keywordIndex            // those plus Scryfall's catalogs; shared by every copy
 	glossary   map[string]GlossaryEntry // lowercased term -> entry
 	glossaryRe *regexp.Regexp           // alternation of matchable terms
 	typeRules  map[string]string        // card type -> category rule number
@@ -280,11 +280,11 @@ func buildKeywordIndex(d *Data) {
 		if len(name) < 4 || len(name) > 40 || !kwNameRe.MatchString(name) {
 			return
 		}
-		lower := strings.ToLower(name)
-		if _, dup := d.keywords[lower]; dup {
+		key := kwKey(name)
+		if _, dup := d.keywords[key]; dup {
 			return
 		}
-		d.keywords[lower] = Keyword{Name: name, Rule: rule, Kind: kind}
+		d.keywords[key] = Keyword{Name: name, Rule: rule, Kind: kind}
 	}
 
 	for _, r := range d.Rules {
@@ -316,11 +316,8 @@ func buildKeywordIndex(d *Data) {
 		}
 	}
 
-	names := make([]string, 0, len(d.keywords))
-	for _, k := range d.keywords {
-		names = append(names, k.Name)
-	}
-	d.keywordRe = alternation(names)
+	d.kw = &keywordIndex{}
+	d.kw.set(d.keywords)
 }
 
 // abilityWords pulls the comma-separated list out of rule 207.2c.
@@ -374,7 +371,7 @@ func buildGlossaryIndex(d *Data) {
 			continue
 		}
 		lower := strings.ToLower(term)
-		if _, isKeyword := d.keywords[lower]; isKeyword {
+		if _, isKeyword := d.keywords[kwKey(term)]; isKeyword {
 			continue
 		}
 		if _, dup := d.glossary[lower]; dup {
@@ -549,9 +546,10 @@ func (d Data) MatchCard(c mtg.Card) []RuleMatch {
 	// still turn up in the rules panel.
 	oracle := c.CombinedOracle()
 
-	for _, sp := range Scan(d.keywordRe, oracle) {
-		kw, ok := d.keywords[strings.ToLower(sp.Text)]
-		if !ok {
+	for _, sp := range Scan(d.kw.regexp(), oracle) {
+		kw, ok := d.kw.lookup(sp.Text)
+		// A keyword only Scryfall's catalogs know has no rule to show.
+		if !ok || kw.Rule == "" {
 			continue
 		}
 		key := kw.Rule
@@ -697,8 +695,8 @@ func (d Data) KeywordSpans(text string) []KeywordSpan {
 		return nil
 	}
 	var out []KeywordSpan
-	for _, sp := range Scan(d.keywordRe, text) {
-		kw, ok := d.keywords[strings.ToLower(sp.Text)]
+	for _, sp := range Scan(d.kw.regexp(), text) {
+		kw, ok := d.kw.lookup(sp.Text)
 		if !ok {
 			continue
 		}

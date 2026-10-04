@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 
+	"ttr/internal/catalog"
 	"ttr/internal/mtg"
 	"ttr/internal/rules"
 	"ttr/internal/scryfall"
@@ -101,6 +102,7 @@ func PrintCardIfSingle(query string) bool {
 	var rd rules.Data
 	if rules.Cached() {
 		rd, _ = rules.Load()
+		rd.AddCatalog(catalog.Kept())
 	}
 	PrintCard(cards[0], rd)
 	return true

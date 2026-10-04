@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/catalog"
 	"ttr/internal/mtg"
 	"ttr/internal/rules"
 )
@@ -68,6 +69,7 @@ func (m Model) handleRulesSynced(msg rulesSyncedMsg) (tea.Model, tea.Cmd) {
 	// A new release: hand it to the model and to every rules panel already
 	// open, so what they show and what a fresh query sees are the same rules.
 	m.rules = msg.data
+	m.rules.AddCatalog(catalog.Current())
 	for _, p := range m.ws.panels {
 		for _, v := range p.stack {
 			if rv, ok := v.(*rulesView); ok {
@@ -174,6 +176,7 @@ func (m Model) handleRulesLoaded(msg rulesLoadedMsg) (tea.Model, tea.Cmd) {
 	}
 
 	m.rules = msg.data
+	m.rules.AddCatalog(catalog.Current())
 	m.fillPending()
 	return m, nil
 }

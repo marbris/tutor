@@ -175,6 +175,8 @@ func (m Model) Init() tea.Cmd {
 	// Tagger's tags are asked for every time: they're read from disk while
 	// they're under a week old, and only then downloaded.
 	cmds = append(cmds, loadTagger)
+	// Scryfall's catalogs likewise, read from disk while under a week old.
+	cmds = append(cmds, loadCatalog)
 	return tea.Batch(cmds...)
 }
 
@@ -309,6 +311,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case taggerMsg:
 		return m.handleTagger(msg)
+	case catalogMsg:
+		return m.handleCatalog(msg)
 
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)
