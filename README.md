@@ -332,6 +332,21 @@ From the shell, `ttr rules <query>` searches the rules too.
 
 ![The rules a card uses, with the full rule in the info panel](screenshots/rules.png)
 
+## Size and speed
+
+Measured on my laptop (Intel i7-1355U, Linux):
+
+- One 14 MB binary.
+- It opens in about 20 ms, with the panels you left back on screen. A Scryfall search among them
+  arrives a quarter of a second later.
+- A key press is drawn in about 13 ms.
+- It uses 30 to 50 MB of memory.
+- What it downloads is kept on disk: about 20 MB for my decks, plus about 100 KB for each card
+  picture you've looked at. `ttr cache` shows what's there.
+
+Anything that waits, waits on Scryfall, which asks apps to send no more than ten requests and two
+searches a second. Tutor keeps to that.
+
 ## Install
 
 Tutor is one binary, `ttr`, with nothing else to install. Git is needed for version control and
