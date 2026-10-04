@@ -74,7 +74,12 @@ func (m *Model) completeTag(p *panel, delta int) {
 		before, word = before+"-", word[1:]
 	}
 	set := func(s string) string { p.setAsk(s); return p.askInput.Value() }
-	m.complete(&p.tagComp, value, set, delta, before, strings.ToLower(word), m.knownTags())
+	known := m.knownTags()
+	// Which tags to move: the ones this list has to give.
+	if l := p.cardsView(); p.asking == askTagMove && l != nil {
+		known = sourceTags(l)
+	}
+	m.complete(&p.tagComp, value, set, delta, before, strings.ToLower(word), known)
 }
 
 // complete is the shell-style tab over the word at the end of an input:

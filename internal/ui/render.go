@@ -594,7 +594,11 @@ func (m Model) barFocused() bool {
 	if p == nil {
 		return false
 	}
-	return (p.searchOpen && p.search.Focused()) || p.asking == askAddCard || p.asking == askOtag
+	switch p.asking {
+	case askAddCard, askOtag, askTag, askTagMove:
+		return true
+	}
+	return p.searchOpen && p.search.Focused()
 }
 
 // footerGroups is what the bottom line shows: the two keys that reach

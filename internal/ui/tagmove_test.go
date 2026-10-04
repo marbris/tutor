@@ -98,7 +98,7 @@ func TestTTCopiesTagsIntoTheEditingDeckForCardsItHas(t *testing.T) {
 		{Qty: 1, Card: mtg.Card{Name: "Rancor"}, Tags: []string{"aura"}},
 	}, sortArrival)
 
-	m = drive(m, "T", "t")
+	m = drive(m, "T", "t", "enter") // empty: every tag
 	if !hasTag(tagged(deckList, "Sol Ring"), "ramp") {
 		t.Error("Sol Ring didn't take ramp")
 	}
@@ -106,7 +106,7 @@ func TestTTCopiesTagsIntoTheEditingDeckForCardsItHas(t *testing.T) {
 		t.Error("T t added a card")
 	}
 
-	m = drive(m, "T", "a")
+	m = drive(m, "T", "a", "enter")
 	if !hasTag(tagged(deckList, "Rancor"), "aura") || len(deckList.all) != 2 {
 		t.Errorf("T a didn't add Rancor with its tag: %v", deckList.all)
 	}
@@ -160,5 +160,45 @@ func TestTShowsItsMenuAndAnythingElseCancels(t *testing.T) {
 	m = drive(m, "z")
 	if m.tagPrefix {
 		t.Error("the menu stayed up")
+	}
+}
+
+func TestTTMovesOnlyTheTagsNamed(t *testing.T) {
+	m, deckList := openDeckPanel(t, sized(160, 30), "ghen", "Ghen", []deck.Card{
+		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}},
+	})
+	m = withCards(m, "f", []deck.Card{
+		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}, Tags: []string{"ramp", "artifact"}},
+		{Qty: 1, Card: mtg.Card{Name: "Rancor"}, Tags: []string{"aura"}},
+		{Qty: 1, Card: mtg.Card{Name: "Cultivate"}, Tags: []string{"ramp"}},
+	}, sortArrival)
+
+	m = drive(m, "T", "t")
+	if p := m.ws.current(); p.asking != askTagMove {
+		t.Fatal("T t didn't ask which tags")
+	}
+	lines := strings.Split(stripANSI(m.View()), "\n")
+	if bottom := lines[len(lines)-1]; !strings.Contains(bottom, "empty: every tag") {
+		t.Errorf("the bottom line doesn't say what enter does: %q", bottom)
+	}
+	// tab completes from this list's tags.
+	m = drive(m, "r", "a", "tab")
+	if got := m.ws.current().askInput.Value(); got != "ramp " {
+		t.Errorf("tab made %q, want ramp from this list", got)
+	}
+	m = drive(m, "enter")
+	tags := tagged(deckList, "Sol Ring")
+	if !hasTag(tags, "ramp") || hasTag(tags, "artifact") {
+		t.Errorf("Sol Ring took %v, want ramp and not artifact", tags)
+	}
+
+	// T a with a tag adds only the cards carrying it.
+	m = drive(m, "T", "a")
+	for _, r := range "ramp" {
+		m = drive(m, string(r))
+	}
+	m = drive(m, "enter")
+	if len(deckList.all) != 2 || !hasTag(tagged(deckList, "Cultivate"), "ramp") {
+		t.Errorf("T a ramp: %d cards; want Cultivate added, not Rancor", len(deckList.all))
 	}
 }

@@ -125,9 +125,16 @@ func (m Model) hintGroups() []hintGroup {
 	if p.searchOpen && p.search.Focused() {
 		return dropUnbound([]hintGroup{{"search", m.barKeys(p)}})
 	}
-	// The i bar likewise, whose tab means what's being typed allows.
-	if p.asking == askAddCard || p.asking == askOtag {
+	// The i bar likewise, whose tab means what's being typed allows, and
+	// the tag prompts, whose tab completes.
+	switch p.asking {
+	case askAddCard, askOtag:
 		return []hintGroup{{"", addBarKeys(p)}}
+	case askTag:
+		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"}, {"enter", "tag them"}, {"esc", "leave"}}}}
+	case askTagMove:
+		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"},
+			{"enter", "bring them over (empty: every tag)"}, {"esc", "leave"}}}}
 	}
 
 	groups := m.panelHintGroups(p)

@@ -146,6 +146,9 @@ type panel struct {
 	askInput textinput.Model
 	// tagComp is tab completion under way in the tag prompt.
 	tagComp *tagCompletion
+	// tagMoveAdd is whether the tags being asked for are T a's, which adds
+	// the cards the editing deck lacks, rather than T t's.
+	tagMoveAdd bool
 	// otagComp is tab completion under way of an otag: in the search bar.
 	otagComp *tagCompletion
 	// writeToNewPane remembers whether it was w or W that raised the

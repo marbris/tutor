@@ -36,6 +36,9 @@ const (
 	askOtag
 	// askRemote is enter on the git remote in the settings panel.
 	askRemote
+	// askTagMove is T t and T a: which of this list's tags to bring into
+	// the editing deck, every one when left empty.
+	askTagMove
 )
 
 // Labels of the two sides of the i bar, which tab swaps between.
@@ -89,7 +92,7 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.ws.current()
 
 	key := msg.String()
-	if p.asking == askTag && (key == "tab" || key == "shift+tab") {
+	if (p.asking == askTag || p.asking == askTagMove) && (key == "tab" || key == "shift+tab") {
 		delta := 1
 		if key == "shift+tab" {
 			delta = -1
@@ -116,7 +119,8 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		kind, answer := p.asking, p.askInput.Value()
 		p.stopAsking()
-		if answer == "" {
+		// Empty is no answer, except to which tags T moves: then it's all.
+		if strings.TrimSpace(answer) == "" && kind != askTagMove {
 			return m, nil
 		}
 
@@ -154,6 +158,11 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		case askRemote:
 			return m, connectRemote(p.id, answer)
+
+		case askTagMove:
+			if l := p.cardsView(); l != nil {
+				m.tagsInto(l, p.tagMoveAdd, strings.Fields(strings.ToLower(answer)))
+			}
 
 		case askOtag:
 			l := p.cardsView()

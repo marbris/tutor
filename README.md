@@ -253,7 +253,8 @@ The tags aren't written into the deck. To write them in, press `T` then `g`.
 ### Copying tags between lists
 
 `T` copies tags from a whole list at once: the cards you selected with `v`, or every card showing.
-Filter first to copy only some.
+Filter first to copy only some. `T t` and `T a` ask which tags to bring: type one or a few (`tab`
+completes from the tags in the list), or leave it empty for all of them.
 
 | Keys | Does |
 | --- | --- |

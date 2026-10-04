@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,6 +19,9 @@ import (
 //
 //	T t  this list's tags onto the editing deck, for the cards it already has
 //	T a  the same, and the cards it lacks are added with their tags
+//
+// T t and T a ask which tags first, completing from the ones in this list
+// with tab; left empty, every tag moves.
 //	T g  the tag lists' tags written into this list's own
 //	T m  every list on screen gets every other list's tags, for its cards
 //
@@ -79,10 +83,17 @@ func (m Model) handleTagMove(key string) (tea.Model, tea.Cmd) {
 	}
 
 	switch keymap.Lookup(keymap.TagMove, key) {
-	case keymap.TagMoveJoin:
-		m.tagsInto(l, false)
-	case keymap.TagMoveUpsert:
-		m.tagsInto(l, true)
+	case keymap.TagMoveJoin, keymap.TagMoveUpsert:
+		if target, why := m.editTarget(); target == nil || target == l {
+			if target == l {
+				why = "this is the editing deck — T t and T a bring tags into it from another list"
+			}
+			m.notice = why
+			return m, nil
+		}
+		p.ask(askTagMove, "bring tags", "")
+		p.askInput.Placeholder = "ramp removal … · tab completes · empty: every tag"
+		p.tagMoveAdd = keymap.Lookup(keymap.TagMove, key) == keymap.TagMoveUpsert
 	case keymap.TagMoveGlobal:
 		m.bakeGlobalTags(l)
 	case keymap.TagMoveMerge:
@@ -92,8 +103,9 @@ func (m Model) handleTagMove(key string) (tea.Model, tea.Cmd) {
 }
 
 // tagsInto is T t and T a: from the list in front of you into the editing
-// deck.
-func (m *Model) tagsInto(from *cardList, addMissing bool) {
+// deck. only is the tags to bring, every one when empty; with some named,
+// only the cards carrying one of them take part, and only those tags go.
+func (m *Model) tagsInto(from *cardList, addMissing bool, only []string) {
 	target, why := m.editTarget()
 	if target == nil {
 		m.notice = why
@@ -103,7 +115,11 @@ func (m *Model) tagsInto(from *cardList, addMissing bool) {
 		m.notice = "this is the editing deck — T t and T a bring tags into it from another list"
 		return
 	}
-	src := from.shownOrPicked()
+	src := onlyTags(from.shownOrPicked(), only)
+	if len(src) == 0 {
+		m.notice = "no card here has " + strings.Join(only, " or ")
+		return
+	}
 	target.pushUndo("tags from " + from.name)
 	all, tagged, added := deck.TransferTags(target.all, src, addMissing)
 	if tagged == 0 && added == 0 {
@@ -185,4 +201,47 @@ func (m *Model) mergeShownTags() {
 		return
 	}
 	m.notice = "merged tags: " + itoa(total) + " cards in " + strings.Join(changed, ", ")
+}
+
+// onlyTags is the cards carrying any of the tags, each with only those, or
+// the cards as they are when no tags are named.
+func onlyTags(cards []deck.Card, tags []string) []deck.Card {
+	if len(tags) == 0 {
+		return cards
+	}
+	want := map[string]bool{}
+	for _, t := range tags {
+		want[strings.ToLower(t)] = true
+	}
+	var out []deck.Card
+	for _, c := range cards {
+		var kept []string
+		for _, t := range c.Tags {
+			if want[strings.ToLower(t)] {
+				kept = append(kept, t)
+			}
+		}
+		if len(kept) > 0 {
+			c.Tags = kept
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// sourceTags is the tags T t and T a would move from a list, for tab to
+// complete from.
+func sourceTags(l *cardList) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, c := range l.shownOrPicked() {
+		for _, t := range c.Tags {
+			if k := strings.ToLower(t); !seen[k] {
+				seen[k] = true
+				out = append(out, k)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
