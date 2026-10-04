@@ -170,7 +170,7 @@ func TestColourIdentityIsEnforced(t *testing.T) {
 	if !strings.Contains(problemText(l), "Llanowar Elves") {
 		t.Errorf("problems are %q", problemText(l))
 	}
-	if !strings.Contains(problemText(l), "colours") {
+	if !strings.Contains(problemText(l), "colors") {
 		t.Errorf("the reason isn't stated: %q", problemText(l))
 	}
 }

@@ -12,7 +12,7 @@ import (
 // Three different things go under that name and a deck has to pass all
 // three: every card has to be allowed in the format, the deck has to be the
 // right size and shape, and — in Commander — everything in it has to fit
-// inside the commander's colours. Scryfall answers the first on its own;
+// inside the commander's colors. Scryfall answers the first on its own;
 // the other two are the deck's business and are worked out here.
 //
 // A deck whose cards aren't all known is reported as unknown rather than
@@ -240,7 +240,7 @@ func commanderProblems(cards []Card) []Problem {
 	}
 
 	// Colour identity. Everything in the deck has to fit inside the
-	// commander's colours — the rule people actually trip over, because a
+	// commander's colors — the rule people actually trip over, because a
 	// card's identity includes mana symbols in its rules text.
 	allowed := map[string]bool{}
 	for _, c := range commanders {
@@ -264,7 +264,7 @@ func commanderProblems(cards []Card) []Problem {
 	if len(outside) > 0 {
 		sort.Strings(outside)
 		out = append(out, Problem{
-			Text:  "outside the commander's colours",
+			Text:  "outside the commander's colors",
 			Cards: outside,
 		})
 	}

@@ -19,7 +19,7 @@ func sortNamed(name string) (cardSort, bool) {
 	switch name {
 	case "scryfall", "scryfall order", "arrival", "as found", "decklist":
 		return sortArrival, true
-	case "color":
+	case "colour":
 		return sortColor, true
 	case "mana", "cmc", "mv":
 		return sortMana, true

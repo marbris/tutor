@@ -74,7 +74,7 @@ func (s cardSort) String() string {
 	case sortType:
 		return "type"
 	case sortColor:
-		return "colour"
+		return "color"
 	case sortRarity:
 		return "rarity"
 	case sortEDHREC:
@@ -95,6 +95,9 @@ func (s cardSort) String() string {
 func parseCardSort(name string) (cardSort, bool) {
 	if name == "" {
 		return 0, false
+	}
+	if name == "colour" { // the name before 5.3, in saved sessions
+		return sortColor, true
 	}
 	for _, s := range allSorts {
 		if s.String() == name {
