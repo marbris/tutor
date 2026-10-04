@@ -104,6 +104,21 @@ func truncate(cards []mtg.Card, limit int) []mtg.Card {
 // with a set's release, a few times a year; a week is plenty fresh.
 const rulingsMaxAge = 7 * 24 * time.Hour
 
+// KeptRulings is a card's rulings as kept on disk, of any age, without
+// asking Scryfall: ok is whether there were any kept, fresh whether they
+// are younger than a week.
+func KeptRulings(uri string) (rulings []mtg.Ruling, fresh, ok bool) {
+	if uri == "" {
+		return []mtg.Ruling{}, true, true
+	}
+	var kept []mtg.Ruling
+	fresh, have := diskcache.Load(filepath.Join("rulings", diskcache.Key(uri)), rulingsMaxAge, &kept)
+	if !have || kept == nil {
+		return nil, false, false
+	}
+	return kept, fresh, true
+}
+
 // Rulings fetches a card's rulings, returning an empty (non-nil) slice when
 // the card simply has none. They are kept on disk, so a card you have read
 // before has them at once.

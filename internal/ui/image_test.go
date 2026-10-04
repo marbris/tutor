@@ -383,3 +383,51 @@ func TestFTurnsADoubleFacedCardOver(t *testing.T) {
 		t.Errorf("a second f showed %q, want the front again", m.shownKey())
 	}
 }
+
+func TestAStaleListOfPrintingsShowsAtOnceAndIsAskedForAgainBehindIt(t *testing.T) {
+	withKitty(t, true)
+	bolt := mtg.Card{Name: "Lightning Bolt", OracleID: "bolt"}
+	jpg := mtg.ImageURIs{Normal: "x.jpg"}
+	old := mtg.Card{ID: "old", Name: "Lightning Bolt", IllustrationID: "a", ImageURIs: jpg}
+	shown := mtg.Card{ID: "shown", Name: "Lightning Bolt", IllustrationID: "b", ImageURIs: jpg}
+	asked := 0
+	oldRefresh := refreshPrintings
+	refreshPrintings = func(c mtg.Card) ([]mtg.Card, int, error) {
+		asked++
+		// A new printing has come out since the list was kept.
+		newer := mtg.Card{ID: "new", Name: "Lightning Bolt", IllustrationID: "c", ReleasedAt: "2099-01-01", ImageURIs: jpg}
+		return []mtg.Card{newer, shown, old}, 0, nil
+	}
+	t.Cleanup(func() { refreshPrintings = oldRefresh })
+
+	m := sized(160, 40)
+	pic := picture{state: imgReady, png: []byte("png"), w: 488, h: 680}
+	fresh := imageMsg{key: "bolt", list: []mtg.Card{shown, old}, at: 0, picture: pic, card: bolt}
+	if _, cmd := m.handleImage(fresh); cmd != nil {
+		t.Error("a fresh list was asked for again")
+	}
+
+	stale := fresh
+	stale.stale = true
+	next, cmd := m.handleImage(stale)
+	m = next.(Model)
+	if cp := m.images["bolt"]; cp == nil || cp.state != imgReady {
+		t.Fatal("the stale list wasn't shown while it was asked for again")
+	}
+	if cmd == nil {
+		t.Fatal("the stale list wasn't asked for again")
+	}
+	msg, ok := cmd().(printingsRefreshedMsg)
+	if !ok || asked != 1 {
+		t.Fatalf("the refresh asked %d times and sent %T", asked, msg)
+	}
+	next, _ = m.handlePrintingsRefreshed(msg)
+	m = next.(Model)
+	cp := m.images["bolt"]
+	if len(cp.list) != 3 {
+		t.Errorf("the refreshed list has %d printings, want 3", len(cp.list))
+	}
+	if p, _ := cp.current(); p.ID != "shown" {
+		t.Errorf("the refresh moved the view to %q, want it to stay on the printing shown", p.ID)
+	}
+}

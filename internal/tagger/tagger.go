@@ -76,25 +76,24 @@ const maxAge = 7 * 24 * time.Hour
 // cacheFile is where the turned-round data is kept, in the cache directory.
 const cacheFile = "tagger/oracle-tags.json"
 
-// Cached reports whether Load would answer from disk without downloading.
-func Cached() bool { return diskcache.Fresh(cacheFile, maxAge) }
-
-// Load is the tags: from disk while the copy there is under a week old,
-// otherwise downloaded and turned round afresh. When the download fails, an
-// older copy stands in.
-func Load() (*Data, error) {
+// Load is the tags kept on disk, of any age, so they are in use from the
+// start; stale says they are over a week old and Refresh should download
+// them again. With nothing kept, they are downloaded now.
+func Load() (d *Data, stale bool, err error) {
 	var kept Data
-	fresh, have := diskcache.Load(cacheFile, maxAge, &kept)
-	if fresh && len(kept.Tags) > 0 {
+	if fresh, have := diskcache.Load(cacheFile, maxAge, &kept); have && len(kept.Tags) > 0 {
 		kept.index()
-		return &kept, nil
+		return &kept, !fresh, nil
 	}
+	d, err = Refresh()
+	return d, false, err
+}
+
+// Refresh downloads the tags, turns them round and keeps them. A failure
+// leaves the kept copy as it was.
+func Refresh() (*Data, error) {
 	d, err := download()
 	if err != nil {
-		if have && len(kept.Tags) > 0 {
-			kept.index()
-			return &kept, nil
-		}
 		return nil, err
 	}
 	diskcache.Save(cacheFile, d)

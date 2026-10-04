@@ -81,10 +81,21 @@ func (m Model) handleRulingsTick(msg rulingsTickMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	return m, func() tea.Msg {
+	ask := func() tea.Msg {
 		got, err := scryfall.Rulings(msg.uri)
 		return rulingsMsg{panel: msg.panel, card: msg.card, rulings: got, err: err}
 	}
+	// Rulings kept on disk show at once, however old. Stale ones are asked
+	// for again behind them (and stand in if that fails).
+	kept, fresh, ok := scryfall.KeptRulings(msg.uri)
+	if !ok {
+		return m, ask
+	}
+	show := func() tea.Msg { return rulingsMsg{panel: msg.panel, card: msg.card, rulings: kept} }
+	if fresh {
+		return m, show
+	}
+	return m, tea.Sequence(show, ask)
 }
 
 func (m Model) handleRulings(msg rulingsMsg) (tea.Model, tea.Cmd) {

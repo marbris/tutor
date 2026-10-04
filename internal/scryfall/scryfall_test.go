@@ -331,3 +331,22 @@ func TestStaleRulingsStandInWhenAskingFails(t *testing.T) {
 		t.Errorf("with Scryfall down, got %v, %v; want the kept copy", got, err)
 	}
 }
+
+func TestKeptRulingsAreAnsweredFromDiskWhateverTheirAge(t *testing.T) {
+	uri := "https://api.scryfall.com/cards/kept-test/rulings"
+	if _, _, ok := KeptRulings(uri); ok {
+		t.Fatal("rulings never kept came back")
+	}
+	rel := filepath.Join("rulings", diskcache.Key(uri))
+	diskcache.Save(rel, []mtg.Ruling{{Comment: "kept"}})
+	got, fresh, ok := KeptRulings(uri)
+	if !ok || !fresh || len(got) != 1 {
+		t.Fatalf("just kept: ok %v fresh %v %v", ok, fresh, got)
+	}
+	old := time.Now().Add(-8 * 24 * time.Hour)
+	os.Chtimes(filepath.Join(paths.Cache(), rel), old, old)
+	got, fresh, ok = KeptRulings(uri)
+	if !ok || fresh || len(got) != 1 {
+		t.Errorf("a week old: ok %v fresh %v %v, want them back, stale", ok, fresh, got)
+	}
+}

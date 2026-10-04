@@ -139,6 +139,18 @@ type imageMsg struct {
 	picture picture
 	back    *picture
 	err     error
+	// stale is a list kept from more than a day ago, shown while gx asks
+	// for it again; card is what to ask about.
+	stale bool
+	card  mtg.Card
+}
+
+// printingsRefreshedMsg is a stale list of printings asked for again: the
+// list, put in order as gx would show it.
+type printingsRefreshedMsg struct {
+	key  string
+	card mtg.Card
+	list []mtg.Card
 }
 
 // pictureMsg is one picture of a printing, for H, L and f.
@@ -181,7 +193,7 @@ func (m *Model) gxCard(c mtg.Card) tea.Cmd {
 // gX adds up.
 func loadPrintings(c mtg.Card) (imageMsg, int) {
 	key := imageKey(c)
-	list, size, err := prints.All(c)
+	list, size, stale, err := prints.All(c)
 	if err != nil {
 		return imageMsg{key: key, err: err}, size
 	}
@@ -190,7 +202,7 @@ func loadPrintings(c mtg.Card) (imageMsg, int) {
 		return imageMsg{key: key, err: fmt.Errorf("no picture of %s", c.Name)}, size
 	}
 	pic, got := loadPicture(list[at], 0)
-	msg := imageMsg{key: key, list: list, at: at, picture: pic}
+	msg := imageMsg{key: key, list: list, at: at, picture: pic, stale: stale, card: c}
 	if list[at].PictureFaces() > 1 {
 		back, more := loadPicture(list[at], 1)
 		msg.back = &back
@@ -221,6 +233,9 @@ func (m *Model) fetchImage(c mtg.Card) tea.Cmd {
 		return msg
 	}
 }
+
+// refreshPrintings is prints.Refresh, as a variable for the tests.
+var refreshPrintings = prints.Refresh
 
 // keptOnDisk is prints.Kept, as a variable for the tests.
 var keptOnDisk = prints.Kept
@@ -281,8 +296,49 @@ func (m Model) handleImageTick(msg imageTickMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// handleImage files what gx asked for. A stale list is shown as it is and
+// asked for again behind it, so a day-old price never costs a wait. (gX
+// leaves its stale lists be: a refresh for every card in a deck would queue
+// a minute of searches in front of yours.)
 func (m Model) handleImage(msg imageMsg) (tea.Model, tea.Cmd) {
 	m.storeImage(msg)
+	if msg.err != nil || !msg.stale {
+		return m, nil
+	}
+	key, c := msg.key, msg.card
+	return m, func() tea.Msg {
+		list, _, err := refreshPrintings(c)
+		if err != nil {
+			return nil // the stale list stays, and is asked for next time
+		}
+		list, _, ok := prints.Start(list, c, time.Now().Format("2006-01-02"))
+		if !ok {
+			return nil
+		}
+		return printingsRefreshedMsg{key: key, card: c, list: list}
+	}
+}
+
+// handlePrintingsRefreshed swaps a fresh list in for the stale one, staying
+// on the printing on show where the new list has it.
+func (m Model) handlePrintingsRefreshed(msg printingsRefreshedMsg) (tea.Model, tea.Cmd) {
+	cp := m.images[msg.key]
+	if cp == nil || cp.state != imgReady {
+		return m, nil
+	}
+	at := 0
+	if p, ok := cp.current(); ok {
+		at = -1
+		for i, q := range msg.list {
+			if q.ID == p.ID {
+				at = i
+			}
+		}
+		if at < 0 {
+			return m, nil // the printing on show has gone: keep what's there
+		}
+	}
+	cp.list, cp.at = msg.list, at
 	return m, nil
 }
 

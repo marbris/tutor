@@ -177,25 +177,28 @@ func printsQuery(c mtg.Card) string {
 const printingsMaxAge = 24 * time.Hour
 
 // All is every paper printing of a card, newest first, and how many bytes
-// it took to find out — none, when the list kept from last
-// time is still good. MTGO's and Arena's own printings are left out — they aren't cards
-// anyone holds — unless they are all the card has.
-func All(c mtg.Card) ([]mtg.Card, int, error) {
-	rel := printingsFile(c)
+// it took to find out — none, when there is a list kept from before. A kept
+// list comes back even when it is stale, at once, so a day-old price never
+// costs a wait; stale says so, and Refresh asks again. MTGO's and Arena's own
+// printings are left out — they aren't cards anyone holds — unless they are
+// all the card has.
+func All(c mtg.Card) (list []mtg.Card, size int, stale bool, err error) {
 	var kept []mtg.Card
-	fresh, have := diskcache.Load(rel, printingsMaxAge, &kept)
-	if fresh && len(kept) > 0 {
-		return kept, 0, nil
+	if fresh, have := diskcache.Load(printingsFile(c), printingsMaxAge, &kept); have && len(kept) > 0 {
+		return kept, 0, !fresh, nil
 	}
+	list, size, err = Refresh(c)
+	return list, size, false, err
+}
+
+// Refresh asks Scryfall for a card's printings and keeps the answer. A
+// failure leaves the kept list as it was.
+func Refresh(c mtg.Card) ([]mtg.Card, int, error) {
 	list, size, err := fetchAll(c)
 	if err != nil {
-		// A day-old price beats no picture at all.
-		if have && len(kept) > 0 {
-			return kept, size, nil
-		}
 		return nil, size, err
 	}
-	diskcache.Save(rel, list)
+	diskcache.Save(printingsFile(c), list)
 	return list, size, nil
 }
 
@@ -203,7 +206,7 @@ func All(c mtg.Card) ([]mtg.Card, int, error) {
 // asking Scryfall. It only looks at the file, so it is cheap enough to ask
 // on every move of the cursor.
 func Kept(c mtg.Card) bool {
-	return diskcache.Fresh(printingsFile(c), printingsMaxAge)
+	return diskcache.Has(printingsFile(c))
 }
 
 // printingsFile is where a card's printings are kept. The "2" is the lists
@@ -260,7 +263,7 @@ func paperOnly(all []mtg.Card) []mtg.Card {
 // Preferred finds the most normal printing of a card, for a card that
 // doesn't carry a printing of its own.
 func Preferred(c mtg.Card) (mtg.Card, error) {
-	list, _, err := All(c)
+	list, _, _, err := All(c)
 	if err != nil {
 		return mtg.Card{}, err
 	}

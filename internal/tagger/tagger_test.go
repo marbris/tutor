@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"ttr/internal/paths"
 )
 
 func TestMain(m *testing.M) {
@@ -108,16 +111,37 @@ func TestLoadDownloadsOnceAndKeepsTheResult(t *testing.T) {
 	defer func() { BulkURL = old }()
 
 	for run := 0; run < 2; run++ {
-		d, err := Load()
+		d, stale, err := Load()
 		if err != nil {
 			t.Fatal(err)
+		}
+		if stale {
+			t.Errorf("run %d: a copy just downloaded is stale", run)
 		}
 		removal, _ := d.Find("removal")
 		if !d.Has("disenchant", removal) {
 			t.Errorf("run %d: the loaded data lost its tree", run)
 		}
 	}
-	if hits != 2 || !Cached() {
+	if hits != 2 {
 		t.Errorf("%d requests over two loads, want the two of the first", hits)
+	}
+
+	// A copy over a week old is still used at once, without downloading,
+	// and says it's stale; Refresh is what downloads again.
+	old8 := time.Now().Add(-8 * 24 * time.Hour)
+	os.Chtimes(filepath.Join(paths.Cache(), cacheFile), old8, old8)
+	d, stale, err := Load()
+	if err != nil || d == nil || !stale {
+		t.Fatalf("a week-old copy: data %v, stale %v, err %v", d != nil, stale, err)
+	}
+	if hits != 2 {
+		t.Errorf("loading a stale copy made %d requests, want none", hits-2)
+	}
+	if _, err := Refresh(); err != nil || hits != 4 {
+		t.Errorf("Refresh: err %v, %d requests, want 2", err, hits-2)
+	}
+	if _, stale, _ := Load(); stale {
+		t.Error("still stale after Refresh")
 	}
 }

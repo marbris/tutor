@@ -293,6 +293,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case imageMsg:
 		return m.handleImage(msg)
+	case printingsRefreshedMsg:
+		return m.handlePrintingsRefreshed(msg)
 
 	case pictureMsg:
 		return m.handlePicture(msg)
