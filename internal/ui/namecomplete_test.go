@@ -97,3 +97,45 @@ func TestNoCardStartsWithItSaysSo(t *testing.T) {
 		t.Errorf("notice %q", m.notice)
 	}
 }
+
+func TestTheIBarsKeysAreOnTheBottomLineAndFollowTab(t *testing.T) {
+	withCardNames(t)
+	m, _ := ownDeck(sized(160, 30))
+	m = drive(m, "i")
+	lines := strings.Split(stripANSI(m.View()), "\n")
+	bottom := lines[len(lines)-1]
+	if !strings.Contains(bottom, "tag by otag instead") {
+		t.Errorf("the bottom line doesn't offer tab's swap: %q", bottom)
+	}
+	m = typeIn(m, "llan")
+	lines = strings.Split(stripANSI(m.View()), "\n")
+	if bottom := lines[len(lines)-1]; !strings.Contains(bottom, "complete the name") {
+		t.Errorf("with a name typed, the bottom line doesn't offer completing it: %q", bottom)
+	}
+}
+
+func TestThePlaceholderIsShownInFullWhereThereIsRoom(t *testing.T) {
+	withCardNames(t)
+	m, _ := ownDeck(sized(200, 30))
+	m = drive(m, "i")
+	view := stripANSI(m.View())
+	if !strings.Contains(view, "tab here: tag this list by otag") {
+		t.Errorf("the placeholder is cut short in a wide panel:\n%s", firstLines(view, 3))
+	}
+	// And it doesn't push the line past the panel: every line is as wide
+	// as the screen at most.
+	for _, line := range strings.Split(view, "\n") {
+		if w := textWidth(line); w > 200 {
+			t.Errorf("a line is %d wide on a 200-wide screen: %q", w, line)
+		}
+	}
+	m = drive(m, "tab")
+	if view := stripANSI(m.View()); !strings.Contains(view, "tab here: add a card") {
+		t.Errorf("the otag placeholder is cut short:\n%s", firstLines(view, 3))
+	}
+}
+
+func firstLines(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	return strings.Join(lines[:min(n, len(lines))], "\n")
+}

@@ -587,11 +587,14 @@ func (m Model) footerLines() []string {
 	return append(lines, hints...)
 }
 
-// barFocused reports whether a search bar has the cursor, where every key
-// is typing and the footer shows the bar's own keys.
+// barFocused reports whether a search bar, or the i bar, has the cursor,
+// where every key is typing and the footer shows the bar's own keys.
 func (m Model) barFocused() bool {
 	p := m.ws.current()
-	return p != nil && p.searchOpen && p.search.Focused()
+	if p == nil {
+		return false
+	}
+	return (p.searchOpen && p.search.Focused()) || p.asking == askAddCard || p.asking == askOtag
 }
 
 // footerGroups is what the bottom line shows: the two keys that reach

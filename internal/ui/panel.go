@@ -307,13 +307,13 @@ func (p *panel) setKind(k Kind) {
 func (p *panel) header(width int) (string, bool) {
 	switch {
 	case p.searchOpen:
-		p.search.Width = inputWidth(width, p.search.Prompt)
+		fitInput(&p.search, width)
 		return p.search.View(), true
 	case p.asking != askNone:
-		p.askInput.Width = inputWidth(width, p.askInput.Prompt)
+		fitInput(&p.askInput, width)
 		return p.askInput.View(), true
 	case p.filtering:
-		p.filterInput.Width = inputWidth(width, p.filterInput.Prompt)
+		fitInput(&p.filterInput, width)
 		return p.filterInput.View(), true
 	}
 
@@ -322,6 +322,18 @@ func (p *panel) header(width int) (string, bool) {
 		name = p.kind.String()
 	}
 	return name, false
+}
+
+// fitInput sizes a text field to the panel. An empty one draws its
+// placeholder, and the text field takes its prompt off the width for that
+// itself: given the room left after the prompt, as typed text needs, it
+// took the prompt off twice and cut the placeholder short.
+func fitInput(in *textinput.Model, width int) {
+	if in.Value() == "" {
+		in.Width = width
+		return
+	}
+	in.Width = inputWidth(width, in.Prompt)
 }
 
 // inputWidth is how much room a text field's text has: the panel, less its
