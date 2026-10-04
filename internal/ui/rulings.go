@@ -6,10 +6,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"ttr/internal/mtg"
+	"ttr/internal/rulings"
 	"ttr/internal/scryfall"
 )
 
-// Rulings, fetched as the cursor settles.
+// Rulings, read from Scryfall's rulings file on disk (internal/rulings) the
+// moment the cursor lands. Until that file is in, or for a card with no
+// oracle id, they're fetched as the cursor settles:
 //
 // Every card has its own rulings endpoint, so showing them means a request
 // per card — which would be a request per keypress if it happened the moment
@@ -53,6 +56,11 @@ func (m *Model) hover() tea.Cmd {
 		return nil
 	}
 	if _, failed := l.rulingErr[c.Card.ID]; failed {
+		return nil
+	}
+	// Kept on disk, they're read now: no request, so nothing to wait for.
+	if rs, ok := rulings.Current().Of(c.Card.OracleID); ok {
+		l.rulings[c.Card.ID] = rs
 		return nil
 	}
 
@@ -117,4 +125,34 @@ func (m Model) handleRulings(msg rulingsMsg) (tea.Model, tea.Cmd) {
 		l.rulings[msg.card] = msg.rulings
 	}
 	return m, nil
+}
+
+// rulingsLoadedMsg is the rulings file on disk, indexed, at the start.
+type rulingsLoadedMsg struct {
+	store *rulings.Store
+	stale bool
+}
+
+// loadRulingsFile reads or downloads the rulings file, quietly: without it,
+// rulings are fetched a card at a time as before.
+func loadRulingsFile() tea.Msg {
+	s, stale, _ := rulings.Load()
+	return rulingsLoadedMsg{store: s, stale: stale}
+}
+
+func refreshRulingsFile() tea.Msg {
+	s, _ := rulings.Refresh()
+	return rulingsLoadedMsg{store: s}
+}
+
+func (m Model) handleRulingsLoaded(msg rulingsLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.store == nil {
+		return m, nil
+	}
+	rulings.SetCurrent(msg.store)
+	cmd := m.hover() // the card under the cursor needn't wait for a move
+	if msg.stale {
+		return m, tea.Batch(cmd, refreshRulingsFile)
+	}
+	return m, cmd
 }

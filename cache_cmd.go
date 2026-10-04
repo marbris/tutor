@@ -44,7 +44,7 @@ var cacheKinds = []cacheKind{
 	{"tagger", "Scryfall Tagger's tags", func(r string) bool { return strings.HasPrefix(r, "tagger"+string(filepath.Separator)) },
 		"the tags download again, about 6 MB"},
 	{"rulings", "card rulings", func(r string) bool { return strings.HasPrefix(r, "rulings"+string(filepath.Separator)) },
-		"each card's rulings are fetched again"},
+		"the rulings file downloads again, about 5 MB"},
 	{"texts", "printed card texts (gv)", func(r string) bool { return strings.HasPrefix(r, "originals"+string(filepath.Separator)) },
 		"gv downloads each set's text again"},
 	{"rules", "comprehensive rules", func(r string) bool { return strings.HasPrefix(r, "comprules") },

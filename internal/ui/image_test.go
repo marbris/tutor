@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"ttr/internal/rulings"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -457,5 +458,36 @@ func TestADecksRefreshedCardsReplaceTheStaleOnesWithoutAnEdit(t *testing.T) {
 	}
 	if len(l.undo) != 0 || l.dirty {
 		t.Error("refreshing prices counted as an edit")
+	}
+}
+
+func TestRulingsComeFromTheFileOnDiskTheMomentTheCursorLands(t *testing.T) {
+	store, err := rulings.Make(filepath.Join(t.TempDir(), "r.tsv"), map[string][]mtg.Ruling{
+		"oid-elves": {{Source: "wotc", Comment: "It taps for green."}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := rulings.Current()
+	rulings.SetCurrent(store)
+	t.Cleanup(func() { rulings.SetCurrent(old) })
+
+	cards := deckSample()
+	for i := range cards {
+		cards[i].Card.ID = "id-" + itoa(i)
+		cards[i].Card.OracleID = "oid-" + itoa(i)
+	}
+	cards[1].Card.OracleID = "oid-elves"
+	m := withCards(sized(120, 30), "d", cards, sortArrival)
+	l := m.ws.current().cardsView()
+	m, cmd := press(m, "j")
+	if cmd != nil {
+		if _, isTick := msgOf(cmd).(rulingsTickMsg); isTick {
+			t.Error("the rulings waited to be asked for; they're on disk")
+		}
+	}
+	got, ok := l.rulings["id-1"]
+	if !ok || len(got) != 1 || got[0].Comment != "It taps for green." {
+		t.Errorf("the card's rulings: %v %v", ok, got)
 	}
 }

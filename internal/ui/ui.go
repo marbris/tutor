@@ -177,6 +177,8 @@ func (m Model) Init() tea.Cmd {
 	cmds = append(cmds, loadTagger)
 	// Scryfall's catalogs likewise, read from disk while under a week old.
 	cmds = append(cmds, loadCatalog)
+	// And Scryfall's rulings, so a card's rulings are read, not asked for.
+	cmds = append(cmds, loadRulingsFile)
 	return tea.Batch(cmds...)
 }
 
@@ -313,6 +315,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTagger(msg)
 	case catalogMsg:
 		return m.handleCatalog(msg)
+	case rulingsLoadedMsg:
+		return m.handleRulingsLoaded(msg)
 
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)

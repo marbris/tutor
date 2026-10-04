@@ -11,6 +11,7 @@ import (
 	"ttr/internal/catalog"
 	"ttr/internal/mtg"
 	"ttr/internal/rules"
+	"ttr/internal/rulings"
 	"ttr/internal/scryfall"
 	"ttr/internal/theme"
 )
@@ -71,7 +72,12 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 
 	fmt.Println()
 	fmt.Println(head.Render("rulings"))
-	got, err := scryfall.Rulings(c.RulingsURI)
+	// From the rulings file on disk if it's there, or else asked for.
+	got, ok := rulings.Kept().Of(c.OracleID)
+	var err error
+	if !ok {
+		got, err = scryfall.Rulings(c.RulingsURI)
+	}
 	switch {
 	case err != nil:
 		fmt.Println(dim.Render("couldn't fetch them"))
