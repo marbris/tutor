@@ -357,7 +357,7 @@ Measured on my laptop (Intel i7-1355U, Linux):
 - It opens in about 20 ms, with the panels you left back on screen. A Scryfall search among them
   arrives a quarter of a second later.
 - A key press is drawn in about 13 ms.
-- It uses 35 to 60 MB of memory.
+- It uses 45 to 60 MB of memory.
 - What it downloads is kept on disk: about 40 MB, half of it every card's rulings so they show
   without asking Scryfall, plus about 100 KB for each card picture you've looked at. `ttr cache`
   shows what's there.
