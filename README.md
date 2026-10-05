@@ -178,7 +178,7 @@ You can browse anyone's public Moxfield decks and make local copies of them.
 1. `space d` to open the lists panel.
 2. `i`, and type a Moxfield username (or paste a deck URL).
 3. `j` `k` to scroll through their public decks.
-4. `enter` to open a deck, `c` to make a local copy of the main deck, or `C` to copy the main deck
+4. `enter` to open a deck in a new panel to the left, `c` to make a local copy of the main deck, or `C` to copy the main deck
    and its considering list.
 
 The people and decks you follow stay under a `moxfield` folder at the top of the lists panel.
@@ -200,20 +200,21 @@ Artifact. Build a filter from the rows, and the list and the bars narrow to the 
 | --- | --- |
 | `s` | open (or close) the statistics of the active list |
 | `S` | open the statistics of the editing list |
-| `j` `k` | walk through the rows |
-| `J` `K` | jump between groups |
-| `a` | add AND *row* to the filter |
-| `o` | add OR *row* to the filter |
-| `n` | add AND NOT *row* to the filter |
-| `x` | take *row* out of the filter |
-| `X` | clear the filter |
-| `p` | show the odds of drawing each row in your opening hand |
+| `J` `K` | walk through the rows |
+| `ctrl+j` `ctrl+k` | jump between groups |
+| `alt+a` | add AND *row* to the filter |
+| `alt+o` | add OR *row* to the filter |
+| `alt+n` | add AND NOT *row* to the filter |
+| `alt+x` | take *row* out of the filter |
+| `alt+X` | clear the filter |
+| `alt+p` | show the odds of drawing each row in your opening hand |
 
-You can still move between lists with `h` `l` and change the editing list with `e` `E` while the
-panel is open.
+The list keeps its own keys while the panel is open: `j` `k` move through the cards, `a` `x` add
+and remove, `esc` clears the filters a step at a time, `h` `l` move between lists and `e` `E`
+change the editing list. Only `s` closes the statistics.
 
-For example, `s`, then `a` on *creature*, `o` on *artifact* and `n` on *ramp* filters the list to
-`(creature OR artifact) AND NOT ramp`.
+For example, `s`, then `alt+a` on *creature*, `alt+o` on *artifact* and `alt+n` on *ramp* filters
+the list to `(creature OR artifact) AND NOT ramp`.
 
 ![The statistics panel, filtered to a combination of categories](screenshots/stats-filter.png)
 
@@ -328,9 +329,9 @@ With `T o`:
 From the statistics:
 
 1. In your list, press `s` to open the statistics.
-2. `K` to the Scryfall Tagger group (it's the last group, one step up from the top), then `j` to
-   the tag you want.
-3. `a` to filter the list by it, and `s` to close the statistics.
+2. `ctrl+k` to the Scryfall Tagger group (it's the last group, one step up from the top), then
+   `J` to the tag you want.
+3. `alt+a` to filter the list by it, and `s` to close the statistics.
 4. `V` to select every card left, and `t` to tag them.
 5. Type a name for the tag and press `enter`.
 
@@ -530,8 +531,7 @@ ttr cache clear [kind]          # delete it, all of it or one kind
 
 | Key | Does |
 | --- | --- |
-| `enter` | open a folder or a list |
-| `L` | open the list in a new panel |
+| `enter` | open a folder, or a list in a new panel to the left |
 | `i` | follow a Moxfield user or deck |
 | `n` `r` | new list / rename |
 | `c` `C` | copy / copy with its considering list |
@@ -572,13 +572,19 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 - **cache**: what's downloaded, by kind, and how much room each takes. `d` clears one. Everything
   there can be downloaded again.
 
+`r` on a download or a kind in the cache fetches it again. The Tagger tags, rulings, catalogs,
+comprehensive rules and the decks of people you follow download again at once. Pictures, printings
+and printed texts are fetched again one by one, the next time each is shown. Card data is fetched
+again for the open lists now and for the others when they open.
+
 The rest is in files. `ttr init` writes every settings file with the defaults commented out. They change nothing until you
 uncomment a line.
 
 - `~/.config/ttr/keys.json`: rebind any key. `ttr keys --defaults` prints the whole keymap. A clash
   is reported on start, and that scope keeps its defaults until it's fixed.
 - `~/.config/ttr/config.json`: which sorts `.` and `,` step through, in what order, and which way
-  each one starts.
+  each one starts; and `otag_prefix`, what `T o` and `T O` put in front of a Scryfall Tagger tag
+  (`otag-` unless you change it, `""` for nothing).
 - Themes: `ttr theme` lists them (gruvbox, nord, and one that uses your terminal's colors), and
   `ttr theme <name>` switches. You can add your own.
 
