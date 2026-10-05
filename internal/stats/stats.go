@@ -35,6 +35,18 @@ type Row struct {
 	Path       string
 	Depth      int
 	Expandable bool
+
+	// Name is how a filter writes the row, where its Label alone would be
+	// ambiguous: "ramp (this list)".
+	Name string
+}
+
+// FilterName is how a filter writes the row.
+func (r Row) FilterName() string {
+	if r.Name != "" {
+		return r.Name
+	}
+	return r.Label
 }
 
 type Group struct {
@@ -314,47 +326,119 @@ func priceRows() []Row {
 	return rows
 }
 
-// tagRows come from the deck itself — only a Moxfield deck whose author
-// tagged their cards has any.
-func tagRows(entries []deck.Card) []Row {
-	seen := map[string]bool{}
+// The Tags group: the list's own tags, and the global tags other lists give
+// its cards (deck.Card.Borrowed). A tag only other lists give is drawn in
+// their colour. A tag both give opens (enter) into the two: the cards that
+// have it of their own, and the ones that only borrow it — every card in
+// the tag's row is in exactly one of them.
+
+// tagPathPrefix keeps the group's paths apart from the other trees' in the
+// one set of opened rows.
+const tagPathPrefix = "tag:"
+
+// The two rows under a tag both give.
+const (
+	OwnTagLabel      = "this list"
+	BorrowedTagLabel = "other lists"
+)
+
+// tagRows is the tags the cards in rowSource have, of their own or borrowed,
+// commonest first or by name, each opened one followed by its two halves, and
+// the untagged at the bottom.
+func tagRows(rowSource []deck.Card, byName bool, open map[string]bool) []Row {
+	own := map[string]bool{}
+	borrowed := map[string]bool{}
+	base := map[string]int{}
 	var labels []string
-	for _, e := range entries {
-		for _, t := range e.Tags {
-			if !seen[t] {
-				seen[t] = true
+	for _, e := range rowSource {
+		seen := map[string]bool{}
+		note := func(t string, into map[string]bool) {
+			into[t] = true
+			if seen[t] {
+				return
+			}
+			seen[t] = true
+			if base[t] == 0 {
 				labels = append(labels, t)
 			}
+			base[t] += copies(e)
+		}
+		for _, t := range e.Tags {
+			note(t, own)
+		}
+		for _, t := range e.Borrowed {
+			note(t, borrowed)
 		}
 	}
-	sort.Strings(labels)
+	sort.Slice(labels, func(i, j int) bool {
+		if !byName && base[labels[i]] != base[labels[j]] {
+			return base[labels[i]] > base[labels[j]]
+		}
+		return strings.ToLower(labels[i]) < strings.ToLower(labels[j])
+	})
 
 	rows := make([]Row, 0, len(labels)+1)
-	for _, l := range labels {
-		tag := l
-		rows = append(rows, Row{
-			Group: "Tags", Label: tag, Color: theme.Highlight,
-			Match: func(ci deck.Card) bool {
-				for _, t := range ci.Tags {
-					if t == tag {
-						return true
-					}
-				}
-				return false
-			},
-		})
+	for _, tag := range labels {
+		r := TagRow(tagPathPrefix + tag)
+		if !own[tag] {
+			r.Color = theme.MemberOther
+		}
+		r.Expandable = own[tag] && borrowed[tag]
+		rows = append(rows, r)
+		if r.Expandable && open[r.Path] {
+			rows = append(rows, TagRow(r.Path+pathSep+OwnTagLabel), TagRow(r.Path+pathSep+BorrowedTagLabel))
+		}
 	}
 	// An untagged line, but only once something is tagged: a histogram whose
 	// one bar is "untagged" says nothing, so a deck with no tags has no tag
 	// group at all. When some cards are tagged, the untagged remainder is worth
 	// seeing — and it sits at the bottom, as the leftover rather than a tag.
 	if len(labels) > 0 {
-		rows = append(rows, Row{
-			Group: "Tags", Label: untaggedLabel, Color: theme.TextDim,
-			Match: func(ci deck.Card) bool { return len(ci.Tags) == 0 },
-		})
+		rows = append(rows, TagRow(tagPathPrefix+untaggedLabel))
 	}
 	return rows
+}
+
+// IsTagPath reports whether a path names a row of the Tags group.
+func IsTagPath(path string) bool { return strings.HasPrefix(path, tagPathPrefix) }
+
+// TagRow is the row for a tag, or for one half of it, by its path — whether
+// or not it is on show, so a filter on it can be put back after a restart.
+func TagRow(path string) Row {
+	rest := strings.TrimPrefix(path, tagPathPrefix)
+	if rest == untaggedLabel {
+		return Row{
+			Group: "Tags", Label: untaggedLabel, Path: path, Color: theme.TextDim,
+			Match: func(ci deck.Card) bool { return len(ci.Tags) == 0 && len(ci.Borrowed) == 0 },
+		}
+	}
+	// A tag of yours may have a slash in it, so the half is read off the end.
+	tag, half := rest, ""
+	for _, h := range []string{OwnTagLabel, BorrowedTagLabel} {
+		if t, ok := strings.CutSuffix(rest, pathSep+h); ok {
+			tag, half = t, h
+		}
+	}
+	has := func(tags []string) bool {
+		for _, t := range tags {
+			if t == tag {
+				return true
+			}
+		}
+		return false
+	}
+	r := Row{Group: "Tags", Label: tag, Path: path, Color: theme.Highlight}
+	switch half {
+	case OwnTagLabel:
+		r.Label, r.Depth, r.Name = OwnTagLabel, 1, tag+" ("+OwnTagLabel+")"
+		r.Match = func(ci deck.Card) bool { return has(ci.Tags) }
+	case BorrowedTagLabel:
+		r.Label, r.Depth, r.Color, r.Name = BorrowedTagLabel, 1, theme.MemberOther, tag+" ("+BorrowedTagLabel+")"
+		r.Match = func(ci deck.Card) bool { return !has(ci.Tags) && has(ci.Borrowed) }
+	default:
+		r.Match = func(ci deck.Card) bool { return has(ci.Tags) || has(ci.Borrowed) }
+	}
+	return r
 }
 
 // untaggedLabel names the remainder row in the tag group. It is matched and
@@ -389,7 +473,7 @@ func Groups(rowSource, counted []deck.Card) []Group {
 var ordered = map[string]bool{
 	"Mana Value (excl. lands)": true, "Price (USD)": true, "Rarity": true,
 	// Trees, ordered level by level as they're built.
-	TaggerGroup: true, TypeGroup: true,
+	TaggerGroup: true, TypeGroup: true, "Tags": true,
 }
 
 // GroupOrder is the order the groups are built and drawn in, before J or K
@@ -415,7 +499,7 @@ var GroupOrder = []string{
 // path.
 func GroupsBy(rowSource, counted []deck.Card, tagsByName bool, openTags map[string]bool) []Group {
 	built := map[string][]Row{
-		"Tags":                     tagRows(rowSource),
+		"Tags":                     tagRows(rowSource, tagsByName, openTags),
 		TypeGroup:                  typeRows(rowSource, openTags),
 		"Color (excl. lands)":      colorRows(),
 		"Mana Value (excl. lands)": cmcRows(),

@@ -295,6 +295,11 @@ func (ps *panelSession) applyLayout(l *cardList) {
 				l.statFilter, _ = l.statFilter.Add(parseOp(sc.Op), stats.TypeRow(sc.Path))
 				continue
 			}
+			// And a tag, or one half of it.
+			if sc.Group == "Tags" && stats.IsTagPath(sc.Path) {
+				l.statFilter, _ = l.statFilter.Add(parseOp(sc.Op), stats.TagRow(sc.Path))
+				continue
+			}
 			if r, ok := findRow(groups, sc.Group, sc.Label); ok {
 				l.statFilter, _ = l.statFilter.Add(parseOp(sc.Op), r)
 			}

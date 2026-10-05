@@ -36,6 +36,17 @@ type Card struct {
 	Qty       int
 	Commander bool
 	Tags      []string
+	// Borrowed is the tags other lists give the card through the global
+	// tags, worked out as it is counted or narrowed. Never written.
+	Borrowed []string
+}
+
+// AllTags is the card's own tags, then the borrowed ones.
+func (d Card) AllTags() []string {
+	if len(d.Borrowed) == 0 {
+		return d.Tags
+	}
+	return append(append([]string(nil), d.Tags...), d.Borrowed...)
 }
 
 // Section is the heading a card is listed under.

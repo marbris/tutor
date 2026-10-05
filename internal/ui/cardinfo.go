@@ -371,15 +371,15 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 
 	var out []string
 
-	// The card's own tags, then in a dimmer hand the ones the global tags give
-	// it — they count the same, but they aren't in this list's file.
-	if global := onlyGlobal(c); len(c.Tags) > 0 || len(global) > 0 {
+	// The card's own tags, then in another list's colour the ones the global
+	// tags give it — they count the same, but they aren't in this list's file.
+	if global := c.Borrowed; len(c.Tags) > 0 || len(global) > 0 {
 		line := lipgloss.NewStyle().Foreground(theme.Highlight).Render(strings.Join(c.Tags, " "))
 		if len(global) > 0 {
 			if len(c.Tags) > 0 {
 				line += " "
 			}
-			line += lipgloss.NewStyle().Foreground(theme.TextDim).Render(strings.Join(global, " "))
+			line += lipgloss.NewStyle().Foreground(theme.MemberOther).Render(strings.Join(global, " "))
 		}
 		out = append(out, "", lipgloss.NewStyle().MaxWidth(width).Render(line))
 	}

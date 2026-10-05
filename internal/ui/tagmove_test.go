@@ -72,7 +72,7 @@ func TestTInTheDecksPanelPinsAListWhoseTagsCountEverywhere(t *testing.T) {
 	// A deck with nothing tagged now counts and filters by the list's tags.
 	m = withCards(m, "f", sample(), sortArrival)
 	dl := m.ws.current().cardsView()
-	r, ok := findRow(stats.Groups(effectiveAll(dl.all), effectiveAll(dl.all)), "Tags", "ramp")
+	r, ok := findRow(stats.Groups(effectiveAll(dl.all, dl.lenderKey()), effectiveAll(dl.all, dl.lenderKey())), "Tags", "ramp")
 	if !ok || r.Base != 2 {
 		t.Fatalf("statistics see ramp %v times", r.Base)
 	}

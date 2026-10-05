@@ -150,7 +150,7 @@ func (m *Model) bakeGlobalTags(l *cardList) {
 	l.pushUndo("tags from the global tags")
 	n := 0
 	for i, c := range l.all {
-		merged := deck.ApplyTagEdits(c.Tags, globalTags.of(c.Card.Name), nil)
+		merged := deck.ApplyTagEdits(c.Tags, globalTags.of(c.Card.Name, l.lenderKey()), nil)
 		if len(merged) != len(c.Tags) {
 			l.all[i].Tags = merged
 			n++

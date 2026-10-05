@@ -239,3 +239,63 @@ func TestXSpellsHaveARowOfTheirOwn(t *testing.T) {
 		t.Error("an X row without an X spell")
 	}
 }
+
+func TestBorrowedTagsAreColouredApartAndATagBothGiveOpensIntoItsHalves(t *testing.T) {
+	entries := []deck.Card{
+		{Card: mtg.Card{Name: "Sol Ring"}, Qty: 1, Tags: []string{"ramp"}},
+		{Card: mtg.Card{Name: "Arcane Signet"}, Qty: 1, Borrowed: []string{"ramp"}},
+		{Card: mtg.Card{Name: "Rancor"}, Qty: 1, Borrowed: []string{"aura"}},
+		{Card: mtg.Card{Name: "Forest"}, Qty: 1, Tags: []string{"land"}},
+	}
+	find := func(groups []Group, path string) (Row, bool) {
+		for _, g := range groups {
+			for _, r := range g.Rows {
+				if r.Path == path {
+					return r, true
+				}
+			}
+		}
+		return Row{}, false
+	}
+
+	groups := GroupsBy(entries, entries, false, nil)
+	ramp, _ := find(groups, "tag:ramp")
+	aura, _ := find(groups, "tag:aura")
+	land, _ := find(groups, "tag:land")
+	if ramp.Base != 2 || !ramp.Expandable {
+		t.Errorf("ramp counts own and borrowed and opens: %+v", ramp)
+	}
+	if aura.Color == land.Color || aura.Expandable || land.Expandable {
+		t.Errorf("a borrowed-only tag should be coloured apart and neither opens: aura %v land %v", aura.Color, land.Color)
+	}
+	if _, ok := find(groups, "tag:ramp/this list"); ok {
+		t.Error("the halves show before ramp is opened")
+	}
+
+	groups = GroupsBy(entries, entries, false, map[string]bool{"tag:ramp": true})
+	own, ok1 := find(groups, "tag:ramp/this list")
+	other, ok2 := find(groups, "tag:ramp/other lists")
+	if !ok1 || !ok2 || own.Base != 1 || other.Base != 1 {
+		t.Fatalf("opened ramp should split 1 and 1: %+v %+v", own, other)
+	}
+	if other.FilterName() != "ramp (other lists)" {
+		t.Errorf("filter name %q", other.FilterName())
+	}
+	// The halves sit right under their tag.
+	for _, g := range groups {
+		if g.Title != "Tags" {
+			continue
+		}
+		for i, r := range g.Rows {
+			if r.Path == "tag:ramp" && (i+2 >= len(g.Rows) || g.Rows[i+1].Path != "tag:ramp/this list") {
+				t.Errorf("halves aren't under ramp: %v", g.Rows)
+			}
+		}
+	}
+	if un := TagRow("tag:untagged"); un.Match(entries[2]) {
+		t.Error("a card with only borrowed tags isn't untagged")
+	}
+	if r := TagRow("tag:a/b"); !r.Match(deck.Card{Tags: []string{"a/b"}}) {
+		t.Error("a tag with a slash in it should still match")
+	}
+}

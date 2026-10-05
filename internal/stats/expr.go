@@ -114,9 +114,9 @@ func (e Expr) String() string {
 	if e[0].Op == AndNot {
 		b.WriteString("¬")
 	}
-	b.WriteString(e[0].Row.Label)
+	b.WriteString(e[0].Row.FilterName())
 	for i, cl := range e[1:] {
-		b.WriteString(" " + cl.Op.Symbol() + " " + cl.Row.Label)
+		b.WriteString(" " + cl.Op.Symbol() + " " + cl.Row.FilterName())
 		if i < len(e)-2 {
 			b.WriteString(")")
 		}

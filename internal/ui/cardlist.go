@@ -172,7 +172,7 @@ func (l *cardList) narrowed() []deck.Card {
 	if len(l.statFilter) > 0 {
 		kept := make([]deck.Card, 0, len(rows))
 		for _, c := range rows {
-			if l.statFilter.Match(effective(c)) {
+			if l.statFilter.Match(effective(c, l.lenderKey())) {
 				kept = append(kept, c)
 			}
 		}
@@ -181,7 +181,7 @@ func (l *cardList) narrowed() []deck.Card {
 	if q := query.Parse(l.filter); !q.Empty() {
 		kept := make([]deck.Card, 0, len(rows))
 		for _, c := range rows {
-			if q.Match(effective(c)) {
+			if q.Match(effective(c, l.lenderKey())) {
 				kept = append(kept, c)
 			}
 		}
@@ -636,7 +636,7 @@ func (l *cardList) info(width int) []string {
 	if !ok {
 		return nil
 	}
-	return cardInfo(c, width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
+	return cardInfo(effective(c, l.lenderKey()), width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
 }
 
 // keys is what this list offers, in two groups: ordering and narrowing it,

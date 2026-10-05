@@ -30,7 +30,7 @@ func term(w string) node {
 func plain(w string) node {
 	return termFunc(func(c deck.Card) bool {
 		hay := strings.ToLower(c.Card.Name + "\n" + c.Card.CombinedOracle() + "\n" +
-			c.Card.TypeLine + "\n" + strings.Join(c.Tags, " "))
+			c.Card.TypeLine + "\n" + strings.Join(c.AllTags(), " "))
 		return strings.Contains(hay, w)
 	})
 }
@@ -131,7 +131,7 @@ func keyword(key, op, val string) node {
 	case "tag":
 		if text {
 			return termFunc(func(c deck.Card) bool {
-				for _, t := range c.Tags {
+				for _, t := range c.AllTags() {
 					if strings.EqualFold(t, val) {
 						return true
 					}

@@ -654,7 +654,7 @@ func (m Model) infoImageLines(width int) []string {
 
 	if l := m.ws.current().cardsView(); l != nil {
 		if dc, ok := l.current(); ok {
-			lines = append(lines, cardMeta(dc, p, width, l.rulings[dc.Card.ID], l.rulingErr[dc.Card.ID])...)
+			lines = append(lines, cardMeta(effective(dc, l.lenderKey()), p, width, l.rulings[dc.Card.ID], l.rulingErr[dc.Card.ID])...)
 		}
 	}
 	return lines

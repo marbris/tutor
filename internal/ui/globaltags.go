@@ -31,10 +31,13 @@ const (
 
 // tagIndex is the lists lending the global tags, and what they say.
 type tagIndex struct {
+	// slugs is the pinned lists, which lend whether open or not.
 	slugs []string
-	// tags is each card's tags across the lists, by lowercased name — and
-	// by its front face too, for a list that names a two-faced card by it.
-	tags map[string][]string
+	// from is what each lending list says: its key (a local list's slug),
+	// then each card's tags by lowercased name — and by its front face too,
+	// for a list that names a two-faced card by it. A list can then be left
+	// out of what it lends itself.
+	from map[string]map[string][]string
 	// gen counts rebuilds, for the statistics to know the tags have moved.
 	gen int
 }
@@ -99,41 +102,72 @@ func (x *tagIndex) toggle(slug string) bool {
 	return true
 }
 
-// of is the tags the global tags give a card.
-func (x *tagIndex) of(name string) []string {
-	if len(x.tags) == 0 {
+// empty reports whether no list lends a tag.
+func (x *tagIndex) empty() bool { return len(x.from) == 0 }
+
+// of is the tags the global tags give a card, but for what the list named
+// except lends: a list sees its own tags as its own, not as borrowed ones.
+func (x *tagIndex) of(name, except string) []string {
+	if len(x.from) == 0 {
 		return nil
 	}
 	k := strings.ToLower(name)
-	if t, ok := x.tags[k]; ok {
-		return t
+	front, _, two := strings.Cut(k, " // ")
+	var out []string
+	for key, tags := range x.from {
+		if key == except {
+			continue
+		}
+		t, ok := tags[k]
+		if !ok && two {
+			t = tags[front]
+		}
+		out = deck.ApplyTagEdits(out, t, nil)
 	}
-	front, _, ok := strings.Cut(k, " // ")
-	if ok {
-		return x.tags[front]
+	return out
+}
+
+// all is every tag the global tags hold, for completion.
+func (x *tagIndex) all() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, tags := range x.from {
+		for _, ts := range tags {
+			for _, t := range ts {
+				if !seen[t] {
+					seen[t] = true
+					out = append(out, t)
+				}
+			}
+		}
 	}
-	return nil
+	return out
 }
 
 // rebuild reads the lists again. A list open on screen is read from there,
 // since its latest edit may not have reached the file yet.
 func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 	x.gen++
-	x.tags = map[string][]string{}
-	add := func(name string, tags []string) {
+	x.from = map[string]map[string][]string{}
+	add := func(key, name string, tags []string) {
 		if len(tags) == 0 {
 			return
 		}
+		into := x.from[key]
+		if into == nil {
+			into = map[string][]string{}
+			x.from[key] = into
+		}
 		k := strings.ToLower(name)
-		x.tags[k] = deck.ApplyTagEdits(x.tags[k], tags, nil)
+		into[k] = deck.ApplyTagEdits(into[k], tags, nil)
 		if front, _, ok := strings.Cut(k, " // "); ok {
-			x.tags[front] = deck.ApplyTagEdits(x.tags[front], tags, nil)
+			into[front] = deck.ApplyTagEdits(into[front], tags, nil)
 		}
 	}
 	for _, slug := range x.slugs {
 		if cards, ok := open[slug]; ok {
 			for _, c := range cards {
-				add(c.Card.Name, c.Tags)
+				add(slug, c.Card.Name, c.Tags)
 			}
 			continue
 		}
@@ -142,47 +176,48 @@ func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 			continue
 		}
 		for _, e := range f.Entries {
-			add(e.Name, e.Tags)
+			add(slug, e.Name, e.Tags)
 		}
 	}
 }
 
-// effective is a card with the global tags added to its own, for
-// narrowing and counting. The card in the list is left as it is.
-func effective(c deck.Card) deck.Card {
-	extra := globalTags.of(c.Card.Name)
-	if len(extra) == 0 {
-		return c
+// lenderKey is what a list lends the global tags under: a local list's slug.
+// A list with none — a search, a deck borrowed from Moxfield — lends nothing
+// yet, and sees every list's tags as borrowed.
+func (l *cardList) lenderKey() string {
+	if l == nil || l.deck == nil {
+		return ""
 	}
-	c.Tags = deck.ApplyTagEdits(c.Tags, extra, nil)
-	return c
+	return l.deck.Slug
 }
 
-func effectiveAll(cards []deck.Card) []deck.Card {
-	if len(globalTags.tags) == 0 {
-		return cards
-	}
-	out := make([]deck.Card, len(cards))
-	for i, c := range cards {
-		out[i] = effective(c)
-	}
-	return out
-}
-
-// onlyGlobal is the tags a card has from the global tags and not of its own.
-func onlyGlobal(c deck.Card) []string {
-	var out []string
-	for _, t := range globalTags.of(c.Card.Name) {
+// effective is a card with Borrowed filled in: the tags the global tags give
+// it that it hasn't of its own, from every list but self. It counts and
+// narrows by both; the card in the list is left as it is.
+func effective(c deck.Card, self string) deck.Card {
+	c.Borrowed = nil
+	for _, t := range globalTags.of(c.Card.Name, self) {
 		mine := false
 		for _, o := range c.Tags {
-			if o == t {
+			if strings.EqualFold(o, t) {
 				mine = true
 				break
 			}
 		}
 		if !mine {
-			out = append(out, t)
+			c.Borrowed = append(c.Borrowed, t)
 		}
+	}
+	return c
+}
+
+func effectiveAll(cards []deck.Card, self string) []deck.Card {
+	if globalTags.empty() {
+		return cards
+	}
+	out := make([]deck.Card, len(cards))
+	for i, c := range cards {
+		out[i] = effective(c, self)
 	}
 	return out
 }
