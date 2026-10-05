@@ -278,15 +278,16 @@ func TestTheEscHintSaysWhatEscWillDo(t *testing.T) {
 	for _, s := range steps {
 		s.setup()
 	}
-	for _, want := range []string{"drop picks", "clear /filter", "clear stats-filter", "close panel"} {
+	// And then nothing: esc doesn't close the panel, so it has no hint.
+	for _, want := range []string{"drop picks", "clear /filter", "clear stats-filter", ""} {
 		label, _ := (&m).escStep(p)
 		if label != want {
 			t.Fatalf("esc hint says %q, want %q", label, want)
 		}
-		if want == "close panel" {
-			break
-		}
 		m = drive(m, "esc")
+	}
+	if m.ws.count() != 1 {
+		t.Error("esc closed the panel")
 	}
 }
 

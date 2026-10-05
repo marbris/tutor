@@ -210,8 +210,9 @@ func (m Model) panelHintGroups(p *panel) []hintGroup {
 	if m.focusNarrowed() {
 		nav = append(nav, hint("clear filters/all", keymap.Global, keymap.GlobalClearFilter, keymap.GlobalClearAll))
 	}
-	esc, _ := (&m).escStep(p)
-	nav = append(nav, hint(esc, keymap.Global, keymap.GlobalBack))
+	if esc, _ := (&m).escStep(p); esc != "" {
+		nav = append(nav, hint(esc, keymap.Global, keymap.GlobalBack))
+	}
 
 	groups := append([]hintGroup{{"", nav}}, rest...)
 

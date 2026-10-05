@@ -132,10 +132,17 @@ func (m Model) viewPanelBody(p *panel, width, height int) []string {
 		return v.lines(width, height, focused, &m)
 	}
 
+	// Out of the bar (esc leaves it, and no longer closes the panel), say
+	// how to get back into it.
+	how := "type a " + p.kind.prompt()
+	if !p.searchOpen {
+		how = keymap.Hint(keymap.Global, keymap.GlobalBar) + " to search · " +
+			leaderHint(keymap.LeaderClose) + " to close"
+	}
 	return fillTo([]string{
 		dim.Render(fit("nothing here yet", width)),
 		"",
-		dim.Render(fit("type a "+p.kind.prompt(), width)),
+		dim.Render(fit(how, width)),
 	}, width, height)
 }
 

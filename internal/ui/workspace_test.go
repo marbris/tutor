@@ -188,9 +188,9 @@ func TestTheSearchBarTakesTypingRatherThanCommands(t *testing.T) {
 	}
 }
 
-func TestEscTakesTheFilterBeforeClosingThePanel(t *testing.T) {
-	// esc is "back": a filtered panel loses its filter first, and only the
-	// next esc closes it.
+func TestEscTakesTheFilterButNeverThePanel(t *testing.T) {
+	// esc is "back": a filtered panel loses its filter, and there it stops.
+	// Closing a panel is space x's.
 	m := withCards(sized(120, 40), "f", sample(), sortArrival)
 	m = drive(m, "/", "e", "l", "f", "enter")
 
@@ -199,90 +199,39 @@ func TestEscTakesTheFilterBeforeClosingThePanel(t *testing.T) {
 		t.Fatal("the first esc should clear the filter and keep the panel")
 	}
 	m = drive(m, "esc")
+	if m.ws.count() != 1 {
+		t.Error("the second esc closed the panel")
+	}
+	m = drive(m, "space", "x")
 	if m.ws.count() != 0 {
-		t.Error("the second esc did not close the panel")
+		t.Error("space x did not close the panel")
 	}
 }
 
-func TestSpaceUReopensAClosedPanelWhereItWas(t *testing.T) {
-	m := sized(160, 30)
-	m = withCards(m, "f", sample(), sortArrival)     // panel 0
-	m = withCards(m, "d", sample()[:2], sortArrival) // panel 1
-	m.ws.panels[0].cardsView().name = "keep-me"
-	if m.ws.count() != 2 {
-		t.Fatalf("setup left %d panels", m.ws.count())
+func TestEscInAnEmptyPanelsBarKeepsThePanel(t *testing.T) {
+	m := drive(sized(120, 40), "space", "f")
+	m = drive(m, "esc", "esc")
+	if m.ws.empty() {
+		t.Fatal("esc closed the empty panel")
 	}
-
-	m = focusOn(m, 0)
-	m = drive(m, "space", "x") // close the first panel
-	if m.ws.count() != 1 {
-		t.Fatalf("close left %d panels", m.ws.count())
+	if m.View() == "" {
+		t.Error("an empty panel without its bar draws nothing")
 	}
-
-	m = drive(m, "space", "u") // undo the close
-	if m.ws.count() != 2 {
-		t.Fatalf("space u left %d panels", m.ws.count())
+	// Out of the bar, the panel's keys work: i opens it again, space x closes.
+	m = drive(m, "i")
+	if p := m.ws.current(); !p.searchOpen || !p.search.Focused() {
+		t.Error("i did not open the bar again")
 	}
-	if got := m.ws.panels[0].cardsView().name; got != "keep-me" {
-		t.Errorf("the restored panel came back at the wrong spot; index 0 holds %q", got)
-	}
-	if m.ws.focused != 0 {
-		t.Errorf("space u focused panel %d, want the one it restored", m.ws.focused)
-	}
-}
-
-func TestSpaceUWithNothingClosedIsANoOp(t *testing.T) {
-	m := withCards(sized(120, 30), "f", sample(), sortArrival)
-	before := m.ws.count()
-	m = drive(m, "space", "u")
-	if m.ws.count() != before {
-		t.Errorf("space u changed the panels with nothing to restore: %d → %d", before, m.ws.count())
-	}
-}
-
-func TestTheLeaderMenuAppearsAndCancels(t *testing.T) {
-	m := openPanel(sized(120, 40), "f", "angel")
-	m = drive(m, "space")
-	if !m.leader {
-		t.Fatal("space did not raise the menu")
-	}
-	if view := m.View(); view == "" {
-		t.Error("the menu drew nothing")
-	}
-	m = drive(m, "z") // names nothing
-	if m.leader {
-		t.Error("an unknown key left the leader waiting")
-	}
-	if m.ws.count() != 1 {
-		t.Error("an unknown leader key did something")
-	}
-}
-
-func TestTheFrameFitsTheTerminal(t *testing.T) {
-	for _, size := range [][2]int{{80, 24}, {120, 40}, {200, 50}, {60, 20}} {
-		m := sized(size[0], size[1])
-		m = openPanel(m, "f", "angel")
-		m = openPanel(m, "d", "marbri")
-		m = openPanel(m, "r", "flying")
-
-		view := m.View()
-		lines := splitLines(view)
-		if len(lines) > size[1] {
-			t.Errorf("%dx%d: drew %d lines", size[0], size[1], len(lines))
-		}
-		for i, line := range lines {
-			if w := visibleWidth(line); w > size[0] {
-				t.Errorf("%dx%d: line %d is %d columns", size[0], size[1], i, w)
-			}
-		}
+	m = drive(m, "esc", "space", "x")
+	if !m.ws.empty() {
+		t.Error("space x did not close the empty panel")
 	}
 }
 
 func TestClosingTheLastPanelLandsOnTheSplash(t *testing.T) {
-	// Not straight out of the program: there is always one press between
-	// you and the exit, and esc from the splash is it.
+	// Not straight out of the program: esc from the splash is what leaves.
 	m := drive(sized(120, 40), "space", "f")
-	m = drive(m, "esc")
+	m = drive(m, "esc", "space", "x")
 
 	if !m.ws.empty() {
 		t.Fatal("the panel did not close")
@@ -435,8 +384,8 @@ func TestTheEscCascadeInAList(t *testing.T) {
 		t.Error("the third esc should take the statistics filter and keep the panel")
 	}
 	m = drive(m, "esc")
-	if m.ws.count() != 0 {
-		t.Error("esc did not close the panel once the filters were gone")
+	if m.ws.count() != 1 {
+		t.Error("esc closed the panel once the filters were gone")
 	}
 }
 

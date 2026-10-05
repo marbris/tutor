@@ -262,8 +262,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.hintsExpanded = !m.hintsExpanded
 
 	case keymap.GlobalBack:
-		_, run := (&m).escStep(p)
-		run()
+		if _, run := (&m).escStep(p); run != nil {
+			run()
+		}
 
 	case keymap.GlobalClearFilter:
 		// Clear the narrowings on the list in front of you — the text filter
@@ -284,11 +285,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // apart.
 //
 // The cascade, outward one step at a time — esc is "back": step off the
-// information panel's modes, drop a transient selection, then the
-// narrowings one at a time — the text filter, the statistics filter — then
-// step back out of a sub-view, and close the panel. Closing the last one
-// lands on the splash rather than quitting — esc *from* the splash is what
-// leaves.
+// printed history, drop a transient selection, then the narrowings one at
+// a time — the text filter, the statistics filter — then step back out of
+// a sub-view. There it stops, with nothing to do and no hint: esc never
+// closes the panel, which is space x's job.
 func (m *Model) escStep(p *panel) (string, func()) {
 	switch {
 	// The picture gx put up is not on the way: gx takes it down again.
@@ -313,7 +313,7 @@ func (m *Model) escStep(p *panel) (string, func()) {
 		}
 		return label, func() { p.pop() }
 	}
-	return "close panel", func() { m.ws.close() }
+	return "", nil
 }
 
 // handleSearchKey is the search bar's own keymap. Everything it doesn't
@@ -346,17 +346,11 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case keymap.SearchBack:
 		// The same cascade as everywhere else: clear what's clearable, then
-		// leave, then close. Typing half a query and pressing esc should
-		// lose the half-query, not the panel.
+		// leave the bar. Typing half a query and pressing esc should lose
+		// the half-query, not the panel. Even an empty panel stays: esc
+		// leaves its bar, so space x can close it.
 		if p.search.Value() != "" {
 			p.search.SetValue("")
-			return m, nil
-		}
-		if p.empty() {
-			// Closing the last panel lands on the splash rather than
-			// quitting. Leaving the program is what esc does *from* the
-			// splash, so there is always one press between you and the exit.
-			m.ws.close()
 			return m, nil
 		}
 		// Leaving the bar over a tab-preview commits it: the decks it was

@@ -351,8 +351,7 @@ func inputWidth(width int, prompt string) int {
 	return maxInt(width-textWidth(prompt)-1, 4)
 }
 
-// empty reports whether a panel has nothing in it yet, which is what makes
-// esc close it rather than clear something.
+// empty reports whether a panel has nothing in it yet.
 func (p *panel) empty() bool { return len(p.stack) == 0 && p.title == "" }
 
 // subtitle is the count line under the header: how many cards, and what has
