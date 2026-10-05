@@ -242,16 +242,23 @@ func TestThePrintedHistoryReadsNewestFirst(t *testing.T) {
 	}
 }
 
-func TestEscBackIsOfferedOverThePrintedTextAndThePicture(t *testing.T) {
+func TestEscBackIsOfferedOverThePrintedTextButNotThePicture(t *testing.T) {
 	withKitty(t, true)
-	for _, keys := range [][]string{{"g", "v"}, {"g", "x"}} {
-		m := withCards(sized(140, 40), "f", twoCards(), sortArrival)
-		m = drive(m, keys...)
-		if got := offered(m, "back"); got != "esc" {
-			t.Errorf("%s: esc back is offered as %q", strings.Join(keys, ""), got)
-		}
-	}
 	m := withCards(sized(140, 40), "f", twoCards(), sortArrival)
+	m = drive(m, "g", "v")
+	if got := offered(m, "back"); got != "esc" {
+		t.Errorf("gv: esc back is offered as %q", got)
+	}
+	// The picture comes down with gx, which says so.
+	m = withCards(sized(140, 40), "f", twoCards(), sortArrival)
+	m = drive(m, "g", "x")
+	if got := offered(m, "back"); got != "" {
+		t.Errorf("gx: back is offered as %q", got)
+	}
+	if got := offered(m, "close printing"); got != "gx" {
+		t.Errorf("gx: close printing is offered as %q", got)
+	}
+	m = withCards(sized(140, 40), "f", twoCards(), sortArrival)
 	if got := offered(m, "back"); got != "" {
 		t.Error("esc back is offered over a plain card")
 	}

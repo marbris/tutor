@@ -104,16 +104,22 @@ func TestGxShowsThePrintingAndSendsItOnce(t *testing.T) {
 		t.Error("the caption doesn't say which printing")
 	}
 
-	// Moving about doesn't send it again; esc takes it down.
+	// Moving about doesn't send it again; esc leaves it up, gx takes it down.
 	before := m.kitty
 	m = drive(m, "?")
 	m = drive(m, "?")
 	if m.kitty != before {
 		t.Error("the picture was resent at the same size")
 	}
-	m = drive(m, "esc")
+	if got := offered(m, "close printing"); got != "gx" {
+		t.Errorf("gx is offered as %q to close the printing", got)
+	}
+	if label, _ := (&m).escStep(m.ws.current()); label == "close printing" {
+		t.Error("esc would take the picture down")
+	}
+	m = drive(m, "g", "x")
 	if m.info.mode != infoCard || m.kitty.key != "" {
-		t.Error("esc didn't take the picture down")
+		t.Error("gx again didn't take the picture down")
 	}
 	_ = sent
 }

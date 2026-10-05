@@ -291,12 +291,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // leaves.
 func (m *Model) escStep(p *panel) (string, func()) {
 	switch {
-	// The picture gx put up comes off the same way.
-	case m.info.mode == infoImage:
-		return "close printing", func() {
-			m.info.mode = infoCard
-			m.info.offset = 0
-		}
+	// The picture gx put up is not on the way: gx takes it down again.
 	// A printed history was put on the information panel from here, so it
 	// comes off from here too, before esc starts taking the panel itself
 	// apart.
@@ -540,6 +535,13 @@ func (m Model) handleGoto(key string) (tea.Model, tea.Cmd) {
 func (m *Model) gx(p *panel) tea.Cmd {
 	switch v := p.top().(type) {
 	case *cardList:
+		// gx again puts the card back: the same key in and out, so esc is
+		// left for the panel's own steps back.
+		if m.info.mode == infoImage {
+			m.info.mode = infoCard
+			m.info.offset = 0
+			return nil
+		}
 		if c, ok := v.current(); ok {
 			return m.gxCard(c.Card)
 		}

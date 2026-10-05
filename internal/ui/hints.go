@@ -432,9 +432,9 @@ func (m Model) infoKeys(p *panel) [][2]string {
 		return nil
 	}
 	var keys [][2]string
-	// The printed history and the picture are put up over the card, and
-	// esc takes them down again — back to the card.
-	if m.info.mode == infoVersions || m.info.mode == infoImage {
+	// The printed history is put up over the card, and esc takes it down
+	// again — back to the card. The picture comes down with gx, below.
+	if m.info.mode == infoVersions {
 		keys = append(keys, hint("back", keymap.Global, keymap.GlobalBack))
 	}
 	if m.info.mode == infoImage {
@@ -444,12 +444,16 @@ func (m Model) infoKeys(p *panel) [][2]string {
 	if m.canFlip() {
 		keys = append(keys, hint("other face", keymap.Global, keymap.GlobalPrintingFace))
 	}
+	printing := "printing"
+	if m.info.mode == infoImage {
+		printing = "close printing"
+	}
 	return append(keys,
 		hint("stats", keymap.Global, keymap.GlobalStats),
 		hint("editing deck stats", keymap.Global, keymap.GlobalStatsEdit),
 		hint("half page", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown),
 		[2]string{gotoHint(keymap.GotoVersions), "card history"},
-		[2]string{gotoHint(keymap.GotoImage), "printing"},
+		[2]string{gotoHint(keymap.GotoImage), printing},
 		[2]string{gotoHint(keymap.GotoImageAll), "every card's picture"},
 	)
 }
