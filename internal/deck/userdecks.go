@@ -20,10 +20,6 @@ import (
 
 const userDecksFile = "userdecks.json"
 
-// UserDecksMaxAge is how old a person's list can get before opening their
-// folder fetches it again.
-const UserDecksMaxAge = 24 * time.Hour
-
 // UserDeck is one of someone's public decks — enough to list and choose by.
 type UserDeck struct {
 	Name    string    `json:"name"`
@@ -40,11 +36,6 @@ type UserDeck struct {
 type UserDeckList struct {
 	Fetched time.Time  `json:"fetched"`
 	Decks   []UserDeck `json:"decks"`
-}
-
-// Stale reports whether the list is old enough to fetch again.
-func (u UserDeckList) Stale() bool {
-	return time.Since(u.Fetched) > UserDecksMaxAge
 }
 
 func userDecksPath() string { return filepath.Join(paths.Cache(), userDecksFile) }

@@ -307,7 +307,8 @@ func TestAPersonIsAFolderOfTheirDecks(t *testing.T) {
 		t.Errorf("the person's folder counts %d decks", person.count)
 	}
 
-	// Opening them drops their decks down beneath, from the cache — no fetch.
+	// Opening them drops their decks down beneath, from the cache at once,
+	// and asks Moxfield again behind it.
 	for i, r := range l.rows {
 		if r.kind == entryUser {
 			l.cursor.at = i
@@ -317,8 +318,8 @@ func TestAPersonIsAFolderOfTheirDecks(t *testing.T) {
 	p := m.ws.open(KindDecks)
 	p.show(l)
 	handled, cmd := l.key("enter", &m, p)
-	if !handled || cmd != nil {
-		t.Errorf("opening a freshly cached person fetched again (cmd %v)", cmd != nil)
+	if !handled || cmd == nil {
+		t.Errorf("opening a freshly cached person didn't fetch again (cmd %v)", cmd != nil)
 	}
 	got := strings.Join(rowNames(l), ",")
 	if !strings.Contains(got, "Hinata") || !strings.Contains(got, "Elf Ball") {
@@ -329,19 +330,20 @@ func TestAPersonIsAFolderOfTheirDecks(t *testing.T) {
 	}
 }
 
-func TestAPersonWithNoListIsFetchedWhenTheFolderOpens(t *testing.T) {
+func TestAPersonIsFetchedEachTimeTheFolderOpens(t *testing.T) {
+	// Even with a list fetched just now: a deck made since should show.
 	followed(t, "MarBri", deck.UserDeck{Name: "Hinata", ID: "abc"})
 	l := newDeckList()
-	if cmd := l.fetchUserIfStale("MarBri"); cmd != nil {
-		t.Error("a fresh list was fetched again")
+	if cmd := l.fetchUserAgain("MarBri"); cmd == nil {
+		t.Error("a freshly cached person wasn't fetched again")
 	}
-	if cmd := l.fetchUserIfStale("nobody"); cmd == nil {
+	if cmd := l.fetchUserAgain("nobody"); cmd == nil {
 		t.Error("a person with no cached list wasn't fetched")
 	}
 	if !l.fetching["nobody"] {
 		t.Error("the fetch isn't marked as under way")
 	}
-	if cmd := l.fetchUserIfStale("nobody"); cmd != nil {
+	if cmd := l.fetchUserAgain("nobody"); cmd != nil {
 		t.Error("a second open fetched again while the first was under way")
 	}
 }

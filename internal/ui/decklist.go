@@ -794,7 +794,7 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		if e, ok := l.current(); ok && (e.kind == entryFolder || e.kind == entryUser) {
 			l.toggleFolder(e.slug)
 			if e.kind == entryUser && l.expanded[e.slug] {
-				return true, l.fetchUserIfStale(e.user)
+				return true, l.fetchUserAgain(e.user)
 			}
 			return true, nil
 		}

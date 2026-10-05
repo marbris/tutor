@@ -134,12 +134,11 @@ func fetchUserDecks(user string) tea.Cmd {
 	}
 }
 
-// fetchUserIfStale fetches a person's decks when their folder opens, unless
-// the cached list is fresh enough to go on with.
-func (l *deckList) fetchUserIfStale(user string) tea.Cmd {
-	if list, ok := deck.CachedUserDecks(deck.LoadUserDecks(), user); ok && !list.Stale() {
-		return nil
-	}
+// fetchUserAgain fetches a person's decks each time their folder opens. The
+// cached list is shown meanwhile, but a deck they made a minute ago should
+// turn up without waiting a day for the cache to age, so the folder always
+// asks Moxfield again.
+func (l *deckList) fetchUserAgain(user string) tea.Cmd {
 	if l.fetching[strings.ToLower(user)] {
 		return nil
 	}

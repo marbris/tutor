@@ -2,7 +2,6 @@ package deck
 
 import (
 	"testing"
-	"time"
 )
 
 func TestUserDecksRoundTrip(t *testing.T) {
@@ -18,12 +17,6 @@ func TestUserDecksRoundTrip(t *testing.T) {
 	got, ok := CachedUserDecks(LoadUserDecks(), "marbri")
 	if !ok || len(got.Decks) != 1 || got.Decks[0].Name != "Elf Ball" {
 		t.Fatalf("got %+v", got)
-	}
-	if got.Stale() {
-		t.Error("a list fetched just now is stale")
-	}
-	if !(UserDeckList{Fetched: time.Now().Add(-48 * time.Hour)}).Stale() {
-		t.Error("a two-day-old list isn't stale")
 	}
 
 	if err := ForgetUserDecks("MARBRI"); err != nil {

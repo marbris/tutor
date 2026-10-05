@@ -180,6 +180,8 @@ You can browse anyone's public Moxfield decks and make local copies of them.
    and its considering list.
 
 The people and decks you follow stay under a `moxfield` folder at the top of the lists panel.
+Opening a person's folder asks Moxfield for their decks again, so a deck they made since shows up
+(Moxfield's search can take a few minutes to list a new one).
 
 ![The lists panel with local decks and followed Moxfield decks](screenshots/decks.png)
 
@@ -321,9 +323,9 @@ its legalities.
 
 `gx` shows the card as printed, in the printing your list holds. `H` and `L` step through older and
 newer artworks, `f` turns a double-faced card over, and `K` `J` scroll down to the price, tags and
-rulings. The picture follows the cursor, and `gx` again puts the card back. `gX` downloads the pictures of every card in the list, so
-walking through it is instant. Pictures are drawn in the terminal in kitty, Ghostty and WezTerm. In
-other terminals `gx` opens the card in your browser.
+rulings. The picture follows the cursor, and `gx` again puts the card back. `gX` downloads the
+pictures of every card in the list, so walking through it is instant. Pictures are drawn in the
+terminal in kitty, Ghostty and WezTerm. In other terminals `gx` opens the card in your browser.
 
 ![A Scryfall search with the info panel showing oracle text, rulings and legalities](screenshots/rulings-inline.png)
 
