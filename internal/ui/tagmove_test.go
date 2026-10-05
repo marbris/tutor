@@ -178,8 +178,8 @@ func TestTTMovesOnlyTheTagsNamed(t *testing.T) {
 		t.Fatal("T t didn't ask which tags")
 	}
 	lines := strings.Split(stripANSI(m.View()), "\n")
-	if bottom := lines[len(lines)-1]; !strings.Contains(bottom, "empty: every tag") {
-		t.Errorf("the bottom line doesn't say what enter does: %q", bottom)
+	if !strings.Contains(lines[0], "empty: every tag") {
+		t.Errorf("the top line doesn't say what enter does: %q", lines[0])
 	}
 	// tab completes from this list's tags.
 	m = drive(m, "r", "a", "tab")

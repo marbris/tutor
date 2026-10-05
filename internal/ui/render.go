@@ -10,13 +10,14 @@ import (
 	"ttr/internal/theme"
 )
 
-// Drawing the workspace: the row of panels, the information panel beside
-// them, and the line along the bottom that says what the keys do here.
+// Drawing the workspace: the two lines along the top that say what the keys
+// do here and what just happened, then the row of panels, and the
+// information panel beside them.
 
 // viewWorkspace lays the whole frame out.
 func (m Model) viewWorkspace() string {
 	ws := m.ws // a copy: layout records the scroll position, and View is a
-	l := ws.layoutWithFooter(m.footerHeight())
+	l := ws.layoutWithTop(m.topHeight())
 
 	// Every visible panel's header is as tall as the tallest, so the rules
 	// under them — and the first rows of cards — line up across the row.
@@ -35,7 +36,7 @@ func (m Model) viewWorkspace() string {
 	}
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, columns...)
-	return lipgloss.JoinVertical(lipgloss.Left, row, m.viewFooter(l))
+	return lipgloss.JoinVertical(lipgloss.Left, m.viewTop(), row)
 }
 
 // viewPanel draws one panel: a border, its header, and its contents.
@@ -381,7 +382,7 @@ func (m Model) infoFrame(width, height int) (inner int, hints []string, room int
 // scroll. False when the terminal is too narrow to have one.
 func (m Model) infoSpan() (inner, room, most int, ok bool) {
 	ws := m.ws // a copy: layout records the scroll position
-	l := ws.layoutWithFooter(m.footerHeight())
+	l := ws.layoutWithTop(m.topHeight())
 	if l.info == 0 {
 		return 0, 0, 0, false
 	}
@@ -439,27 +440,53 @@ func (m Model) infoVersions(width int) []string {
 	return m.infoBody(width)
 }
 
-// ── The bottom line ─────────────────────────────────────────────
+// ── The top lines ───────────────────────────────────────────────
 
-// viewFooter is the leader menu while the leader is waiting, and otherwise
-// the keys that apply where you are.
-func (m Model) viewFooter(l layout) string {
+// viewTop is the two lines above the panels: the leader menu while the
+// leader is waiting, and otherwise the keys that apply where you are, with
+// the last thing you did under them.
+//
+// They used to run along the bottom, but your eyes are at the top: the i bar
+// and the search bars are in the panels' headers, and the tab-completion list
+// is read while typing in them. The block used to grow and shrink too, with
+// the notice coming and going, and every panel jumped with it.
+func (m Model) viewTop() string {
+	return strings.Join(m.topLines(), "\n")
+}
+
+// topLines is the top of the screen, a line each, always two: the keys, then
+// the notice — the line nearest the panels, which is where you are typing.
+// Only a leader menu too long for two lines, on a narrow terminal, takes a
+// third rather than being cut.
+func (m Model) topLines() []string {
+	var lines []string
 	switch {
 	case m.quitting:
-		return m.viewQuitQuestion()
+		lines = []string{m.viewQuitQuestion()}
 	case m.leader:
-		return m.viewLeaderBar()
+		lines = strings.Split(m.viewLeaderBar(), "\n")
 	case m.tagPrefix:
-		lines := m.tagMoveBarLines()
-		for i := range lines {
-			lines[i] = " " + lines[i]
+		lines = indent(m.tagMoveBarLines())
+	default:
+		notice := m.viewNotice()
+		lines = indent(m.keyLines(notice == ""))
+		if notice != "" {
+			lines = append(lines, " "+notice)
 		}
-		return strings.Join(lines, "\n")
 	}
-	// The notice used to replace this line rather than sit beside it, so
-	// the result of what you had just done stood on top of the keys for
-	// what to do next — and nothing cleared it, so it stood there for good.
-	return m.viewHint(l)
+	for len(lines) < topRows {
+		lines = append(lines, "")
+	}
+	return lines
+}
+
+// indent sets lines in by a space, the margin the top lines keep.
+func indent(lines []string) []string {
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		out[i] = " " + line
+	}
+	return out
 }
 
 // viewQuitQuestion asks about decks with edits that were written but never
@@ -487,15 +514,10 @@ func (m Model) viewQuitQuestion() string {
 // memorised. Being able to see the menu is what makes a two-key binding
 // cheaper in practice than a one-key chord you can't remember.
 func (m Model) viewLeaderBar() string {
-	// No background fill: a band of colour across the bottom contrasts with
-	// an otherwise semi-transparent terminal, where nothing else here paints
-	// one. The menu is just text, indented a space like the hint bar.
-	lines := m.leaderBarLines()
-	painted := make([]string, len(lines))
-	for i, line := range lines {
-		painted[i] = " " + line
-	}
-	return strings.Join(painted, "\n")
+	// No background fill: a band of colour across the top contrasts with an
+	// otherwise semi-transparent terminal, where nothing else here paints
+	// one. The menu is just text, indented a space like the keys line.
+	return strings.Join(indent(m.leaderBarLines()), "\n")
 }
 
 // leaderBarLines is the menu, wrapped onto as many lines as it needs.
@@ -503,8 +525,9 @@ func (m Model) viewLeaderBar() string {
 // It used to be cut off at the width, which is the wrong thing to do to a
 // menu: the entries you can't see are exactly the ones you opened it to
 // read, and the cut lands mid-entry where it looks like a rendering fault.
-// The layout asks how tall this is, so growing it takes room from the panels
-// rather than pushing them off the screen.
+// The layout asks how tall this is, so past the two lines the top always
+// has, growing it takes room from the panels rather than pushing them off
+// the screen.
 func (m Model) leaderBarLines() []string {
 	return packStyled(leaderParts(), leaderSep(), maxInt(m.width-2, 1))
 }
@@ -527,10 +550,15 @@ func leaderSep() string {
 	return lipgloss.NewStyle().Foreground(theme.TextMuted).Render(" · ")
 }
 
-// leaderReference is the leader's menu as ? shows it along the bottom: led
-// by the leader itself, so it reads as what to press first — "space: f find
+// leaderReference is the leader's menu as ? shows it along the top: led by
+// the leader itself, so it reads as what to press first — "space: f find
 // · d decks · …" — without having to press it to find out.
 func (m Model) leaderReference(width int) []string {
+	return packStyled(m.leaderReferenceParts(), leaderSep(), width)
+}
+
+// leaderReferenceParts is the same, an entry each.
+func (m Model) leaderReferenceParts() []string {
 	lead := keymap.Hint(keymap.Global, keymap.GlobalLeader)
 	parts := leaderParts()
 	if lead == "" || len(parts) == 0 {
@@ -538,60 +566,43 @@ func (m Model) leaderReference(width int) []string {
 	}
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render(lead + ":")
 	parts[0] = head + " " + parts[0]
-	return packStyled(parts, leaderSep(), width)
+	return parts
 }
 
-// footerHeight is how many rows the bottom of the screen needs. The leader
-// menu and the grouped hint bar can each want more than one.
-func (m Model) footerHeight() int {
-	if m.leader {
-		return maxInt(len(m.leaderBarLines()), 1)
-	}
-	if m.tagPrefix {
-		return maxInt(len(m.tagMoveBarLines()), 1)
-	}
-	if m.quitting {
-		return 1
-	}
-	// The hint bar is the whole contextual keymap now — one row per group,
-	// with a line for the last result above them when there is one. The
-	// panels give up the room, the way they do for the leader menu; being
-	// pushed off the top of the screen instead is a bug this project has
-	// already had once.
-	return maxInt(len(m.footerLines()), 1)
+// topHeight is how many rows the top of the screen takes: two, unless a
+// leader menu needs more on a narrow terminal.
+func (m Model) topHeight() int {
+	return len(m.topLines())
 }
 
-// viewHint is the keys that work where you are, one grouped row each.
-func (m Model) viewHint(l layout) string {
-	return strings.Join(m.footerLines(), "\n")
-}
-
-// footerLines is the bottom of the screen: the last thing you did on its own
-// line, then the grouped keys — one row per group, led by what the group is.
+// keyLines is the keys line: the two keys that reach everything else, or a
+// focused bar's own keys. It is one line, or two when spare is set — when no
+// notice wants the second.
 //
-// The notice used to share the keys' first line, off to the right, and the
-// groups wrapped over as many lines as they liked; a result worth reading and
-// the keys for what to do next fought over the same row, and the bar grew
-// tall. The notice is on its own line above them now, and each group is a
-// single row across the full width.
-//
-// With ? on, the leader's menu sits above the keys: the panels carry their
-// own keys, and the leader's are the ones that belong to none of them.
-func (m Model) footerLines() []string {
+// With ? on, the leader's menu leads it: the panels carry their own keys,
+// and the leader's are the ones that belong to none of them. ? and q always
+// show, at the end; the leader's last entries give way to them when the
+// line runs out, since pressing the leader shows its whole menu anyway.
+func (m Model) keyLines(spare bool) []string {
 	width := maxInt(m.width-2, 1)
-	hints := m.hintGroupLines(m.footerGroups(), width)
-	if m.hintsExpanded && !m.barFocused() {
-		hints = append(m.leaderReference(width), hints...)
+	// One group, one row: no state offers more than that here. Cut to one
+	// regardless, so the line can't grow the block.
+	keys := m.hintGroupLines(m.footerGroups(), width)[:1]
+	if !m.hintsExpanded || m.barFocused() {
+		return keys
 	}
-	for i := range hints {
-		hints[i] = " " + hints[i]
+	most := 1
+	if spare {
+		most = 2
 	}
-
-	var lines []string
-	if notice := m.viewNotice(); notice != "" {
-		lines = append(lines, " "+notice)
+	parts := m.leaderReferenceParts()
+	for n := len(parts); n >= 0; n-- {
+		lines := packStyled(append(parts[:n:n], keys[0]), leaderSep(), width)
+		if len(lines) <= most {
+			return lines
+		}
 	}
-	return append(lines, hints...)
+	return keys
 }
 
 // barFocused reports whether a search bar, or the i bar, has the cursor,
@@ -608,7 +619,7 @@ func (m Model) barFocused() bool {
 	return p.searchOpen && p.search.Focused()
 }
 
-// footerGroups is what the bottom line shows: the two keys that reach
+// footerGroups is what the keys line shows: the two keys that reach
 // everything else. ? draws the rest inside the panels they belong to.
 //
 // A focused search bar is the exception — it shows its own small keymap,
@@ -722,7 +733,7 @@ func (m Model) hintGroupLines(groups []hintGroup, width int) []string {
 	return lines
 }
 
-// viewNotice is the last thing you did, on its own line above the keys.
+// viewNotice is the last thing you did, on its own line under the keys.
 func (m Model) viewNotice() string {
 	if m.notice == "" {
 		return ""

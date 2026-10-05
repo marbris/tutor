@@ -136,19 +136,18 @@ func TestNoCardStartsWithItSaysSo(t *testing.T) {
 	}
 }
 
-func TestTheIBarsKeysAreOnTheBottomLineAndFollowTab(t *testing.T) {
+func TestTheIBarsKeysAreOnTheTopLineAndFollowTab(t *testing.T) {
 	withCardNames(t)
 	m, _ := ownDeck(sized(160, 30))
 	m = drive(m, "i")
 	lines := strings.Split(stripANSI(m.View()), "\n")
-	bottom := lines[len(lines)-1]
-	if !strings.Contains(bottom, "tag by otag instead") {
-		t.Errorf("the bottom line doesn't offer tab's swap: %q", bottom)
+	if !strings.Contains(lines[0], "tag by otag instead") {
+		t.Errorf("the top line doesn't offer tab's swap: %q", lines[0])
 	}
 	m = typeIn(m, "llan")
 	lines = strings.Split(stripANSI(m.View()), "\n")
-	if bottom := lines[len(lines)-1]; !strings.Contains(bottom, "complete the name") {
-		t.Errorf("with a name typed, the bottom line doesn't offer completing it: %q", bottom)
+	if !strings.Contains(lines[0], "complete the name") {
+		t.Errorf("with a name typed, the top line doesn't offer completing it: %q", lines[0])
 	}
 }
 

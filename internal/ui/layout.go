@@ -19,8 +19,9 @@ const (
 	// panel is held to the same floor.
 	minPanel = 16
 
-	// hintHeight is the line along the bottom saying which keys apply.
-	hintHeight = 1
+	// topRows is the two lines above the panels: the keys that apply, and
+	// the last thing you did. Always two, so the panels never move.
+	topRows = 2
 )
 
 // layout is the arithmetic for one frame: how wide everything is, and which
@@ -33,7 +34,7 @@ type layout struct {
 	panels []int
 	// first is the index of the leftmost visible panel.
 	first int
-	// height is the room a panel has, the hint line excluded.
+	// height is the room a panel has, the two lines above it excluded.
 	height int
 }
 
@@ -50,7 +51,7 @@ func (l layout) shows(i int) bool { return i >= l.first && i < l.first+l.visible
 // it would put the focused panel off screen, because the panel you're typing
 // into has to be one you can see.
 func computeLayout(width, height, count, focused, scroll int) layout {
-	l := layout{height: maxInt(height-hintHeight, 1)}
+	l := layout{height: maxInt(height-topRows, 1)}
 	if count == 0 {
 		return l
 	}

@@ -510,8 +510,8 @@ func TestTurningAGroupOverShowsItsHeading(t *testing.T) {
 		m = drive(m, key)
 		want := m.statGroups()[0].Title
 		lines := strings.Split(stripANSI(m.View()), "\n")
-		if !strings.Contains(lines[3], want) {
-			t.Errorf("after %s the panel starts %q, want the %q heading", key, lines[3], want)
+		if !strings.Contains(lines[3+topRows], want) {
+			t.Errorf("after %s the panel starts %q, want the %q heading", key, lines[3+topRows], want)
 		}
 	}
 }

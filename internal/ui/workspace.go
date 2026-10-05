@@ -366,13 +366,14 @@ func (w *workspace) editingPanel() *panel {
 
 // layout works out this frame's widths and remembers where the row was
 // scrolled to, so the next frame starts from the same place.
-func (w *workspace) layout() layout { return w.layoutWithFooter(1) }
+func (w *workspace) layout() layout { return w.layoutWithTop(topRows) }
 
-// layoutWithFooter is the same, told how many rows the bottom of the screen
-// is taking. The leader menu can want several, and the panels have to give
-// up the room rather than being pushed off the top.
-func (w *workspace) layoutWithFooter(footer int) layout {
-	l := computeLayout(w.width, w.height-(footer-1), w.count(), w.focused, w.scroll)
+// layoutWithTop is the same, told how many rows the top of the screen is
+// taking. That is two, except for a leader menu too wide for two lines on a
+// narrow terminal: then the panels give up the room rather than being pushed
+// off the bottom.
+func (w *workspace) layoutWithTop(top int) layout {
+	l := computeLayout(w.width, w.height-(top-topRows), w.count(), w.focused, w.scroll)
 	w.scroll = l.first
 	return l
 }

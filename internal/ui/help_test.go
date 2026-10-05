@@ -152,10 +152,9 @@ func keyText(m Model) string {
 // footerOf is the same: what ? shows, wherever on the screen it shows it.
 func footerOf(m Model) string { return keyText(m) }
 
-// bottomLine is the footer alone, which ? no longer grows.
-func bottomLine(m Model) string {
-	l := m.ws.layoutWithFooter(m.footerHeight())
-	return stripANSI(m.viewFooter(l))
+// topBlock is the two lines above the panels alone.
+func topBlock(m Model) string {
+	return stripANSI(m.viewTop())
 }
 
 func TestTheHintBarDoesNotOfferStatisticsWhereThereAreNone(t *testing.T) {
@@ -266,24 +265,24 @@ func TestNoKeyIsOfferedTwice(t *testing.T) {
 	}
 }
 
-func TestTheNoticeSitsAboveTheKeysAndGoesAway(t *testing.T) {
-	// The result of the last thing you did gets its own line above the keys,
-	// rather than sharing a line with them — so it can be read at a glance
+func TestTheNoticeSitsUnderTheKeysAndGoesAway(t *testing.T) {
+	// The result of the last thing you did gets its own line under the keys,
+	// next to the panels, rather than sharing a line with them — so it can be read at a glance
 	// and the keys for what to do next aren't crowded. The next key clears
 	// it, which is what it always claimed to and once didn't.
 	m := withCards(sized(140, 30), "f", sample(), sortArrival)
 	m.notice = "+1 Sol Ring"
 
-	got := bottomLine(m)
+	got := topBlock(m)
 	lines := strings.Split(got, "\n")
-	if !strings.Contains(lines[0], "+1 Sol Ring") {
-		t.Fatalf("the notice isn't on the first line:\n%s", got)
+	if len(lines) != 2 || !strings.Contains(lines[1], "+1 Sol Ring") {
+		t.Fatalf("the notice isn't on the second line:\n%s", got)
 	}
-	if strings.Contains(lines[0], "quit") {
-		t.Errorf("the keys are packed onto the notice line:\n%s", lines[0])
+	if strings.Contains(lines[1], "quit") {
+		t.Errorf("the keys are packed onto the notice line:\n%s", lines[1])
 	}
-	if len(lines) < 2 || !strings.Contains(lines[1], "q quit") {
-		t.Errorf("the keys aren't shown under the notice:\n%s", got)
+	if !strings.Contains(lines[0], "q quit") {
+		t.Errorf("the keys aren't shown above the notice:\n%s", got)
 	}
 
 	m = drive(m, "j")
