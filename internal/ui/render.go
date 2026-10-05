@@ -613,7 +613,7 @@ func (m Model) barFocused() bool {
 		return false
 	}
 	switch p.asking {
-	case askAddCard, askOtag, askTag, askTagMove:
+	case askAddCard, askOtag, askTag, askTagMove, askAddTag, askGlobalTags:
 		return true
 	}
 	return p.searchOpen && p.search.Focused()

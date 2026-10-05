@@ -124,7 +124,7 @@ func TestTGBakesTheGlobalTagsIn(t *testing.T) {
 	withPinned(t, "ramp-cards", "name: ramp-cards\nformat: tags\n[mainboard]\n1 Sol Ring [ramp]\n")
 	m, l := openDeckPanel(t, sized(160, 30), "ghen", "Ghen", sample())
 	m.togglePin("ramp-cards", "ramp-cards")
-	m = drive(m, "T", "g")
+	m = drive(m, "T", "g", "enter") // empty: every tag
 	if !hasTag(tagged(l, "Sol Ring"), "ramp") {
 		t.Errorf("Sol Ring has %v", tagged(l, "Sol Ring"))
 	}
@@ -133,30 +133,10 @@ func TestTGBakesTheGlobalTagsIn(t *testing.T) {
 	}
 }
 
-func TestTMMergesTheTagsOfEveryListOnScreen(t *testing.T) {
-	m, a := openDeckPanel(t, sized(200, 30), "ghen", "Ghen", []deck.Card{
-		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}, Tags: []string{"ramp"}},
-		{Qty: 1, Card: mtg.Card{Name: "Rancor"}},
-	})
-	m = withCards(m, "f", []deck.Card{
-		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}, Tags: []string{"rock"}},
-		{Qty: 1, Card: mtg.Card{Name: "Rancor"}, Tags: []string{"aura"}},
-	}, sortArrival)
-	search := m.ws.current().cardsView()
-
-	m = drive(m, "T", "m")
-	if !hasTag(tagged(a, "Sol Ring"), "rock") || !hasTag(tagged(a, "Rancor"), "aura") {
-		t.Errorf("the deck has %v", a.all)
-	}
-	if hasTag(tagged(search, "Sol Ring"), "ramp") {
-		t.Error("a search that isn't yours was changed")
-	}
-}
-
 func TestTShowsItsMenuAndAnythingElseCancels(t *testing.T) {
 	m := withCards(sized(160, 30), "f", sample(), sortArrival)
 	m = drive(m, "T")
-	if !m.tagPrefix || !strings.Contains(stripANSI(m.View()), "merge tags across lists") {
+	if !m.tagPrefix || !strings.Contains(stripANSI(m.View()), "otag + cards") {
 		t.Error("T didn't raise its menu")
 	}
 	m = drive(m, "z")

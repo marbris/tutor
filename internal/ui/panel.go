@@ -149,6 +149,9 @@ type panel struct {
 	// tagMoveAdd is whether the tags being asked for are T a's, which adds
 	// the cards the editing deck lacks, rather than T t's.
 	tagMoveAdd bool
+	// otagAdd is whether the oracle tags being asked for are T O's, which
+	// adds the cards the editing deck lacks.
+	otagAdd bool
 	// otagComp is tab completion under way of an otag: in the search bar.
 	otagComp *tagCompletion
 	// writeToNewPane remembers whether it was w or W that raised the

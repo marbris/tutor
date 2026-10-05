@@ -132,9 +132,12 @@ func (m Model) hintGroups() []hintGroup {
 		return []hintGroup{{"", addBarKeys(p)}}
 	case askTag:
 		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"}, {"enter", "tag them"}, {"esc", "leave"}}}}
-	case askTagMove:
+	case askTagMove, askGlobalTags:
 		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"},
 			{"enter", "bring them over (empty: every tag)"}, {"esc", "leave"}}}}
+	case askAddTag:
+		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"},
+			{"enter", "add and tag (empty: just add)"}, {"esc", "leave"}}}}
 	}
 
 	groups := m.panelHintGroups(p)
@@ -368,21 +371,20 @@ func (m Model) barKeys(p *panel) [][2]string {
 	)
 }
 
-// addBarKeys is the i bar's keys. Its keys are the prompt's own, not the
-// keymap's, like every one-line prompt's: tab, enter and esc.
+// addBarKeys is the i bar's keys, and T o's. Its keys are the prompt's own,
+// not the keymap's, like every one-line prompt's: tab, enter and esc.
 func addBarKeys(p *panel) [][2]string {
-	tab, enter := "tag by otag instead", "add the card"
 	if p.asking == askOtag {
-		tab, enter = "add a card instead", "tag the list"
-	}
-	if addBarTyping(p) {
-		tab = "complete the name"
-		if p.asking == askOtag {
-			tab = "complete the tag"
+		enter := "tag the editing deck"
+		if p.otagAdd {
+			enter = "add and tag every card with it"
 		}
-		return [][2]string{{"tab shift+tab", tab}, {"enter", enter}, {"esc", "leave"}}
+		return [][2]string{{"tab shift+tab", "complete the tag"}, {"enter", enter}, {"esc", "leave"}}
 	}
-	return [][2]string{{"tab", tab}, {"enter", enter}, {"esc", "leave"}}
+	if strings.TrimSpace(p.askInput.Value()) == "" {
+		return [][2]string{{"enter", "add the card"}, {"esc", "leave"}}
+	}
+	return [][2]string{{"tab shift+tab", "complete the name"}, {"enter", "add the card"}, {"esc", "leave"}}
 }
 
 // editHints is the keys that change the editing deck, drawn at the bottom
@@ -401,6 +403,8 @@ func (m Model) editHints() [][2]string {
 	keys := [][2]string{
 		hint("add", keymap.Cards, keymap.CardsAdd),
 		hint("add + tag", keymap.Cards, keymap.CardsAddTagged),
+		hint("tag", keymap.Cards, keymap.CardsTag),
+		hint("tag a whole list…", keymap.Cards, keymap.CardsTagMove),
 		hint("remove", keymap.Cards, keymap.CardsRemove),
 		hint("commander", keymap.Cards, keymap.CardsCommander),
 		hint("undo", keymap.Cards, keymap.CardsUndo),

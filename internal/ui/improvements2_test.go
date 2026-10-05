@@ -117,6 +117,7 @@ func ownDeck(m Model) (Model, *cardList) {
 	m = withCards(m, "d", sample(), sortArrival)
 	l := m.ws.current().cardsView()
 	l.deck = &deck.Info{Name: "Ghen", Slug: "ghen"}
+	m.ws.editing = m.ws.focused // as opening it for real would make it
 	return m, l
 }
 

@@ -233,3 +233,23 @@ func Collection(ids []string) (map[string]mtg.Card, error) {
 	}
 	return out, nil
 }
+
+// ByOracle looks up a card for each oracle id — some printing of it — keyed
+// by oracle id. 75 a request, paced like every collection request.
+func ByOracle(ids []string) (map[string]mtg.Card, error) {
+	idents := make([]map[string]string, len(ids))
+	for i, id := range ids {
+		idents[i] = map[string]string{"oracle_id": id}
+	}
+	cards, _, err := Identifiers(idents)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]mtg.Card, len(cards))
+	for _, c := range cards {
+		if _, ok := out[c.OracleID]; !ok {
+			out[c.OracleID] = c
+		}
+	}
+	return out, nil
+}

@@ -7,9 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
 	"ttr/internal/scryfall"
+	"ttr/internal/tagger"
 )
 
 func TestOtagNamesAreWhatWasTyped(t *testing.T) {
@@ -55,7 +58,7 @@ func TestATwoFacedCardIsFoundByEitherName(t *testing.T) {
 	}
 }
 
-func TestTabInTheAddBarTagsTheDeckByOtag(t *testing.T) {
+func TestTOAsksScryfallWhenTheTaggerTagsArentIn(t *testing.T) {
 	var asked []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("q")
@@ -79,13 +82,9 @@ func TestTabInTheAddBarTagsTheDeckByOtag(t *testing.T) {
 	t.Cleanup(func() { deck.Delete("ghen") })
 	m, l := openDeckPanel(t, sized(160, 30), "ghen", "Ghen", sample())
 
-	m = drive(m, "i")
-	if m.ws.current().asking != askAddCard {
-		t.Fatal("i didn't open the add bar")
-	}
-	m = drive(m, "tab")
+	m = drive(m, "T", "o")
 	if m.ws.current().asking != askOtag {
-		t.Fatal("tab didn't turn it to otag")
+		t.Fatal("T o didn't ask for oracle tags")
 	}
 	for _, r := range "ramp removal" {
 		m = drive(m, string(r))
@@ -132,7 +131,7 @@ func TestOtagTaggingIsWorkedOutLocallyFromTheTaggerTags(t *testing.T) {
 	m, l := ownDeck(sized(160, 30))
 	l.all = taggedCards()
 	l.refresh()
-	m = drive(m, "i", "tab")
+	m = drive(m, "T", "o")
 	for _, r := range "removal nosuchtag" {
 		m = drive(m, string(r))
 	}
@@ -167,5 +166,132 @@ func TestOtagTaggingIsWorkedOutLocallyFromTheTaggerTags(t *testing.T) {
 		if len(c.Tags) != 0 {
 			t.Errorf("%s kept %v after undo", c.Card.Name, c.Tags)
 		}
+	}
+}
+
+// otagAddOf runs what enter handed back and keeps T O's answer, leaving
+// any other command (a hover's rulings) unrun.
+func otagAddOf(t *testing.T, cmd tea.Cmd) otagAddMsg {
+	t.Helper()
+	for _, msg := range messages(cmd) {
+		if a, ok := msg.(otagAddMsg); ok {
+			return a
+		}
+	}
+	t.Fatal("T O handed back no answer to wait for")
+	return otagAddMsg{}
+}
+
+func TestTOBuildsAnOtagListFromTheTaggerTagsOnDisk(t *testing.T) {
+	// Which cards carry the tag is on disk, so Scryfall is never searched;
+	// it's only asked for the card it hasn't got, by oracle id.
+	searched := 0
+	search := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		searched++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer search.Close()
+	var askedFor []string
+	collection := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Identifiers []map[string]string `json:"identifiers"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		var out struct {
+			Data []mtg.Card `json:"data"`
+		}
+		for _, id := range req.Identifiers {
+			askedFor = append(askedFor, id["oracle_id"])
+			out.Data = append(out.Data, mtg.Card{Name: id["oracle_id"], OracleID: id["oracle_id"], TypeLine: "Instant"})
+		}
+		json.NewEncoder(w).Encode(out)
+	}))
+	defer collection.Close()
+	oldS, oldC := scryfall.SearchURL, scryfall.CollectionURL
+	scryfall.SearchURL, scryfall.CollectionURL = search.URL, collection.URL
+	t.Cleanup(func() { scryfall.SearchURL, scryfall.CollectionURL = oldS, oldC })
+
+	withTagger(t)
+	m, l := ownDeck(sized(160, 30))
+	l.all = taggedCards()[:1] // shatter
+	l.refresh()
+	m = drive(m, "T", "O")
+	for _, r := range "removal" {
+		m = drive(m, string(r))
+	}
+	m, cmd := press(m, "enter")
+	next, _ := m.Update(otagAddOf(t, cmd))
+	m = next.(Model)
+
+	if searched != 0 {
+		t.Errorf("searched Scryfall %d times; the tags are on disk", searched)
+	}
+	if len(askedFor) != 1 || askedFor[0] != "disenchant" {
+		t.Errorf("asked for %v, want only disenchant, the card the deck lacks", askedFor)
+	}
+	for _, name := range []string{"shatter", "disenchant"} {
+		if !hasTag(tagged(l, name), "otag-removal") {
+			t.Errorf("%s has %v, want otag-removal", name, tagged(l, name))
+		}
+	}
+	if len(l.all) != 2 {
+		t.Errorf("the deck holds %d cards, want 2", len(l.all))
+	}
+	if !strings.Contains(m.notice, "1 added, 1 tagged") {
+		t.Errorf("notice %q", m.notice)
+	}
+	m.undo()
+	if len(l.all) != 1 || len(tagged(l, "shatter")) != 0 {
+		t.Error("one undo didn't take T O back")
+	}
+}
+
+func TestTOSearchesScryfallOnlyWithoutTheTaggerTags(t *testing.T) {
+	var asked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query().Get("q")
+		asked = append(asked, q)
+		sr := mtg.SearchResponse{TotalCards: 2, Data: []mtg.Card{
+			{Name: "Ball Lightning", OracleID: "bl"}, {Name: "Fireball Lightning", OracleID: "fbl"}}}
+		json.NewEncoder(w).Encode(sr)
+	}))
+	defer srv.Close()
+	old := scryfall.SearchURL
+	scryfall.SearchURL = srv.URL
+	t.Cleanup(func() { scryfall.SearchURL = old })
+	oldTg := tagger.Current()
+	tagger.SetCurrent(nil)
+	t.Cleanup(func() { tagger.SetCurrent(oldTg) })
+
+	m, l := ownDeck(sized(160, 30))
+	l.all = nil
+	l.refresh()
+	m = drive(m, "T", "O")
+	for _, r := range "ball-lightning" {
+		m = drive(m, string(r))
+	}
+	m, cmd := press(m, "enter")
+	next, _ := m.Update(otagAddOf(t, cmd))
+	m = next.(Model)
+	if len(asked) != 1 || asked[0] != "otag:ball-lightning" {
+		t.Errorf("asked %q", asked)
+	}
+	if len(l.all) != 2 || !hasTag(tagged(l, "Ball Lightning"), "otag-ball-lightning") {
+		t.Errorf("the list holds %v", l.all)
+	}
+	if !strings.Contains(m.notice, "aren't downloaded") {
+		t.Errorf("notice %q should say why Scryfall was asked", m.notice)
+	}
+}
+
+func TestTOFromAnotherListTagsTheEditingDeck(t *testing.T) {
+	withTagger(t)
+	m, l := ownDeck(sized(200, 30))
+	l.all = taggedCards()
+	l.refresh()
+	m = withCards(m, "f", nil, sortArrival) // an empty search, focused
+	m = drive(m, "T", "o", "r", "a", "m", "p", "enter")
+	if !hasTag(tagged(l, "sol"), "otag-ramp") {
+		t.Errorf("sol has %v, want otag-ramp in the editing deck", tagged(l, "sol"))
 	}
 }

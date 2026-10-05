@@ -361,3 +361,21 @@ func ResolveCached(entries []Entry) ([]Card, bool) {
 	}
 	return out, complete
 }
+
+// CachedByOracle is the cards the cache holds among oracle ids, by oracle
+// id: a card already fetched for any deck needn't be asked for again.
+func CachedByOracle(ids []string) map[string]mtg.Card {
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	out := map[string]mtg.Card{}
+	for _, c := range loadCardCache().cards {
+		if want[c.OracleID] {
+			if _, ok := out[c.OracleID]; !ok {
+				out[c.OracleID] = c
+			}
+		}
+	}
+	return out
+}

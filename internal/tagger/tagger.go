@@ -300,3 +300,36 @@ func (d *Data) Labels(prefix string) []string {
 	}
 	return out
 }
+
+// With is the oracle id of every card with a tag — the tag itself, or any
+// under it, as Has and otag: count — sorted. It reads without filling the
+// per-card cache, so it costs one pass over the cards and can be asked once
+// for a whole list.
+func (d *Data) With(tag int) []string {
+	if d == nil || tag < 0 || tag >= len(d.Tags) {
+		return nil
+	}
+	under := map[int]bool{}
+	var walk func(int)
+	walk = func(t int) {
+		if under[t] {
+			return
+		}
+		under[t] = true
+		for _, c := range d.Tags[t].Children {
+			walk(c)
+		}
+	}
+	walk(tag)
+	var out []string
+	for id, tags := range d.Cards {
+		for _, t := range tags {
+			if under[t] {
+				out = append(out, id)
+				break
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}

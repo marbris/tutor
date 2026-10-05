@@ -12,21 +12,22 @@ import (
 	"ttr/internal/theme"
 )
 
-// T: the tags of a whole list at once, moved between lists.
+// T: tags a whole list at a time, into the editing deck.
 //
-// t, a and A move cards one at a time. These move tags a list at a time, as
-// joins on the card's name, and the second key echoes the one-card verb:
+// t, a and A work on the cursor or the v picks. T works on a whole list,
+// and the second key says where the tags come from (log/design/keymap.md,
+// "Tags"):
 //
-//	T t  this list's tags onto the editing deck, for the cards it already has
+//	T t  this list's tags onto the editing deck, for the cards it has
 //	T a  the same, and the cards it lacks are added with their tags
+//	T o  Scryfall Tagger's tag, on the editing deck's cards that carry it
+//	T O  the same, and every other card that carries it added
+//	T g  the global tags made the editing deck's own
 //
-// T t and T a ask which tags first, completing from the ones in this list
-// with tab; left empty, every tag moves.
-//	T g  the global tags written into this list's own
-//	T m  every list on screen gets every other list's tags, for its cards
-//
-// "This list's cards" are the ones picked out with v, or failing that every
-// card showing — so / and the statistics narrow what moves.
+// All but T o and T O ask which tags first, completing with tab; left empty,
+// every tag moves. "This list's cards" are the ones picked out with v, or
+// failing that every card showing — so / and the statistics narrow what
+// moves. Each is one undo step on the editing deck.
 
 // tagMoveCmd is one entry in the menu T raises.
 type tagMoveCmd struct {
@@ -37,8 +38,9 @@ type tagMoveCmd struct {
 var tagMoveMenu = []tagMoveCmd{
 	{keymap.TagMoveJoin, "tags → editing deck"},
 	{keymap.TagMoveUpsert, "tags + cards → editing deck"},
-	{keymap.TagMoveGlobal, "global tags → this list"},
-	{keymap.TagMoveMerge, "merge tags across lists"},
+	{keymap.TagMoveOtag, "otag → editing deck"},
+	{keymap.TagMoveOtagAdd, "otag + cards → editing deck"},
+	{keymap.TagMoveGlobal, "global tags → editing deck"},
 }
 
 // tagMoveParts is the menu, an entry each, led by T so it reads as what was
@@ -81,23 +83,33 @@ func (m Model) handleTagMove(key string) (tea.Model, tea.Cmd) {
 	if l == nil {
 		return m, nil
 	}
+	target, why := m.editTarget()
+	if target == nil {
+		m.notice = why
+		return m, nil
+	}
 
-	switch keymap.Lookup(keymap.TagMove, key) {
+	switch action := keymap.Lookup(keymap.TagMove, key); action {
 	case keymap.TagMoveJoin, keymap.TagMoveUpsert:
-		if target, why := m.editTarget(); target == nil || target == l {
-			if target == l {
-				why = "this is the editing deck — T t and T a bring tags into it from another list"
-			}
-			m.notice = why
+		if target == l {
+			m.notice = "this is the editing deck — T t and T a bring tags into it from another list"
 			return m, nil
 		}
 		p.ask(askTagMove, "bring tags", "")
 		p.askInput.Placeholder = "ramp removal … · tab completes · empty: every tag"
-		p.tagMoveAdd = keymap.Lookup(keymap.TagMove, key) == keymap.TagMoveUpsert
+		p.tagMoveAdd = action == keymap.TagMoveUpsert
+	case keymap.TagMoveOtag, keymap.TagMoveOtagAdd:
+		add := action == keymap.TagMoveOtagAdd
+		what := "tag by otag"
+		if add {
+			what = "add by otag"
+		}
+		p.ask(askOtag, what+" → "+target.name, "")
+		p.askInput.Placeholder = "ball-lightning removal … · tab completes"
+		p.otagAdd = add
 	case keymap.TagMoveGlobal:
-		m.bakeGlobalTags(l)
-	case keymap.TagMoveMerge:
-		m.mergeShownTags()
+		p.ask(askGlobalTags, "global tags → "+target.name, "")
+		p.askInput.Placeholder = "ramp removal … · tab completes · empty: every tag"
 	}
 	return m, nil
 }
@@ -132,70 +144,35 @@ func (m *Model) tagsInto(from *cardList, addMissing bool, only []string) {
 	m.notice += " in " + target.name
 }
 
-// bakeGlobalTags is T g: the global tags made this list's own.
-func (m *Model) bakeGlobalTags(l *cardList) {
-	if l.deck == nil || !l.deck.Local() {
-		m.notice = "that list isn't yours — " + keymap.Hint(keymap.Cards, keymap.CardsWrite) + " takes a copy you can tag"
+// bakeGlobalTags is T g: the global tags made the editing deck's own — the
+// ones named, or every one when only is empty.
+func (m *Model) bakeGlobalTags(only []string) {
+	target, why := m.editTarget()
+	if target == nil {
+		m.notice = why
 		return
 	}
-	if len(globalTags.slugs) == 0 {
-		m.notice = "no global tags — t in the decks panel pins a list to them"
+	if globalTags.empty() {
+		m.notice = "no other list lends tags — open one, or pin one with t in the decks panel"
 		return
 	}
-	l.pushUndo("tags from the global tags")
-	n := 0
-	for i, c := range l.all {
-		merged := deck.ApplyTagEdits(c.Tags, globalTags.of(c.Card.Name, l.lenderKey()), nil)
-		if len(merged) != len(c.Tags) {
-			l.all[i].Tags = merged
-			n++
+	var src []deck.Card
+	for _, c := range target.all {
+		if tags := globalTags.of(c.Card.Name, target.lenderKey()); len(tags) > 0 {
+			src = append(src, deck.Card{Card: c.Card, Tags: tags})
 		}
 	}
-	if n == 0 {
-		l.undoLast()
-		m.notice = "the global tags have nothing this list hasn't"
+	src = onlyTags(src, only)
+	r := bringInto(target, bringing{what: "tags from the global tags", cards: src, carry: true})
+	if !r.changed() {
+		m.notice = "the global tags have nothing " + target.name + " hasn't"
 		return
 	}
-	l.refresh()
 	what := " cards took"
-	if n == 1 {
+	if r.tagged == 1 {
 		what = " card took"
 	}
-	m.notice = itoa(n) + what + " tags from the global tags"
-}
-
-// mergeShownTags is T m: every list on screen gives its tags to the others.
-// Only your own lists change; the rest only give.
-func (m *Model) mergeShownTags() {
-	var lists []*cardList
-	for _, p := range m.ws.panels {
-		if l := p.cardsView(); l != nil {
-			lists = append(lists, l)
-		}
-	}
-	var cards [][]deck.Card
-	for _, l := range lists {
-		cards = append(cards, l.all)
-	}
-	out, tagged := deck.MergeTags(cards...)
-
-	var changed []string
-	total := 0
-	for i, l := range lists {
-		if tagged[i] == 0 || l.deck == nil || !l.deck.Local() {
-			continue
-		}
-		l.pushUndo("merged tags")
-		l.all = out[i]
-		l.refresh()
-		changed = append(changed, l.name)
-		total += tagged[i]
-	}
-	if len(changed) == 0 {
-		m.notice = "the lists on screen already share their tags"
-		return
-	}
-	m.notice = "merged tags: " + itoa(total) + " cards in " + strings.Join(changed, ", ")
+	m.notice = itoa(r.tagged) + what + " tags from the global tags"
 }
 
 // onlyTags is the cards carrying any of the tags, each with only those, or

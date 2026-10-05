@@ -31,7 +31,7 @@ const (
 	// askAddCard is i on a deck: a Scryfall query whose one answer goes
 	// into the deck in front of you.
 	askAddCard
-	// askOtag is tab from askAddCard: oracle tags whose cards in the deck
+	// askOtag is T o and T O: oracle tags whose cards in the editing deck
 	// in front of you get tagged otag-<tag>.
 	askOtag
 	// askRemote is enter on the git remote in the settings panel.
@@ -41,32 +41,18 @@ const (
 	askTagMove
 	// askAddTag is A: the tags to add the cards with.
 	askAddTag
+	// askGlobalTags is T g: which of the global tags to make the editing
+	// deck's own, every one when left empty.
+	askGlobalTags
 )
 
-// Labels of the two sides of the i bar, which tab swaps between.
-const (
-	addCardLabel = "add from scryfall"
-	otagLabel    = "tag by otag"
-)
+// addCardLabel is the i bar's label.
+const addCardLabel = "add from scryfall"
 
-// askAdd raises the i bar: a card to add, or with tab, oracle tags.
+// askAdd raises the i bar: a card to add.
 func (p *panel) askAdd(initial string) {
 	p.ask(askAddCard, addCardLabel, initial)
-	p.askInput.Placeholder = "a card name, tab completes it · tab here: tag this list by otag"
-}
-
-// swapAddOtag turns the i bar from adding a card to tagging by otag and
-// back, keeping what was typed.
-func (p *panel) swapAddOtag() {
-	if p.asking == askAddCard {
-		p.asking = askOtag
-		p.askInput.Prompt = otagLabel + ": "
-		p.askInput.Placeholder = "removal ramp …, tab completes · tab here: add a card"
-		return
-	}
-	p.asking = askAddCard
-	p.askInput.Prompt = addCardLabel + ": "
-	p.askInput.Placeholder = "a card name, tab completes it · tab here: tag this list by otag"
+	p.askInput.Placeholder = "a card name, tab completes it"
 }
 
 // ask raises the prompt.
@@ -94,7 +80,7 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.ws.current()
 
 	key := msg.String()
-	if (p.asking == askTag || p.asking == askTagMove || p.asking == askAddTag) && (key == "tab" || key == "shift+tab") {
+	if (p.asking == askTag || p.asking == askTagMove || p.asking == askAddTag || p.asking == askGlobalTags) && (key == "tab" || key == "shift+tab") {
 		delta := 1
 		if key == "shift+tab" {
 			delta = -1
@@ -123,7 +109,7 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.stopAsking()
 		// Empty is no answer, except to which tags T moves: then it's all.
 		// For A it's just an add.
-		if strings.TrimSpace(answer) == "" && kind != askTagMove && kind != askAddTag {
+		if strings.TrimSpace(answer) == "" && kind != askTagMove && kind != askAddTag && kind != askGlobalTags {
 			return m, nil
 		}
 
@@ -173,28 +159,10 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 		case askOtag:
-			l := p.cardsView()
-			tags := otagNames(answer)
-			if l == nil || len(tags) == 0 || len(l.all) == 0 {
-				return m, nil
-			}
-			if msg, unknown, ok := localOtag(tags, l.all); ok {
-				msg.panel = p.id
-				next, cmd := m.handleOtag(msg)
-				if len(unknown) > 0 {
-					nm := next.(Model)
-					no := "Scryfall Tagger has no " + strings.Join(unknown, ", ")
-					if len(msg.tags) == 0 {
-						nm.notice = no
-					} else {
-						nm.notice += " · " + no
-					}
-					next = nm
-				}
-				return next, cmd
-			}
-			m.notice = "asking scryfall about " + strings.Join(tags, ", ") + "…"
-			return m, runOtag(p.id, tags, uniqueNames(l.all))
+			return m, m.otagInto(answer, p.otagAdd)
+
+		case askGlobalTags:
+			m.bakeGlobalTags(strings.Fields(strings.ToLower(answer)))
 
 		case askWrite:
 			if l := p.cardsView(); l != nil {

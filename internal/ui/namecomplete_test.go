@@ -102,27 +102,30 @@ func TestTabWithNothingToFinishKeepsWhatYouTyped(t *testing.T) {
 	}
 }
 
-func TestTabOnAnEmptyIBarStillSwapsToOtag(t *testing.T) {
+func TestTabOnAnEmptyIBarDoesNothingAndTOCompletesTags(t *testing.T) {
 	withCardNames(t)
 	m, _ := ownDeck(sized(140, 30))
 	m = drive(m, "i")
 	p := m.ws.current()
-	if hints := fmt.Sprint(m.hintGroups()); !strings.Contains(hints, "tag by otag instead") {
-		t.Errorf("tab on an empty bar isn't offered as the swap: %s", hints)
+	if hints := fmt.Sprint(m.hintGroups()); strings.Contains(hints, "tab") {
+		t.Errorf("tab on an empty bar does nothing, so it isn't offered: %s", hints)
 	}
 	m = drive(m, "tab")
-	if p.asking != askOtag {
-		t.Fatal("tab on an empty bar didn't swap to otag")
+	if p.asking != askAddCard || p.askInput.Value() != "" {
+		t.Fatal("tab on an empty i bar changed something")
 	}
-	// On the otag side, tab completes the tag being typed.
+	m = drive(m, "esc")
+
+	// T o's bar completes Scryfall Tagger's tags.
 	withTagger(t)
+	m = drive(m, "T", "o")
+	if p.asking != askOtag {
+		t.Fatal("T o didn't ask for oracle tags")
+	}
 	m = typeIn(m, "remova")
 	m = drive(m, "tab")
 	if got := p.askInput.Value(); !strings.HasPrefix(got, "removal") {
-		t.Errorf("tab on the otag side made %q, want removal…", got)
-	}
-	if p.asking != askOtag {
-		t.Error("completing a tag swapped back")
+		t.Errorf("tab in T o's bar made %q, want removal…", got)
 	}
 }
 
@@ -141,8 +144,8 @@ func TestTheIBarsKeysAreOnTheTopLineAndFollowTab(t *testing.T) {
 	m, _ := ownDeck(sized(160, 30))
 	m = drive(m, "i")
 	lines := strings.Split(stripANSI(m.View()), "\n")
-	if !strings.Contains(lines[0], "tag by otag instead") {
-		t.Errorf("the top line doesn't offer tab's swap: %q", lines[0])
+	if !strings.Contains(lines[0], "add the card") || strings.Contains(lines[0], "tab") {
+		t.Errorf("the top line should offer enter and no tab yet: %q", lines[0])
 	}
 	m = typeIn(m, "llan")
 	lines = strings.Split(stripANSI(m.View()), "\n")
@@ -156,7 +159,7 @@ func TestThePlaceholderIsShownInFullWhereThereIsRoom(t *testing.T) {
 	m, _ := ownDeck(sized(200, 30))
 	m = drive(m, "i")
 	view := stripANSI(m.View())
-	if !strings.Contains(view, "tab here: tag this list by otag") {
+	if !strings.Contains(view, "a card name, tab completes it") {
 		t.Errorf("the placeholder is cut short in a wide panel:\n%s", firstLines(view, 3))
 	}
 	// And it doesn't push the line past the panel: every line is as wide
@@ -166,8 +169,8 @@ func TestThePlaceholderIsShownInFullWhereThereIsRoom(t *testing.T) {
 			t.Errorf("a line is %d wide on a 200-wide screen: %q", w, line)
 		}
 	}
-	m = drive(m, "tab")
-	if view := stripANSI(m.View()); !strings.Contains(view, "tab here: add a card") {
+	m = drive(m, "esc", "T", "o")
+	if view := stripANSI(m.View()); !strings.Contains(view, "ball-lightning removal … · tab completes") {
 		t.Errorf("the otag placeholder is cut short:\n%s", firstLines(view, 3))
 	}
 }

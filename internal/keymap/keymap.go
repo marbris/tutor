@@ -161,10 +161,11 @@ const (
 	GotoImage    Action = "image"
 	GotoImageAll Action = "image.all"
 
-	TagMoveJoin   Action = "join"
-	TagMoveUpsert Action = "upsert"
-	TagMoveGlobal Action = "global"
-	TagMoveMerge  Action = "merge"
+	TagMoveJoin    Action = "join"
+	TagMoveUpsert  Action = "upsert"
+	TagMoveOtag    Action = "otag"
+	TagMoveOtagAdd Action = "otag.add"
+	TagMoveGlobal  Action = "global"
 
 	SearchNextTarget  Action = "target.next"
 	SearchPrevTarget  Action = "target.prev"
@@ -297,12 +298,14 @@ var defaults = []binding{
 	{Goto, GotoImage, k("x")},
 	{Goto, GotoImageAll, k("X")},
 
-	// After T, the second key is the verb it echoes: t tags only what's
-	// there, a adds what isn't.
+	// After T, the second key is where the tags come from: t and a this
+	// list (echoing t, which tags only what's there, and a, which adds what
+	// isn't), o Scryfall Tagger (O adds too), g the global tags.
 	{TagMove, TagMoveJoin, k("t")},
 	{TagMove, TagMoveUpsert, k("a")},
+	{TagMove, TagMoveOtag, k("o")},
+	{TagMove, TagMoveOtagAdd, k("O")},
 	{TagMove, TagMoveGlobal, k("g")},
-	{TagMove, TagMoveMerge, k("m")},
 
 	{Search, SearchNextTarget, k("tab")},
 	{Search, SearchPrevTarget, k("shift+tab")},

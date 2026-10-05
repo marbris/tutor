@@ -55,35 +55,20 @@ func namesStarting(prefix string) []string {
 	return out
 }
 
-// addBarTyping reports whether tab in the i bar completes rather than swaps
-// sides: something is being typed — a card name, or a tag at the end.
-func addBarTyping(p *panel) bool {
-	v := p.askInput.Value()
-	switch p.asking {
-	case askAddCard:
-		return strings.TrimSpace(v) != ""
-	case askOtag:
-		return v != "" && !strings.HasSuffix(v, " ")
-	}
-	return false
-}
-
-// tabInAddBar is tab (delta 1) or shift+tab (-1) in the i bar.
+// tabInAddBar is tab (delta 1) or shift+tab (-1) in the i bar, which
+// completes the card name, and in T o's bar, which completes the tag.
 func (m *Model) tabInAddBar(p *panel, delta int) {
-	if !addBarTyping(p) {
-		if delta > 0 {
-			p.swapAddOtag()
-		}
-		return
-	}
 	if p.asking == askOtag {
 		m.completeOtagInBar(p, delta)
+		return
+	}
+	if strings.TrimSpace(p.askInput.Value()) == "" {
 		return
 	}
 	m.completeName(p, delta)
 }
 
-// completeOtagInBar finishes the tag at the end of the otag side.
+// completeOtagInBar finishes the tag at the end of T o's bar.
 func (m *Model) completeOtagInBar(p *panel, delta int) {
 	labels := tagger.Current().Labels("")
 	if len(labels) == 0 {

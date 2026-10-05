@@ -145,3 +145,18 @@ func TestLoadDownloadsOnceAndKeepsTheResult(t *testing.T) {
 		t.Error("still stale after Refresh")
 	}
 }
+
+func TestWithIsEveryCardUnderATag(t *testing.T) {
+	d := read(t)
+	removal, _ := d.Find("removal")
+	if got := strings.Join(d.With(removal), " "); got != "disenchant shatter" {
+		t.Errorf("removal is on %q, want its children's cards", got)
+	}
+	ramp, _ := d.Find("ramp")
+	if got := strings.Join(d.With(ramp), " "); got != "sol" {
+		t.Errorf("ramp is on %q", got)
+	}
+	if d.With(-1) != nil || (*Data)(nil).With(0) != nil {
+		t.Error("no tag is on no cards")
+	}
+}

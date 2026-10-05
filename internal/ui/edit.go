@@ -113,12 +113,18 @@ func (r brought) changed() bool { return r.added+r.raised+r.tagged > 0 }
 // bring is every tag and add edit, into the editing deck, as one undo step.
 // It returns the deck, or nil (and the notice says why) when there is none.
 func (m *Model) bring(b bringing) (*cardList, brought) {
-	var r brought
 	l, why := m.editTarget()
 	if l == nil {
 		m.notice = why
-		return nil, r
+		return nil, brought{}
 	}
+	return l, bringInto(l, b)
+}
+
+// bringInto is bring into a deck already settled on: the one an answer from
+// Scryfall was asked for, which may no longer be the editing deck.
+func bringInto(l *cardList, b bringing) brought {
+	var r brought
 	l.pushUndo(b.what)
 	for _, c := range b.cards {
 		i := l.indexOfCard(c.Card.Name)
@@ -153,11 +159,11 @@ func (m *Model) bring(b bringing) (*cardList, brought) {
 	}
 	if !r.changed() {
 		l.undoLast() // nothing changed, so there is nothing to undo
-		return l, r
+		return r
 	}
 	l.refresh()
 	l.recheck()
-	return l, r
+	return r
 }
 
 func sameTags(a, b []string) bool {

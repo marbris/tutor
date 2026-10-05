@@ -104,6 +104,11 @@ func (m *Model) completeTag(p *panel, delta int) {
 	if l := p.cardsView(); p.asking == askTagMove && l != nil {
 		known = sourceTags(l)
 	}
+	// Which global tags to bake in: the ones other lists lend.
+	if p.asking == askGlobalTags {
+		known = globalTags.all()
+		sort.Strings(known)
+	}
 	m.complete(&p.tagComp, value, set, delta, before, strings.ToLower(word), known)
 }
 

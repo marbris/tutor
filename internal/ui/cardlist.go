@@ -673,8 +673,6 @@ func (l *cardList) keys() []hintGroup {
 	if local {
 		sel = append(sel, hint("put", keymap.Cards, keymap.CardsPut))
 	}
-	sel = append(sel, hint("tag", keymap.Cards, keymap.CardsTag))
-	sel = append(sel, hint("move tags…", keymap.Cards, keymap.CardsTagMove))
 	if local {
 		sel = append(sel, hint("commit", keymap.Cards, keymap.CardsWrite))
 	} else {
