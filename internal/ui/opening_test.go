@@ -398,3 +398,32 @@ func TestTheMoxfieldFolderComesFirst(t *testing.T) {
 		t.Errorf("rows start %v", rowNames(l))
 	}
 }
+
+func TestADeckOpenedWithNothingBeingEditedBecomesTheEditingDeck(t *testing.T) {
+	m := sized(200, 30)
+	open := func(slug string) *panel {
+		p := m.ws.open(KindDecks)
+		next, _ := m.Update(deckOpenedMsg{panel: p.id, newPane: true, info: deck.Info{Name: slug, Slug: slug},
+			cards: []deck.Card{{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}}}})
+		m = next.(Model)
+		return p
+	}
+	first := open("first")
+	if m.ws.editingPanel() != first {
+		t.Fatal("the first deck opened should be the editing deck")
+	}
+
+	// Two decks open and neither being edited — a session saved that way —
+	// and the next deck opened is the one edited.
+	open("second")
+	m.ws.editing = -1
+	third := open("third")
+	if m.ws.editingPanel() != third {
+		t.Errorf("a deck opened with nothing being edited should be edited; editing is panel %d", m.ws.editing)
+	}
+	// And a deck opened while one is being edited leaves it alone.
+	open("fourth")
+	if m.ws.editingPanel() != third {
+		t.Error("opening another deck moved the editing deck")
+	}
+}

@@ -438,3 +438,17 @@ func TestTagEditsAreLowercased(t *testing.T) {
 		}
 	}
 }
+
+func TestBigABringsTheCardsOwnTagsAndThePromptsToo(t *testing.T) {
+	m, search, target := editing(t)
+	search.all[1].Tags = []string{"elf"} // Llanowar Elves
+	search.refresh()
+	m.lastTag = "ramp"
+	m = focusOn(m, 0)
+	search.selectByName("Llanowar Elves")
+	m = drive(m, "A", "enter")
+	i := target.indexOfCard("Llanowar Elves")
+	if i < 0 || !hasTag(target.all[i].Tags, "elf") || !hasTag(target.all[i].Tags, "ramp") {
+		t.Errorf("A should bring elf and add ramp: %v", target.all)
+	}
+}

@@ -184,7 +184,8 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	l.deck = &msg.info
 	l.dirty = msg.uncommitted
 	l.recheck()
-	if p.pending != nil {
+	restored := p.pending != nil
+	if restored {
 		p.pending.applyLayout(l)
 		p.pending = nil
 	}
@@ -196,6 +197,11 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	} else {
 		p.push(l)
 		p.title = l.name
+	}
+	// With nothing being edited, a deck of yours just opened is the one you
+	// mean to edit. A restored session keeps the choice it saved.
+	if msg.info.Local() && !restored && !m.ws.editable(m.ws.editing) && !m.ws.awaitingDeck(m.ws.editing) {
+		m.ws.editing = m.ws.indexOf(p)
 	}
 	m.ws.deriveEditingIfUnpinned()
 	// A remote just followed should appear in any decks list on screen.
