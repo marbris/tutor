@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"ttr/internal/browser"
+	"ttr/internal/cache"
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 	"ttr/internal/paths"
@@ -442,15 +443,19 @@ var printingPNG = func(p mtg.Card, face int) ([]byte, int, int, int, error) {
 	jpg := filepath.Join(dir, pictureKey(p.ID, face)+".crop.jpg")
 	raw, err := os.ReadFile(jpg)
 	got := 0
-	if err != nil {
-		raw, err = fetch.GetFile(p.FaceImage(face, "border_crop"))
-		if err != nil {
-			return nil, 0, 0, 0, err
-		}
-		got = len(raw)
-		// The cache is a convenience: failing to keep a copy loses nothing.
-		if os.MkdirAll(dir, 0755) == nil {
-			os.WriteFile(jpg, raw, 0644)
+	// One refreshed from the settings since it was kept is downloaded
+	// again, and the kept one shown if that fails.
+	if err != nil || cache.DueFile("pictures", jpg) {
+		fresh, ferr := fetch.GetFile(p.FaceImage(face, "border_crop"))
+		switch {
+		case ferr == nil:
+			raw, err, got = fresh, nil, len(fresh)
+			// The cache is a convenience: failing to keep a copy loses nothing.
+			if os.MkdirAll(dir, 0755) == nil {
+				os.WriteFile(jpg, raw, 0644)
+			}
+		case err != nil:
+			return nil, 0, 0, 0, ferr
 		}
 	}
 	data, w, h, err := toPNG(raw)

@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	"ttr/internal/cache"
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 	"ttr/internal/paths"
@@ -102,21 +103,28 @@ func Printings(uri string) ([]Printing, error) {
 
 // SetOriginals pulls one set's printed text, from disk if it's already been
 // distilled, otherwise from MTGJSON — and caches it on the way past.
+//
+// A set refreshed from the settings since it was kept is downloaded again,
+// the kept copy standing in if that fails.
 func SetOriginals(set string) (map[string]string, error) {
-	if cards, ok := readCache(set); ok {
-		return cards, nil
+	kept, have := readCache(set)
+	if have && !cache.DueFile("texts", cachePath(set)) {
+		return kept, nil
 	}
 
 	sem <- struct{}{}
 	defer func() { <-sem }()
 
 	// Another card may have fetched it while we waited for a slot.
-	if cards, ok := readCache(set); ok {
+	if cards, ok := readCache(set); ok && !cache.DueFile("texts", cachePath(set)) {
 		return cards, nil
 	}
 
 	cards, err := download(set)
 	if err != nil {
+		if have {
+			return kept, nil
+		}
 		return nil, err
 	}
 	writeCache(set, cards)
@@ -305,7 +313,7 @@ func writeCache(set string, cards map[string]string) {
 // tells an instant answer from one that needs the network.
 func IsCached(set string) bool {
 	_, err := os.Stat(cachePath(set))
-	return err == nil
+	return err == nil && !cache.DueFile("texts", cachePath(set))
 }
 
 // ── Building the history ────────────────────────────────────────

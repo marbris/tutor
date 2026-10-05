@@ -123,20 +123,21 @@ const (
 	VersionsRevert Action = "revert"
 	VersionsCopy   Action = "copy"
 
-	StatsDown      Action = "down"
-	StatsUp        Action = "up"
-	StatsNextGroup Action = "group.next"
-	StatsPrevGroup Action = "group.prev"
-	StatsAnd       Action = "and"
-	StatsOr        Action = "or"
-	StatsNot       Action = "not"
-	StatsDrop      Action = "drop"
-	StatsClear     Action = "clear"
-	StatsOddsNext  Action = "odds.next"
-	StatsOddsPrev  Action = "odds.prev"
-	StatsClose     Action = "close"
-	SettingsChange Action = "change"
-	SettingsClear  Action = "clear"
+	StatsDown       Action = "down"
+	StatsUp         Action = "up"
+	StatsNextGroup  Action = "group.next"
+	StatsPrevGroup  Action = "group.prev"
+	StatsAnd        Action = "and"
+	StatsOr         Action = "or"
+	StatsNot        Action = "not"
+	StatsDrop       Action = "drop"
+	StatsClear      Action = "clear"
+	StatsOddsNext   Action = "odds.next"
+	StatsOddsPrev   Action = "odds.prev"
+	StatsClose      Action = "close"
+	SettingsChange  Action = "change"
+	SettingsClear   Action = "clear"
+	SettingsRefresh Action = "refresh"
 
 	StatsTagOrder Action = "tag.order"
 	StatsExpand   Action = "expand"
@@ -260,6 +261,7 @@ var defaults = []binding{
 
 	{Settings, SettingsChange, k("enter")},
 	{Settings, SettingsClear, k("d")},
+	{Settings, SettingsRefresh, k("r")},
 
 	// The statistics sit in the information panel, so they take its keys,
 	// shift, and leave the list its own: j, k, a, x, p and esc still act on

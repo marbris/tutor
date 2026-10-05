@@ -1,12 +1,19 @@
 package ui
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"ttr/internal/mtg"
 	"ttr/internal/paths"
 	"ttr/internal/tagger"
 )
@@ -124,5 +131,78 @@ func TestTheSettingsComeBackNextSession(t *testing.T) {
 	}
 	if !found {
 		t.Error("the settings panel isn't saved with the session")
+	}
+}
+
+func TestRMakesThePicturesDueAndTheNextLookFetchesAgain(t *testing.T) {
+	var jpg bytes.Buffer
+	jpeg.Encode(&jpg, image.NewRGBA(image.Rect(0, 0, 49, 68)), nil)
+	hits, broken := 0, false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if broken {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		hits++
+		w.Write(jpg.Bytes())
+	}))
+	defer srv.Close()
+	p := mtg.Card{ID: "duetest", ImageURIs: mtg.ImageURIs{BorderCrop: srv.URL + "/crop.jpg"}}
+	kept := filepath.Join(paths.Cache(), "images", "duetest.crop.jpg")
+	t.Cleanup(func() { os.Remove(kept) })
+
+	printingPNG(p, 0)
+	past := time.Now().Add(-time.Hour)
+	os.Chtimes(kept, past, past)
+
+	m := withCards(sized(160, 40), "d", deckSample(), sortArrival)
+	m, v := settingsPanel(t, m)
+	pointRow(t, v, "card pictures")
+	m, cmd := press(m, "r")
+	if cmd != nil {
+		t.Error("marking the pictures due shouldn't fetch anything yet")
+	}
+	if !strings.Contains(m.notice, "next time") {
+		t.Errorf("notice %q", m.notice)
+	}
+
+	// Scryfall down: the kept picture stands in, and stays due.
+	broken = true
+	if _, _, _, _, err := printingPNG(p, 0); err != nil {
+		t.Errorf("a due picture with Scryfall down failed: %v", err)
+	}
+	broken = false
+	printingPNG(p, 0)
+	printingPNG(p, 0)
+	if hits != 2 {
+		t.Errorf("fetched %d times, want twice: once, and once refreshed", hits)
+	}
+}
+
+func TestROnTaggerDownloadsItAgain(t *testing.T) {
+	m := withCards(sized(160, 40), "d", deckSample(), sortArrival)
+	m, v := settingsPanel(t, m)
+	pointRow(t, v, "Scryfall Tagger's tags")
+	m, cmd := press(m, "r")
+	if cmd == nil {
+		t.Fatal("r didn't start a download")
+	}
+	if !strings.Contains(m.notice, "again") {
+		t.Errorf("notice %q", m.notice)
+	}
+	if m = drive(m, "?"); !strings.Contains(stripANSI(m.View()), "r refresh") {
+		t.Error("no r hint")
+	}
+}
+
+func TestRSaysWhenADownloadIsOff(t *testing.T) {
+	saveDownloadsOff(map[string]bool{"rulings": true})
+	t.Cleanup(func() { saveDownloadsOff(map[string]bool{}) })
+	m := withCards(sized(160, 40), "d", deckSample(), sortArrival)
+	m, v := settingsPanel(t, m)
+	pointRow(t, v, "every card's rulings")
+	m, cmd := press(m, "r")
+	if cmd != nil || !strings.Contains(m.notice, "turned off") {
+		t.Errorf("r on a download that's off: notice %q", m.notice)
 	}
 }

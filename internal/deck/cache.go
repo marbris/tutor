@@ -242,6 +242,18 @@ func Resolve(entries []Entry) ([]Card, error) {
 	return cards, nil
 }
 
+// MarkCardsStale makes every kept card stale, which is how the settings
+// panel refreshes card data: each deck asks for its cards again as it opens
+// (RefreshStale), the kept ones shown meanwhile. It forgets when each was
+// fetched, which a lost times file already means.
+func MarkCardsStale() error {
+	err := os.Remove(filepath.Join(paths.Cache(), cardFetchedFile))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
 // RefreshStale asks Scryfall again for the cards of a deck whose cached copy
 // is over a day old, keeps the answers, and returns them by the id of the
 // card they replace. Decks open from the cache at once, stale or not, and

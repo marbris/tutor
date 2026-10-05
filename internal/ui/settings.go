@@ -20,7 +20,8 @@ import (
 //   - downloads: the bulk files Tutor keeps (downloads.go). enter turns one
 //     on or off.
 //   - cache: what's kept, by kind, and how much room it takes. d clears a
-//     kind. Everything in the cache can be fetched again.
+//     kind, r refreshes it (refresh.go). Everything in the cache can be
+//     fetched again.
 //
 // The info panel says what the row under the cursor is, and what clearing
 // it costs.
@@ -184,6 +185,10 @@ func (v *settingsView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		case srowCacheKind:
 			return true, clearCacheKind(p.id, r.name)
 		}
+	case keymap.SettingsRefresh:
+		if r.kind == srowDownload || r.kind == srowCacheKind {
+			return true, m.refreshKind(p.id, r.name)
+		}
 	}
 	return false, nil
 }
@@ -206,13 +211,15 @@ func (v *settingsView) info(width int) []string {
 	case srowDownload:
 		for _, d := range downloads {
 			if d.name == r.name {
-				body = []string{d.what + ", " + d.size + ".", downloadEffect(d.name), "enter turns it on or off"}
+				body = []string{d.what + ", " + d.size + ".", downloadEffect(d.name), "enter turns it on or off",
+					"r: " + refreshEffect(d.name)}
 			}
 		}
 	case srowCacheKind:
 		for _, k := range cache.Kinds {
 			if k.Name == r.name {
-				body = []string{k.What + ": " + r.value + ".", "Clearing it: " + k.Refetch + ".", "d clears it"}
+				body = []string{k.What + ": " + r.value + ".", "Clearing it: " + k.Refetch + ".", "d clears it",
+					"r: " + refreshEffect(k.Name)}
 			}
 		}
 	case srowCacheTotal:
@@ -251,8 +258,12 @@ func (v *settingsView) keys() []hintGroup {
 			}
 		case srowDownload:
 			acts = append(acts, hint("turn on/off", keymap.Settings, keymap.SettingsChange))
+			if !downloadsOff()[r.name] {
+				acts = append(acts, hint("refresh", keymap.Settings, keymap.SettingsRefresh))
+			}
 		case srowCacheKind:
-			acts = append(acts, hint("clear it", keymap.Settings, keymap.SettingsClear))
+			acts = append(acts, hint("clear it", keymap.Settings, keymap.SettingsClear),
+				hint("refresh", keymap.Settings, keymap.SettingsRefresh))
 		}
 	}
 	return []hintGroup{{"navigation", nav}, {"settings", acts}}

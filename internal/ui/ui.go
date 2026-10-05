@@ -321,6 +321,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRulingsLoaded(msg)
 	case settingsDoneMsg:
 		return m.handleSettingsDone(msg)
+	case refreshedMsg:
+		return m.handleRefreshed(msg)
 
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)

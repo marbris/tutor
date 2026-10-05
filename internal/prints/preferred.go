@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"ttr/internal/cache"
 	"ttr/internal/diskcache"
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
@@ -188,6 +189,11 @@ func All(c mtg.Card) (list []mtg.Card, size int, stale bool, err error) {
 		if at, ok := diskcache.ModTime(printingsFile(c)); ok {
 			for i := range kept {
 				kept[i].PricedAt = at
+			}
+			// Refreshed from the settings since it was kept: shown, and
+			// asked for again, as a day-old one is.
+			if cache.Due("printings", at) {
+				fresh = false
 			}
 		}
 		return kept, 0, !fresh, nil
