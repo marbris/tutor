@@ -64,12 +64,27 @@ func (w *workspace) current() *panel {
 // in the middle of doing something with the one you're on, and it belongs
 // beside it.
 func (w *workspace) open(kind Kind) *panel {
-	w.nextID++
-	p := newPanel(kind)
-	p.id = w.nextID
 	at := w.focused + 1
 	if w.empty() {
 		at = 0
+	}
+	return w.insert(kind, at)
+}
+
+// insert puts a new panel at index at, with focus. The panels from there on
+// move one to the right, and the editing deck's index moves with them.
+func (w *workspace) insert(kind Kind, at int) *panel {
+	w.nextID++
+	p := newPanel(kind)
+	p.id = w.nextID
+	if at < 0 {
+		at = 0
+	}
+	if at > len(w.panels) {
+		at = len(w.panels)
+	}
+	if !w.empty() && w.editing >= at {
+		w.editing++
 	}
 	w.panels = append(w.panels, nil)
 	copy(w.panels[at+1:], w.panels[at:])

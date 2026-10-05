@@ -104,7 +104,6 @@ const (
 	DecksSortPrev   Action = "sort.prev"
 	DecksFilter     Action = "filter"
 	DecksOpen       Action = "open"
-	DecksOpenBeside Action = "open-beside"
 	DecksNew        Action = "new"
 	DecksRename     Action = "rename"
 	DecksCopy       Action = "copy"
@@ -241,7 +240,6 @@ var defaults = []binding{
 	{Decks, DecksSortPrev, k(">")},
 	{Decks, DecksFilter, k("/")},
 	{Decks, DecksOpen, k("enter")},
-	{Decks, DecksOpenBeside, k("L")},
 	{Decks, DecksNew, k("n")},
 	{Decks, DecksRename, k("r")},
 	{Decks, DecksCopy, k("c")},
@@ -324,6 +322,12 @@ func k(keys ...string) []string { return keys }
 // the rename still moves them.
 var renamed = map[Scope]map[string]Action{
 	Decks: {"tag-list": DecksGlobalTags},
+}
+
+// retired is actions that are gone, so a keys.json that still moves one is
+// let be rather than warned about: there is nothing left for it to move.
+var retired = map[Scope]map[string]bool{
+	Decks: {"open-beside": true}, // enter opens beside since 9.0.0
 }
 
 // The keymap in force: each scope's actions and their keys, and the same
@@ -457,6 +461,9 @@ func apply(body []byte) error {
 		}
 		for _, name := range sortedKeys(file[scope]) {
 			a := Action(name)
+			if retired[s][name] {
+				continue
+			}
 			if now, ok := renamed[s][name]; ok {
 				a = now
 			}

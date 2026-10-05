@@ -37,8 +37,9 @@ func decksPanel(t *testing.T) (Model, *deckList) {
 	return m, m.ws.current().top().(*deckList)
 }
 
-func TestEnterOpensADeckInThePanelYouAreIn(t *testing.T) {
-	// Stepping into it, so esc goes back to the list rather than closing.
+func TestEnterOpensADeckToTheLeftAndLeavesYouWhereYouWere(t *testing.T) {
+	// The decks panel stays a decks panel, under the cursor, so the next
+	// deck is one enter away.
 	m, l := decksPanel(t)
 	l.cursor.at = 0
 
@@ -48,46 +49,41 @@ func TestEnterOpensADeckInThePanelYouAreIn(t *testing.T) {
 	}
 	m = settle(m, cmd)
 
-	p := m.ws.current()
-	if m.ws.count() != 1 {
-		t.Errorf("enter opened %d panels", m.ws.count())
+	if m.ws.count() != 2 {
+		t.Fatalf("enter opened %d panels", m.ws.count()-1)
 	}
-	if len(p.stack) != 2 {
-		t.Fatalf("the deck did not go on top of the list: %d views", len(p.stack))
+	if m.ws.focused != 1 {
+		t.Errorf("focus is on panel %d, not the decks panel", m.ws.focused)
 	}
-	if p.cardsView() == nil {
-		t.Fatal("no cards")
+	decks := m.ws.panels[1]
+	if _, ok := decks.top().(*deckList); !ok || len(decks.stack) != 1 {
+		t.Errorf("the decks panel shows %T, %d views", decks.top(), len(decks.stack))
 	}
-
-	// And esc comes back out to the decks list.
-	m = drive(m, "esc")
-	if _, ok := m.ws.current().top().(*deckList); !ok {
-		t.Errorf("esc left the panel showing %T", m.ws.current().top())
+	if m.ws.panels[0].cardsView() == nil {
+		t.Error("the deck on the left has no cards")
 	}
 }
 
-func TestLOpensADeckBesideAndLeavesYouWhereYouWere(t *testing.T) {
-	// So the list you were browsing is still under the cursor.
+func TestOpeningToTheLeftKeepsTheEditingDeck(t *testing.T) {
+	// The editing deck sits right of the decks panel; a deck opened to the
+	// left pushes it one along, and it must still be the one being edited.
 	m, l := decksPanel(t)
 	l.cursor.at = 0
-
-	m, cmd := press(m, "L")
-	if cmd == nil {
-		t.Fatal("L did nothing")
-	}
+	m, cmd := press(m, "enter")
 	m = settle(m, cmd)
+	// Deck, decks: move the deck right of the decks panel.
+	m.ws.focus(0)
+	m.ws.movePanel(1)
+	m.ws.focus(0)
+	editing := m.ws.panels[m.ws.editing]
 
-	if m.ws.count() != 2 {
-		t.Fatalf("L opened %d panels", m.ws.count())
+	m, cmd = press(m, "enter")
+	m = settle(m, cmd)
+	if m.ws.count() != 3 {
+		t.Fatalf("%d panels", m.ws.count())
 	}
-	if m.ws.focused != 0 {
-		t.Errorf("focus moved to panel %d", m.ws.focused)
-	}
-	if _, ok := m.ws.panels[0].top().(*deckList); !ok {
-		t.Error("the decks list is no longer under the cursor")
-	}
-	if m.ws.panels[1].cardsView() == nil {
-		t.Error("the new panel has no cards")
+	if m.ws.panels[m.ws.editing] != editing {
+		t.Errorf("the editing deck moved to panel %d", m.ws.editing)
 	}
 }
 
@@ -98,7 +94,7 @@ func TestAnOpenedDeckBecomesTheOneBeingEdited(t *testing.T) {
 	m, cmd := press(m, "enter")
 	m = settle(m, cmd)
 
-	if m.ws.editing != 0 {
+	if m.ws.editing != 0 || m.ws.panels[0].cardsView() == nil {
 		t.Errorf("the editing deck is panel %d", m.ws.editing)
 	}
 	if _, why := m.editTarget(); why != "" {

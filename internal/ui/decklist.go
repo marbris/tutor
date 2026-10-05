@@ -790,7 +790,7 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		l.cycleSort(-1)
 	case keymap.DecksFilter:
 		p.openFilter(l.filter)
-	case keymap.DecksOpen, keymap.DecksOpenBeside:
+	case keymap.DecksOpen:
 		if e, ok := l.current(); ok && (e.kind == entryFolder || e.kind == entryUser) {
 			l.toggleFolder(e.slug)
 			if e.kind == entryUser && l.expanded[e.slug] {
@@ -798,7 +798,7 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			}
 			return true, nil
 		}
-		return true, m.openEntry(l, p, action == keymap.DecksOpenBeside)
+		return true, m.openEntry(l, p)
 
 	case keymap.DecksNew:
 		p.ask(askNewDeck, "name", "")
@@ -1038,7 +1038,6 @@ func (l *deckList) keys() []hintGroup {
 		}},
 		{"decks", [][2]string{
 			hint("open/fold", keymap.Decks, keymap.DecksOpen),
-			hint("open beside", keymap.Decks, keymap.DecksOpenBeside),
 			hint("new", keymap.Decks, keymap.DecksNew),
 			hint("rename", keymap.Decks, keymap.DecksRename),
 			hint("copy deck/&considering", keymap.Decks, keymap.DecksCopy, keymap.DecksCopyBoth),

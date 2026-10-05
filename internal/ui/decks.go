@@ -56,37 +56,38 @@ type noticeMsg struct {
 
 // ── Opening ─────────────────────────────────────────────────────
 
-// openEntry acts on the highlighted row: a deck becomes a list of cards, a
-// person becomes a list of their decks.
-func (m *Model) openEntry(l *deckList, p *panel, newPane bool) tea.Cmd {
+// openEntry opens the deck on the highlighted row in a panel of its own, to
+// the left of the decks panel. The decks panel stays a decks panel, and keeps
+// focus, so the list you were browsing is still under the cursor and the
+// next deck is one enter away.
+func (m *Model) openEntry(l *deckList, p *panel) tea.Cmd {
 	e, ok := l.current()
 	if !ok {
 		return nil
 	}
-
-	target := p
-	if newPane {
-		// L opens to the right and leaves you where you were, so the list
-		// you were browsing is still under the cursor.
-		target = m.ws.open(p.kind)
-		m.ws.focus(m.ws.indexOf(p))
+	switch e.kind {
+	case entryLocal, entryRemote, entryUserDeck:
+	default:
+		return nil
 	}
+
+	target := m.ws.insert(p.kind, m.ws.indexOf(p))
+	m.ws.focus(m.ws.indexOf(p))
 	target.loading = true
 	target.err = nil
 
 	switch e.kind {
 	case entryLocal:
 		target.title = e.name
-		return openLocalDeck(target.id, newPane, e.slug)
+		return openLocalDeck(target.id, true, e.slug)
 	case entryRemote:
 		target.title = e.name
-		return openRemoteDeck(target.id, newPane, e.id, true)
+		return openRemoteDeck(target.id, true, e.id, true)
 	case entryUserDeck:
 		// Already listed under its author, so looking doesn't follow it.
 		target.title = e.name
-		return openRemoteDeck(target.id, newPane, e.id, false)
+		return openRemoteDeck(target.id, true, e.id, false)
 	}
-	target.loading = false
 	return nil
 }
 
@@ -190,8 +191,8 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 		p.pending = nil
 	}
 
-	// A deck opened in its own panel replaces what was there; one opened
-	// from the decks list steps into it, so esc goes back to the list.
+	// A deck opened in its own panel fills it; one w saved from a search
+	// steps in over the search, so esc goes back to the results.
 	if msg.newPane || p.top() == nil {
 		p.show(l)
 	} else {
