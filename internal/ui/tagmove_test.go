@@ -2,11 +2,13 @@ package ui
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
+	"ttr/internal/paths"
 	"ttr/internal/stats"
 )
 
@@ -28,20 +30,20 @@ func hasTag(tags []string, want string) bool {
 	return false
 }
 
-// withTagList turns a tag list on for one test and off again after.
-func withTagList(t *testing.T, slug, body string) {
+// withPinned pins a list to the global tags for one test, and unpins it after.
+func withPinned(t *testing.T, slug, body string) {
 	t.Helper()
 	seedDeck(t, slug, body)
 	t.Cleanup(func() {
 		deck.Delete(slug)
-		os.Remove(tagListsPath())
+		os.Remove(pinnedPath())
 		globalTags = &tagIndex{}
 	})
 }
 
-func TestTInTheDecksPanelMakesATagListWhoseTagsCountEverywhere(t *testing.T) {
+func TestTInTheDecksPanelPinsAListWhoseTagsCountEverywhere(t *testing.T) {
 	resetDecks(t)
-	withTagList(t, "ramp-cards", "name: ramp-cards\nformat: tags\n[mainboard]\n1 Sol Ring [ramp]\n1 Llanowar Elves [ramp, elf]\n")
+	withPinned(t, "ramp-cards", "name: ramp-cards\nformat: tags\n[mainboard]\n1 Sol Ring [ramp]\n1 Llanowar Elves [ramp, elf]\n")
 
 	m := openPanel(sized(160, 30), "d", "")
 	l := m.ws.current().top().(*deckList)
@@ -52,18 +54,18 @@ func TestTInTheDecksPanelMakesATagListWhoseTagsCountEverywhere(t *testing.T) {
 	}
 	m = drive(m, "t")
 	if !globalTags.active("ramp-cards") {
-		t.Fatal("t didn't turn the tag list on")
+		t.Fatal("t didn't pin the list")
 	}
 	found := false
 	for _, r := range l.rows {
-		if r.kind == entryFolder && r.slug == tagListsFolder {
+		if r.kind == entryFolder && r.slug == globalTagsFolder {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("no tag lists folder in the tree")
+		t.Error("no global tags folder in the tree")
 	}
-	if got := loadTagLists(); len(got) != 1 || got[0] != "ramp-cards" {
+	if got := loadPinned(); len(got) != 1 || got[0] != "ramp-cards" {
 		t.Errorf("remembered %v", got)
 	}
 
@@ -82,10 +84,10 @@ func TestTInTheDecksPanelMakesATagListWhoseTagsCountEverywhere(t *testing.T) {
 	dl.statFilter = nil
 	dl.setFilter("elf")
 	if len(dl.rows) < 1 {
-		t.Error("/ didn't find the tag list's elf tag")
+		t.Error("/ didn't find the pinned list's elf tag")
 	}
 	if len(tagged(dl, "Sol Ring")) != 0 {
-		t.Error("the tag list's tags were written into the list")
+		t.Error("the pinned list's tags were written into the list")
 	}
 }
 
@@ -118,10 +120,10 @@ func TestTTCopiesTagsIntoTheEditingDeckForCardsItHas(t *testing.T) {
 	}
 }
 
-func TestTGBakesTheTagListsIn(t *testing.T) {
-	withTagList(t, "ramp-cards", "name: ramp-cards\nformat: tags\n[mainboard]\n1 Sol Ring [ramp]\n")
+func TestTGBakesTheGlobalTagsIn(t *testing.T) {
+	withPinned(t, "ramp-cards", "name: ramp-cards\nformat: tags\n[mainboard]\n1 Sol Ring [ramp]\n")
 	m, l := openDeckPanel(t, sized(160, 30), "ghen", "Ghen", sample())
-	m.toggleTagList("ramp-cards", "ramp-cards")
+	m.togglePin("ramp-cards", "ramp-cards")
 	m = drive(m, "T", "g")
 	if !hasTag(tagged(l, "Sol Ring"), "ramp") {
 		t.Errorf("Sol Ring has %v", tagged(l, "Sol Ring"))
@@ -200,5 +202,24 @@ func TestTTMovesOnlyTheTagsNamed(t *testing.T) {
 	m = drive(m, "enter")
 	if len(deckList.all) != 2 || !hasTag(tagged(deckList, "Cultivate"), "ramp") {
 		t.Errorf("T a ramp: %d cards; want Cultivate added, not Rancor", len(deckList.all))
+	}
+}
+
+func TestPinnedListsFromBeforeTheRenameAreStillPinned(t *testing.T) {
+	resetDecks(t)
+	withPinned(t, "ramp-cards", "name: ramp-cards\n[mainboard]\n1 Sol Ring [ramp]\n")
+	old := filepath.Join(paths.State(), oldPinnedFile)
+	os.MkdirAll(filepath.Dir(old), 0755)
+	if err := os.WriteFile(old, []byte(`["ramp-cards"]`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Remove(old) })
+
+	if got := loadPinned(); len(got) != 1 || got[0] != "ramp-cards" {
+		t.Fatalf("taglists.json should still be read, got %v", got)
+	}
+	savePinned([]string{"ramp-cards"})
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Error("taglists.json should go once globaltags.json is written")
 	}
 }

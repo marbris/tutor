@@ -58,14 +58,14 @@ func (k entryKind) letter() string {
 // sorts first, and in its own colour, so it never passes for one of yours.
 const moxFolder = "moxfield"
 
-// tagListsFolder is the virtual folder the tag lists that are on show in, as
+// globalTagsFolder is the virtual folder the tag lists that are on show in, as
 // a second row each: the file stays in its own folder too. Its name has a
 // space, which a folder on disk never does, so it can't be mistaken for one.
-const tagListsFolder = "tag lists"
+const globalTagsFolder = "global tags"
 
 // virtualFolder reports whether a folder is built by the panel rather than
 // found on disk.
-func virtualFolder(f string) bool { return f == moxFolder || f == tagListsFolder }
+func virtualFolder(f string) bool { return f == moxFolder || f == globalTagsFolder }
 
 // userFolder is where a followed person's decks sit in the tree.
 func userFolder(user string) string { return moxFolder + "/" + strings.ToLower(user) }
@@ -327,7 +327,7 @@ func (l *deckList) buildTree() []deckEntry {
 			if globalTags.active(e.slug) {
 				ref := e
 				ref.tagRef = true
-				leaves = append(leaves, leaf{ref, tagListsFolder})
+				leaves = append(leaves, leaf{ref, globalTagsFolder})
 				hasTags = true
 			}
 		case entryRemote:
@@ -376,7 +376,7 @@ func (l *deckList) buildTree() []deckEntry {
 		addFolder(moxFolder)
 	}
 	if hasTags {
-		addFolder(tagListsFolder)
+		addFolder(globalTagsFolder)
 	}
 	for f := range people {
 		addFolder(f)
@@ -391,7 +391,7 @@ func (l *deckList) buildTree() []deckEntry {
 			switch f {
 			case moxFolder:
 				return 0
-			case tagListsFolder:
+			case globalTagsFolder:
 				return 1
 			}
 			return 2
@@ -731,7 +731,7 @@ func renderFolderRow(e deckEntry, indent string, width int, under bool) string {
 		colour = theme.Info
 	case e.slug == moxFolder:
 		colour = theme.Special
-	case e.slug == tagListsFolder && e.kind == entryFolder, e.tagRef:
+	case e.slug == globalTagsFolder && e.kind == entryFolder, e.tagRef:
 		colour = theme.Highlight
 	}
 	nameStyle := lipgloss.NewStyle().Foreground(colour).Bold(true)
@@ -843,9 +843,9 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			l.moving = &deckMove{slug: e.slug, name: e.name, cut: true}
 		}
 
-	case keymap.DecksTagList:
+	case keymap.DecksGlobalTags:
 		if e, ok := l.current(); ok && e.kind == entryLocal {
-			m.toggleTagList(e.slug, e.name)
+			m.togglePin(e.slug, e.name)
 			l.refresh()
 		}
 
@@ -928,7 +928,7 @@ func (l *deckList) info(width int) []string {
 		out = append(out, dim.Render(fit("local deck", width)))
 		if globalTags.active(e.slug) {
 			out = append(out, lipgloss.NewStyle().Foreground(theme.Highlight).
-				Render(fit("tag list: its tags count in every list", width)))
+				Render(fit("pinned to the global tags", width)))
 		}
 		location := "top level"
 		if e.folder != "" {
@@ -942,9 +942,9 @@ func (l *deckList) info(width int) []string {
 		out = append(out, "")
 		out = append(out, legalityLines(e.legal, width)...)
 		out = append(out, "", mutedLine("enter: open", width))
-		toggle := "t: use as a tag list"
+		toggle := "t: pin to the global tags"
 		if globalTags.active(e.slug) {
-			toggle = "t: stop using as a tag list"
+			toggle = "t: unpin from the global tags"
 		}
 		out = append(out, mutedLine(toggle, width))
 		out = append(out, "", mutedLine("gv: versions", width))
@@ -1043,7 +1043,7 @@ func (l *deckList) keys() []hintGroup {
 			hint("rename", keymap.Decks, keymap.DecksRename),
 			hint("copy deck/&considering", keymap.Decks, keymap.DecksCopy, keymap.DecksCopyBoth),
 			hint("delete/cut/yank/put", keymap.Decks, keymap.DecksDelete, keymap.DecksCut, keymap.DecksYank, keymap.DecksPut),
-			hint("tag list on/off", keymap.Decks, keymap.DecksTagList),
+			hint("pin to global tags", keymap.Decks, keymap.DecksGlobalTags),
 			{gotoHint(keymap.GotoVersions), "versions"},
 			{gotoHint(keymap.GotoImage), "open on moxfield"},
 		}},

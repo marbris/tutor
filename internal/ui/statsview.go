@@ -68,7 +68,7 @@ type statsState struct {
 type statsKey struct {
 	list       *cardList
 	gen        int // the list's refreshes: its cards and filters
-	tagGen     int // the tag lists' rebuilds
+	tagGen     int // the global tags' rebuilds
 	tagger     *tagger.Data
 	catalog    *catalog.Data // where each subtype counts
 	tagsByName bool

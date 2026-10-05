@@ -22,7 +22,7 @@ import (
 //
 // T t and T a ask which tags first, completing from the ones in this list
 // with tab; left empty, every tag moves.
-//	T g  the tag lists' tags written into this list's own
+//	T g  the global tags written into this list's own
 //	T m  every list on screen gets every other list's tags, for its cards
 //
 // "This list's cards" are the ones picked out with v, or failing that every
@@ -37,7 +37,7 @@ type tagMoveCmd struct {
 var tagMoveMenu = []tagMoveCmd{
 	{keymap.TagMoveJoin, "tags → editing deck"},
 	{keymap.TagMoveUpsert, "tags + cards → editing deck"},
-	{keymap.TagMoveGlobal, "tag lists → this list"},
+	{keymap.TagMoveGlobal, "global tags → this list"},
 	{keymap.TagMoveMerge, "merge tags across lists"},
 }
 
@@ -137,17 +137,17 @@ func (m *Model) tagsInto(from *cardList, addMissing bool, only []string) {
 	m.notice += " in " + target.name
 }
 
-// bakeGlobalTags is T g: the tag lists' tags made this list's own.
+// bakeGlobalTags is T g: the global tags made this list's own.
 func (m *Model) bakeGlobalTags(l *cardList) {
 	if l.deck == nil || !l.deck.Local() {
 		m.notice = "that list isn't yours — " + keymap.Hint(keymap.Cards, keymap.CardsWrite) + " takes a copy you can tag"
 		return
 	}
 	if len(globalTags.slugs) == 0 {
-		m.notice = "no tag lists are on — t in the decks panel turns one on"
+		m.notice = "no global tags — t in the decks panel pins a list to them"
 		return
 	}
-	l.pushUndo("tags from the tag lists")
+	l.pushUndo("tags from the global tags")
 	n := 0
 	for i, c := range l.all {
 		merged := deck.ApplyTagEdits(c.Tags, globalTags.of(c.Card.Name), nil)
@@ -158,7 +158,7 @@ func (m *Model) bakeGlobalTags(l *cardList) {
 	}
 	if n == 0 {
 		l.undoLast()
-		m.notice = "the tag lists have nothing this list hasn't"
+		m.notice = "the global tags have nothing this list hasn't"
 		return
 	}
 	l.refresh()
@@ -166,7 +166,7 @@ func (m *Model) bakeGlobalTags(l *cardList) {
 	if n == 1 {
 		what = " card took"
 	}
-	m.notice = itoa(n) + what + " tags from the tag lists"
+	m.notice = itoa(n) + what + " tags from the global tags"
 }
 
 // mergeShownTags is T m: every list on screen gives its tags to the others.

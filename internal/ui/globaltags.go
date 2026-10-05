@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,18 +11,25 @@ import (
 	"ttr/internal/paths"
 )
 
-// Tag lists: tags that hold across every list on screen.
+// Global tags: tags that hold across every list on screen.
 //
-// A tag list is an ordinary .list file — often format: tags, a card a line,
-// each with its tags — that you turn on with t in the decks panel. While it
-// is on, its tags count as every list's own: a deck with nothing tagged ramp
-// still shows ramp in its statistics, and / and the statistics filter find
-// it, when a tag list says the card is ramp. They are never written into the
-// deck; the deck's own tags stay its own, and T g is how you copy them in.
+// A list pinned to the global tags is an ordinary .list file — often format:
+// tags, a card a line, each with its tags — pinned with t in the decks panel.
+// While it is pinned, its tags count as every list's own: a deck with nothing
+// tagged ramp still shows ramp in its statistics, and / and the statistics
+// filter find it, when a pinned list says the card is ramp. They are never
+// written into the deck; the deck's own tags stay its own, and T g is how you
+// copy them in.
+//
+// Before 8.0.0 these were "tag lists", kept in taglists.json; that file is
+// still read when globaltags.json isn't there yet.
 
-const tagListsFile = "taglists.json"
+const (
+	pinnedFile    = "globaltags.json"
+	oldPinnedFile = "taglists.json"
+)
 
-// tagIndex is the tag lists that are on, and what they say.
+// tagIndex is the lists lending the global tags, and what they say.
 type tagIndex struct {
 	slugs []string
 	// tags is each card's tags across the lists, by lowercased name — and
@@ -35,11 +43,14 @@ type tagIndex struct {
 // narrow themselves without being told what the workspace holds.
 var globalTags = &tagIndex{}
 
-func tagListsPath() string { return filepath.Join(paths.State(), tagListsFile) }
+func pinnedPath() string { return filepath.Join(paths.State(), pinnedFile) }
 
-// loadTagLists reads which tag lists were on, dropping any since deleted.
-func loadTagLists() []string {
-	body, err := os.ReadFile(tagListsPath())
+// loadPinned reads which lists were pinned, dropping any since deleted.
+func loadPinned() []string {
+	body, err := os.ReadFile(pinnedPath())
+	if errors.Is(err, os.ErrNotExist) {
+		body, err = os.ReadFile(filepath.Join(paths.State(), oldPinnedFile))
+	}
 	if err != nil {
 		return nil
 	}
@@ -56,13 +67,15 @@ func loadTagLists() []string {
 	return out
 }
 
-func saveTagLists(slugs []string) {
+func savePinned(slugs []string) {
 	body, err := json.Marshal(slugs)
 	if err != nil {
 		return
 	}
-	os.MkdirAll(filepath.Dir(tagListsPath()), 0755)
-	os.WriteFile(tagListsPath(), body, 0644)
+	os.MkdirAll(filepath.Dir(pinnedPath()), 0755)
+	if os.WriteFile(pinnedPath(), body, 0644) == nil {
+		os.Remove(filepath.Join(paths.State(), oldPinnedFile))
+	}
 }
 
 func (x *tagIndex) active(slug string) bool {
@@ -74,7 +87,7 @@ func (x *tagIndex) active(slug string) bool {
 	return false
 }
 
-// toggle turns a tag list on or off, and says which.
+// toggle pins a list or unpins it, and says which.
 func (x *tagIndex) toggle(slug string) bool {
 	for i, s := range x.slugs {
 		if s == slug {
@@ -86,7 +99,7 @@ func (x *tagIndex) toggle(slug string) bool {
 	return true
 }
 
-// of is the tags the lists give a card.
+// of is the tags the global tags give a card.
 func (x *tagIndex) of(name string) []string {
 	if len(x.tags) == 0 {
 		return nil
@@ -134,7 +147,7 @@ func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 	}
 }
 
-// effective is a card with the tag lists' tags added to its own, for
+// effective is a card with the global tags added to its own, for
 // narrowing and counting. The card in the list is left as it is.
 func effective(c deck.Card) deck.Card {
 	extra := globalTags.of(c.Card.Name)
@@ -156,7 +169,7 @@ func effectiveAll(cards []deck.Card) []deck.Card {
 	return out
 }
 
-// onlyGlobal is the tags a card has from the tag lists and not of its own.
+// onlyGlobal is the tags a card has from the global tags and not of its own.
 func onlyGlobal(c deck.Card) []string {
 	var out []string
 	for _, t := range globalTags.of(c.Card.Name) {
@@ -174,7 +187,7 @@ func onlyGlobal(c deck.Card) []string {
 	return out
 }
 
-// refreshGlobalTags reads the tag lists again and re-narrows every list on
+// refreshGlobalTags reads the lending lists again and re-narrows every list on
 // screen, whose filters may now match differently.
 func (m Model) refreshGlobalTags() {
 	open := map[string][]deck.Card{}
@@ -195,14 +208,14 @@ func (m Model) refreshGlobalTags() {
 	}
 }
 
-// toggleTagList is t in the decks panel.
-func (m *Model) toggleTagList(slug, name string) {
+// togglePin is t in the decks panel.
+func (m *Model) togglePin(slug, name string) {
 	if globalTags.toggle(slug) {
-		m.notice = name + " is a tag list now — its tags count in every list"
+		m.notice = name + " is pinned to the global tags — its tags count in every list"
 	} else {
-		m.notice = name + " is no longer a tag list"
+		m.notice = name + " is unpinned from the global tags"
 	}
-	saveTagLists(globalTags.slugs)
+	savePinned(globalTags.slugs)
 	m.refreshGlobalTags()
 	for _, p := range m.ws.panels {
 		for _, v := range p.stack {

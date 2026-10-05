@@ -199,3 +199,14 @@ func TestDefaultsJSONRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+func TestARenamedActionStillMoves(t *testing.T) {
+	isolate(t)
+	write(t, `{"decks": {"tag-list": "P"}}`)
+	if err := Load(); err != nil {
+		t.Fatal(err)
+	}
+	if got := Lookup(Decks, "P"); got != DecksGlobalTags {
+		t.Fatalf("tag-list, the old name, should move global-tags; P = %q", got)
+	}
+}

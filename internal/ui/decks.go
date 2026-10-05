@@ -421,9 +421,9 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 			return noticeMsg{err: fmt.Errorf("the moxfield folder is for followed decks, not yours")}
 		}
 	}
-	if dir == tagListsFolder {
+	if dir == globalTagsFolder {
 		return func() tea.Msg {
-			return noticeMsg{err: fmt.Errorf("the tag lists folder shows the tag lists that are on — t turns one on")}
+			return noticeMsg{err: fmt.Errorf("the global tags folder shows the pinned lists — t pins one")}
 		}
 	}
 	dest := uniqueSlug(inFolder(dir, path.Base(mv.slug)))

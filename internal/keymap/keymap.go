@@ -113,7 +113,7 @@ const (
 	DecksCut        Action = "cut"
 	DecksPut        Action = "put"
 	DecksDelete     Action = "delete"
-	DecksTagList    Action = "tag-list"
+	DecksGlobalTags Action = "global-tags"
 
 	RulesOrderNext Action = "order.next"
 	RulesOrderPrev Action = "order.prev"
@@ -248,7 +248,7 @@ var defaults = []binding{
 	{Decks, DecksCut, k("x")},
 	{Decks, DecksYank, k("y")},
 	{Decks, DecksPut, k("p")},
-	{Decks, DecksTagList, k("t")},
+	{Decks, DecksGlobalTags, k("t")},
 
 	{Rules, RulesOrderNext, k(".")},
 	{Rules, RulesOrderPrev, k(">")},
@@ -314,6 +314,12 @@ var defaults = []binding{
 }
 
 func k(keys ...string) []string { return keys }
+
+// renamed is actions known by an older name, so a keys.json written before
+// the rename still moves them.
+var renamed = map[Scope]map[string]Action{
+	Decks: {"tag-list": DecksGlobalTags},
+}
 
 // The keymap in force: each scope's actions and their keys, and the same
 // read backwards.
@@ -446,6 +452,9 @@ func apply(body []byte) error {
 		}
 		for _, name := range sortedKeys(file[scope]) {
 			a := Action(name)
+			if now, ok := renamed[s][name]; ok {
+				a = now
+			}
 			if _, ok := next[a]; !ok {
 				problems = append(problems, fmt.Sprintf("%s: no action %q", scope, name))
 				continue

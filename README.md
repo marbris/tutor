@@ -24,7 +24,7 @@ favorite things about it:
 - Keyboard only. Scryfall searches and decks sit side by side, and a card goes into the deck with `a`.
 - Every deck is a plain text file in git. Every version is kept, and you can sync them to any git host.
 - You can see the Scryfall Tagger oracle tags of every card, and count your deck by them.
-- Tagging in bulk, and tag lists that count in every deck.
+- Tagging in bulk, and global tags that count in every deck.
 - Filtering a deck by combinations of tags and properties: AND, OR, NOT.
 - Your own theme colors.
 
@@ -97,7 +97,7 @@ Tutor is a row of panels, with an info panel on the right that describes whateve
 
 | Keys | Opens |
 | --- | --- |
-| `space d` | your lists: local decks, Moxfield decks, tag lists |
+| `space d` | your lists: local decks, Moxfield decks, global tags |
 | `space f` | a Scryfall search |
 | `space r` | the comprehensive rules |
 | `space n` | a new panel; `tab` cycles between the three |
@@ -126,7 +126,7 @@ f:commander  kw:flying  set:mh3  otag:ramp  tag:wincon
 -t:land  (t:instant or t:sorcery)
 ```
 
-`tag:` is your own tags, including the ones from tag lists. Anything it doesn't know is matched as
+`tag:` is your own tags, including the global tags. Anything it doesn't know is matched as
 plain text.
 
 ### Sorting
@@ -223,13 +223,13 @@ it again for at least two, three or four.
 ## Tagging
 
 - Tag many cards at once.
-- Keep tag lists, and use any number of them in your deck.
+- Pin lists to the global tags, and use any number of them in your deck.
 - Copy tags from one list to another.
 
 Tags are written at the end of a card's line in the list file: `1 Lightning Bolt (2xm) 141 [removal, burn]`.
 Without the tags, a list pastes straight into Moxfield or Archidekt.
 
-### Making a tag list
+### Making a list of tags
 
 1. `space f` to open a new Scryfall search.
 2. Search `id:rbg otag:removal`. Scryfall's API returns at most 175 cards a page, and Tutor
@@ -242,8 +242,8 @@ Without the tags, a list pastes straight into Moxfield or Archidekt.
 ### Using it in a deck
 
 1. `space d` to open the lists panel.
-2. Scroll to `jund-removal` and press `t` to make it a tag list. The tag lists in use show under a
-   `tag lists` folder at the top.
+2. Scroll to `jund-removal` and press `t` to pin it to the global tags. The pinned lists show under a
+   `global tags` folder at the top.
 3. Scroll to your Jund deck and press `enter` to open it.
 4. `s` to open the statistics. The cards in the deck that are in `jund-removal` count as `removal`
    in the tags group, and the filters find them too.
@@ -262,7 +262,7 @@ completes from the tags in the list), or leave it empty for all of them.
 | --- | --- |
 | `T t` | this list's tags onto the editing list, for the cards it has |
 | `T a` | the same, and the cards the editing list doesn't have are added with their tags |
-| `T g` | the tag lists' tags, written into this list |
+| `T g` | the global tags, written into this list |
 | `T m` | every list on screen gets the others' tags, for the cards it has |
 
 ## Scryfall Tagger tags
@@ -514,7 +514,7 @@ ttr cache clear [kind]          # delete it, all of it or one kind
 | `c` `C` | copy / copy with its considering list |
 | `y` `x` `p` | yank / cut / put into this folder |
 | `d` | delete |
-| `t` | use as a tag list, or stop |
+| `t` | pin to the global tags, or unpin |
 | `gv` | git history |
 | `gx` | open a Moxfield deck on moxfield.com |
 
