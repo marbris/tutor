@@ -55,6 +55,7 @@ func (l *cardList) pushUndo(what string) {
 
 // edited notes a change to the deck: uncommitted, and not yet written.
 func (l *cardList) edited() {
+	l.tagEdits++
 	if !l.dirty {
 		l.wasClean = true
 	}

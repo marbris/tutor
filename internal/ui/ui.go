@@ -185,6 +185,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// a panel opened — a list ordered by where else its cards are is kept
 	// in that order, here, rather than by every handler that could change it.
 	if updated, ok := next.(Model); ok {
+		// The global tags follow the lists on screen: one opened, closed,
+		// loaded, edited or muted changes what the others borrow.
+		updated.syncGlobalTags()
 		updated.resortInclusion()
 		updated.followStats()
 		// And the picture gx put up is the one the terminal holds, at the

@@ -3,8 +3,10 @@ package ui
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"ttr/internal/deck"
@@ -13,16 +15,20 @@ import (
 
 // Global tags: tags that hold across every list on screen.
 //
-// A list pinned to the global tags is an ordinary .list file — often format:
-// tags, a card a line, each with its tags — pinned with t in the decks panel.
-// While it is pinned, its tags count as every list's own: a deck with nothing
-// tagged ramp still shows ramp in its statistics, and / and the statistics
-// filter find it, when a pinned list says the card is ramp. They are never
-// written into the deck; the deck's own tags stay its own, and T g is how you
-// copy them in.
+// A list's tags describe that list, and they also set the dictionary while
+// you work. Every list open on screen lends its tags to the others, and so
+// does every list pinned with t in the decks panel, open or not — often a
+// list of format: tags, a card a line, each with its tags. space t on a list
+// stops it lending (mutes it), and again starts it.
 //
-// Before 8.0.0 these were "tag lists", kept in taglists.json; that file is
-// still read when globaltags.json isn't there yet.
+// While a list lends, its tags count as every other list's own: a deck with
+// nothing tagged ramp still shows ramp in its statistics, and / and the
+// statistics filter find it, when another list says the card is ramp. They
+// are never written into the deck; the deck's own tags stay its own, and
+// T g is how you copy them in.
+//
+// Before 8.0.0 these were "tag lists", kept in taglists.json, and only the
+// pinned ones lent; that file is still read when globaltags.json isn't there.
 
 const (
 	pinnedFile    = "globaltags.json"
@@ -38,8 +44,13 @@ type tagIndex struct {
 	// for a list that names a two-faced card by it. A list can then be left
 	// out of what it lends itself.
 	from map[string]map[string][]string
+	// muted is the lists space t has stopped lending, by key.
+	muted map[string]bool
 	// gen counts rebuilds, for the statistics to know the tags have moved.
 	gen int
+	// sig is what the lists on screen were at the last rebuild, to know
+	// when to rebuild again.
+	sig string
 }
 
 // globalTags is the one index, shared by every list, because the lists
@@ -144,8 +155,10 @@ func (x *tagIndex) all() []string {
 	return out
 }
 
-// rebuild reads the lists again. A list open on screen is read from there,
-// since its latest edit may not have reached the file yet.
+// rebuild reads the lists again: every list in open, which are the ones on
+// screen, and the pinned ones that aren't — but none that is muted. A list
+// on screen is read from there, since its latest edit may not have reached
+// the file yet.
 func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 	x.gen++
 	x.from = map[string]map[string][]string{}
@@ -164,11 +177,16 @@ func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 			into[front] = deck.ApplyTagEdits(into[front], tags, nil)
 		}
 	}
+	for key, cards := range open {
+		if x.muted[key] {
+			continue
+		}
+		for _, c := range cards {
+			add(key, c.Card.Name, c.Tags)
+		}
+	}
 	for _, slug := range x.slugs {
-		if cards, ok := open[slug]; ok {
-			for _, c := range cards {
-				add(slug, c.Card.Name, c.Tags)
-			}
+		if _, ok := open[slug]; ok || x.muted[slug] {
 			continue
 		}
 		f, err := deck.Read(slug)
@@ -181,15 +199,32 @@ func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 	}
 }
 
-// lenderKey is what a list lends the global tags under: a local list's slug.
-// A list with none — a search, a deck borrowed from Moxfield — lends nothing
-// yet, and sees every list's tags as borrowed.
+// lenderKey is what a list lends the global tags under: a local list's
+// slug, or a Moxfield deck's id. A search has none; it has no tags to lend.
 func (l *cardList) lenderKey() string {
 	if l == nil || l.deck == nil {
 		return ""
 	}
-	return l.deck.Slug
+	if l.deck.Local() {
+		return l.deck.Slug
+	}
+	if id := firstOf(l.deck.ID, l.deck.URL, l.deck.Name); id != "" {
+		return "moxfield:" + id
+	}
+	return ""
 }
+
+func firstOf(s ...string) string {
+	for _, v := range s {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// lends reports whether the list lends its tags: muted, it doesn't.
+func (x *tagIndex) lends(key string) bool { return key != "" && !x.muted[key] }
 
 // effective is a card with Borrowed filled in: the tags the global tags give
 // it that it hasn't of its own, from every list but self. It counts and
@@ -222,17 +257,33 @@ func effectiveAll(cards []deck.Card, self string) []deck.Card {
 	return out
 }
 
-// refreshGlobalTags reads the lending lists again and re-narrows every list on
-// screen, whose filters may now match differently.
-func (m Model) refreshGlobalTags() {
+// openLenders is the lists on screen that could lend, by key, and a
+// signature of them that changes whenever what they say might have: a list
+// opened, closed, loaded, edited or muted.
+func (m Model) openLenders() (map[string][]deck.Card, string) {
 	open := map[string][]deck.Card{}
+	var sig []string
 	for _, p := range m.ws.panels {
-		for _, v := range p.stack {
-			if l, ok := v.(*cardList); ok && l.deck != nil && l.deck.Local() && globalTags.active(l.deck.Slug) {
-				open[l.deck.Slug] = l.all
-			}
+		l := p.cardsView()
+		key := l.lenderKey()
+		if key == "" {
+			continue
 		}
+		if _, seen := open[key]; seen {
+			continue
+		}
+		open[key] = l.all
+		sig = append(sig, fmt.Sprintf("%s:%d:%d:%p:%t", key, l.tagEdits, len(l.all), l.all, globalTags.muted[key]))
 	}
+	sort.Strings(sig)
+	return open, strings.Join(sig, "|")
+}
+
+// refreshGlobalTags reads the lending lists again and re-narrows every list
+// on screen, whose filters may now match differently.
+func (m Model) refreshGlobalTags() {
+	open, sig := m.openLenders()
+	globalTags.sig = sig
 	globalTags.rebuild(open)
 	for _, p := range m.ws.panels {
 		for _, v := range p.stack {
@@ -241,6 +292,43 @@ func (m Model) refreshGlobalTags() {
 			}
 		}
 	}
+}
+
+// syncGlobalTags rebuilds the global tags when the lists on screen have
+// changed since the last time — one check after every message, rather than
+// one in every handler that opens, closes, loads or edits a list.
+func (m Model) syncGlobalTags() {
+	if _, sig := m.openLenders(); sig != globalTags.sig {
+		m.refreshGlobalTags()
+	}
+}
+
+// toggleLending is space t: the list in front of you stops lending its tags
+// to the global tags, or starts again.
+func (m *Model) toggleLending() {
+	var l *cardList
+	if p := m.ws.current(); p != nil {
+		l = p.cardsView()
+	}
+	key := l.lenderKey()
+	if key == "" {
+		m.notice = "only a list lends tags — this panel has none"
+		return
+	}
+	if globalTags.muted == nil {
+		globalTags.muted = map[string]bool{}
+	}
+	if globalTags.muted[key] {
+		delete(globalTags.muted, key)
+		m.notice = l.name + " lends its tags to the other lists again"
+	} else {
+		globalTags.muted[key] = true
+		m.notice = l.name + " no longer lends its tags to the other lists"
+		if globalTags.active(key) {
+			m.notice += " (still pinned — t in the decks panel unpins)"
+		}
+	}
+	m.refreshGlobalTags()
 }
 
 // togglePin is t in the decks panel.

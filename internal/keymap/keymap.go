@@ -153,6 +153,7 @@ const (
 	LeaderSettings  Action = "settings"
 	LeaderUndoClose Action = "undo-close"
 	LeaderOnly      Action = "only"
+	LeaderLendTags  Action = "lend-tags"
 
 	GotoTop      Action = "top"
 	GotoEditing  Action = "editing"
@@ -288,6 +289,7 @@ var defaults = []binding{
 	{Leader, LeaderSettings, k("c")},
 	{Leader, LeaderUndoClose, k("u")},
 	{Leader, LeaderOnly, k("o")},
+	{Leader, LeaderLendTags, k("t")},
 
 	{Goto, GotoTop, k("g")},
 	{Goto, GotoEditing, k("d")},

@@ -91,6 +91,9 @@ type cardList struct {
 	// when edits made in another editor get committed before ttr writes
 	// over them.
 	wasClean bool
+	// tagEdits counts edits, so the global tags know a list they borrow
+	// from has changed.
+	tagEdits int
 	// undo holds the deck as it stood before each edit.
 	undo []undoStep
 
@@ -510,6 +513,9 @@ func (l *cardList) headerRows(queryOrder string) [][]string {
 		} else {
 			state = append(state, "committed")
 		}
+	}
+	if key := l.lenderKey(); key != "" && !globalTags.lends(key) {
+		state = append(state, "not lending tags")
 	}
 	if l.legality != nil && l.legality.Known {
 		if l.legality.Legal {

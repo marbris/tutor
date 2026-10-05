@@ -46,6 +46,8 @@ type panelSession struct {
 	Filter string `json:"filter,omitempty"`
 	// Stats is the statistics filter, a category at a time.
 	Stats []savedClause `json:"stats,omitempty"`
+	// Muted is a deck space t stopped lending its tags.
+	Muted bool `json:"muted,omitempty"`
 	// QuerySort and QueryDir are the order a find panel asks Scryfall for.
 	QuerySort string `json:"querySort,omitempty"`
 	QueryDir  string `json:"queryDir,omitempty"`
@@ -116,6 +118,7 @@ func (m Model) saveSession() {
 			case v.deck != nil && v.deck.Local():
 				ps.Kind = "deck"
 				ps.Deck = v.deck.Slug
+				ps.Muted = globalTags.muted[v.deck.Slug]
 			case v.deck != nil:
 				continue // borrowed, and might not be there tomorrow
 			default:
@@ -231,6 +234,12 @@ func (m *Model) restore() tea.Cmd {
 			p.loading = true
 			p.title = ps.Deck
 			p.pending = &ps
+			if ps.Muted {
+				if globalTags.muted == nil {
+					globalTags.muted = map[string]bool{}
+				}
+				globalTags.muted[ps.Deck] = true
+			}
 			cmds = append(cmds, openLocalDeck(p.id, true, ps.Deck))
 		}
 	}
