@@ -270,7 +270,8 @@ empty for all of them. Each of these is one step for `u` to undo.
 ### Making a list of tags
 
 1. `space d` to open the lists panel, `n` to make a new list, say `otag-ball-lightning`, and
-   `enter` to open it. It's now the editing list.
+   `enter` to open it. If another list is being edited, press `e` until this one is (its border
+   changes color, and the `T O` prompt names the list it adds to).
 2. `T O`, type `ball-lightning` (`tab` completes) and press `enter`. Every card Scryfall Tagger
    tags `ball-lightning` goes in, tagged `otag-ball-lightning`.
 3. `w` to commit.
