@@ -107,8 +107,10 @@ query Scryfall and get a list of results.
 
 One of your local lists is the **editing list**. It has its own border color, and `e` `E` choose
 which one it is. `a` adds the highlighted card to it and `x` removes it, from whichever panel you're
-in, so you can add from a search two panels over. Cards that are already in the editing list are
-marked in the other panels.
+in, so you can add from a search two panels over. A card brought in from another of your lists comes
+with its tags. If the editing list already has it, it only takes the tags; `a` gives another copy
+only in the editing list itself. Cards that are already in the editing list are marked in the other
+panels.
 
 `?` shows every key for wherever you are. `space` shows the menu. `q` quits.
 
@@ -223,47 +225,67 @@ it again for at least two, three or four.
 ## Tagging
 
 - Tag many cards at once.
-- Pin lists to the global tags, and use any number of them in your deck.
-- Copy tags from one list to another.
+- Every list you have open lends its tags to the others, and you can pin lists so they always do.
+- Bring tags from one list, from Scryfall Tagger or from the global tags into the list you're editing.
 
 Tags are written at the end of a card's line in the list file: `1 Lightning Bolt (2xm) 141 [removal, burn]`.
 Without the tags, a list pastes straight into Moxfield or Archidekt.
 
-### Making a list of tags
+### Global tags
 
-1. `space f` to open a new Scryfall search.
-2. Search `id:rbg otag:removal`. Scryfall's API returns at most 175 cards a page, and Tutor
-   loads the first page: by default, the 175 most played on EDHREC.
-3. `w` to save the result as a local list, say `jund-removal`.
-4. `V` to select every card in the list.
-5. `t` to tag them, say `removal`.
-6. `w` to commit.
+The tags on a list describe that list, and they also set the vocabulary while you work. Every list
+open on screen lends its tags to the others: if one list says Sol Ring is `ramp`, Sol Ring counts as
+`ramp` in every other open list too. That holds in the statistics, `/` and `tag:` filters, tag
+completion and the info panel. These are the **global tags**. They're never written into a list
+unless you ask (`T g`).
 
-### Using it in a deck
+- `space t` on a list stops it lending its tags, and again starts it. A list always sees its own
+  tags.
+- `t` in the lists panel **pins** a list to the global tags, so it lends even when it isn't open.
+  Pinned lists show under a `global tags` folder at the top.
 
-1. `space d` to open the lists panel.
-2. Scroll to `jund-removal` and press `t` to pin it to the global tags. The pinned lists show under a
-   `global tags` folder at the top.
-3. Scroll to your Jund deck and press `enter` to open it.
-4. `s` to open the statistics. The cards in the deck that are in `jund-removal` count as `removal`
-   in the tags group, and the filters find them too.
+In the statistics, a tag that only another list gives is drawn in its own color. A tag that both
+this list and another give opens with `enter` into `this list` and `other lists`.
 
-The tags aren't written into the deck. To write them in, press `T` then `g`.
+### Tagging the editing list
 
-![Selecting cards in a search and tagging them together](screenshots/tagging.png)
-
-### Copying tags between lists
-
-`T` copies tags from a whole list at once: the cards you selected with `v`, or every card showing.
-Filter first to copy only some. `T t` and `T a` ask which tags to bring: type one or a few (`tab`
-completes from the tags in the list), or leave it empty for all of them.
+Every tagging key changes the **editing list**. The list in front of you only says which cards.
+`t`, `a` and `A` work on the highlighted card or the ones selected with `v`. `T` works on a whole
+list: the cards selected with `v`, or every card showing, so filter first to bring only some.
 
 | Keys | Does |
 | --- | --- |
+| `t` | tag the cards in the editing list (`ramp -draw` adds one and takes one off; `tab` completes) |
+| `a` | add the cards, with their tags. A card the editing list has only takes the tags |
+| `A` | the same, and tag them too (the last tag is filled in, so `A enter` repeats it) |
 | `T t` | this list's tags onto the editing list, for the cards it has |
-| `T a` | the same, and the cards the editing list doesn't have are added with their tags |
-| `T g` | the global tags, written into this list |
-| `T m` | every list on screen gets the others' tags, for the cards it has |
+| `T a` | the same, and the cards it doesn't have are added with their tags |
+| `T o` | Scryfall Tagger's tag, as `otag-…`, on the editing list's cards that have it |
+| `T O` | the same, and every other card with that tag is added |
+| `T g` | the global tags, written into the editing list |
+
+`T t`, `T a` and `T g` ask which tags to bring: type one or a few (`tab` completes), or leave it
+empty for all of them. Each of these is one step for `u` to undo.
+
+### Making a list of tags
+
+1. `space d` to open the lists panel, `n` to make a new list, say `otag-ball-lightning`, and
+   `enter` to open it. It's now the editing list.
+2. `T O`, type `ball-lightning` (`tab` completes) and press `enter`. Every card Scryfall Tagger
+   tags `ball-lightning` goes in, tagged `otag-ball-lightning`.
+3. `w` to commit.
+
+Or from a search: `space f`, search `id:rbg otag:removal`, `w` to save the result as a local list,
+`V` to select every card and `t` to tag them `removal`.
+
+### Using it in a deck
+
+1. Open your deck beside the list. While both are open, the deck's cards that are in the list count
+   with its tags in the statistics, and the filters find them.
+2. To have it count without opening it, press `t` on the list in the lists panel to pin it.
+3. To write the tags into the deck, make the deck the editing list and press `T g`.
+
+![Selecting cards in a search and tagging them together](screenshots/tagging.png)
 
 ## Scryfall Tagger tags
 
@@ -295,12 +317,12 @@ The tags show up in three places:
 
 There are two ways to turn Tagger tags into tags of your own on a local list.
 
-From the `i` bar:
+With `T o`:
 
-1. In your list, press `i`, then `tab` to switch to tagging by otag.
-2. Type the tag, `removal`, and press `enter`.
-3. Scryfall is asked which cards in your list have `otag:removal`, and those cards are tagged
-   `otag-removal`.
+1. Make the list the editing list, and press `T o`.
+2. Type the tag, `removal` (`tab` completes), and press `enter`.
+3. The cards in your list that Tagger tags `removal` are tagged `otag-removal`. This is worked out
+   from the downloaded tags, without asking Scryfall. `T O` adds every other card with the tag too.
 
 From the statistics:
 
@@ -487,12 +509,12 @@ ttr cache clear [kind]          # delete it, all of it or one kind
 | `.` `>` | next / previous first sort |
 | `,` `<` | next / previous second sort |
 | `alt+.` `alt+,` | reverse the first / second sort |
-| `i` | edit the search; on your own list, add a card (`tab` completes its name; on an empty bar, `tab` tags by otag instead) |
+| `i` | edit the search; on your own list, add a card (`tab` completes its name) |
 | `v` `V` | select one / select all |
-| `a` `A` | add to the editing list / add and tag with the last tag |
+| `a` `A` | add to the editing list, with the cards' tags / add and tag (see *Tagging*) |
 | `x` | remove a copy from the editing list |
-| `t` | tag the selection (`tab` completes) |
-| `T` `t` `a` `g` `m` | copy tags between lists |
+| `t` | tag the selection in the editing list (`tab` completes) |
+| `T` `t` `a` `o` `O` `g` | tag the editing list from a whole list, Scryfall Tagger or the global tags |
 | `c` | make the card the editing deck's commander |
 | `u` | undo |
 | `y` `p` | yank the selection / put it into this list |
@@ -534,6 +556,7 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 | `space u` | bring back the last closed panel |
 | `space w` | commit every list with changes |
 | `space s` | sync with the git remote |
+| `space t` | this list lends its tags to the global tags, or stops |
 
 </details>
 

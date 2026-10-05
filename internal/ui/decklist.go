@@ -58,7 +58,7 @@ func (k entryKind) letter() string {
 // sorts first, and in its own colour, so it never passes for one of yours.
 const moxFolder = "moxfield"
 
-// globalTagsFolder is the virtual folder the tag lists that are on show in, as
+// globalTagsFolder is the virtual folder the lists pinned to the global tags show in, as
 // a second row each: the file stays in its own folder too. Its name has a
 // space, which a folder on disk never does, so it can't be mistaken for one.
 const globalTagsFolder = "global tags"
@@ -101,7 +101,7 @@ type deckEntry struct {
 	// loading is a person whose decks are being fetched.
 	loading bool
 
-	// tagRef is the second row a tag list gets, under the tag lists folder.
+	// tagRef is the second row a pinned list gets, under the global tags folder.
 	tagRef bool
 
 	// folder is a local deck's location — the folder part of its slug, empty at
@@ -386,7 +386,7 @@ func (l *deckList) buildTree() []deckEntry {
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
 		subs := append([]string(nil), subfolders[dir]...)
-		// The virtual folders come first: moxfield, then the tag lists.
+		// The virtual folders come first: moxfield, then the global tags.
 		rank := func(f string) int {
 			switch f {
 			case moxFolder:
