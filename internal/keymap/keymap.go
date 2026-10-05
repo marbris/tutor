@@ -135,7 +135,6 @@ const (
 	StatsOddsNext  Action = "odds.next"
 	StatsOddsPrev  Action = "odds.prev"
 	StatsClose     Action = "close"
-	StatsBack      Action = "back"
 	SettingsChange Action = "change"
 	SettingsClear  Action = "clear"
 
@@ -262,19 +261,21 @@ var defaults = []binding{
 	{Settings, SettingsChange, k("enter")},
 	{Settings, SettingsClear, k("d")},
 
-	{Stats, StatsDown, k("j", "down")},
-	{Stats, StatsUp, k("k", "up")},
-	{Stats, StatsNextGroup, k("J", "shift+down")},
-	{Stats, StatsPrevGroup, k("K", "shift+up")},
-	{Stats, StatsAnd, k("a")},
-	{Stats, StatsOr, k("o")},
-	{Stats, StatsNot, k("n")},
-	{Stats, StatsDrop, k("x")},
-	{Stats, StatsClear, k("X")},
-	{Stats, StatsOddsNext, k("p")},
-	{Stats, StatsOddsPrev, k("P")},
+	// The statistics sit in the information panel, so they take its keys,
+	// shift, and leave the list its own: j, k, a, x, p and esc still act on
+	// the cards. The filter keys are the old letters with alt.
+	{Stats, StatsDown, k("J", "shift+down")},
+	{Stats, StatsUp, k("K", "shift+up")},
+	{Stats, StatsNextGroup, k("ctrl+j")},
+	{Stats, StatsPrevGroup, k("ctrl+k")},
+	{Stats, StatsAnd, k("alt+a")},
+	{Stats, StatsOr, k("alt+o")},
+	{Stats, StatsNot, k("alt+n")},
+	{Stats, StatsDrop, k("alt+x")},
+	{Stats, StatsClear, k("alt+X")},
+	{Stats, StatsOddsNext, k("alt+p")},
+	{Stats, StatsOddsPrev, k("alt+P")},
 	{Stats, StatsClose, k("s")},
-	{Stats, StatsBack, k("esc")},
 	{Stats, StatsTagOrder, k("tab")},
 	{Stats, StatsExpand, k("enter")},
 
@@ -328,6 +329,7 @@ var renamed = map[Scope]map[string]Action{
 // let be rather than warned about: there is nothing left for it to move.
 var retired = map[Scope]map[string]bool{
 	Decks: {"open-beside": true}, // enter opens beside since 9.0.0
+	Stats: {"back": true},        // esc is the list's since 9.0.0; s closes
 }
 
 // The keymap in force: each scope's actions and their keys, and the same

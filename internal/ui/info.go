@@ -7,8 +7,8 @@ package ui
 // you have to go and come back from. The cost is two keys in the shift
 // space; the saving is a whole mode.
 //
-// In statistics J and K turn the groups over instead, and j and k walk the
-// categories.
+// In statistics J and K walk the categories instead, and ctrl+j and ctrl+k
+// turn the groups over.
 
 type infoMode int
 

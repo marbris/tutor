@@ -97,9 +97,9 @@ func TestNInTheStatisticsNegates(t *testing.T) {
 		if r, ok := m.statUnder(); ok && r.Group == "Type" && r.Label == "Land" {
 			break
 		}
-		m = drive(m, "j")
+		m = drive(m, "J")
 	}
-	m = drive(m, "n")
+	m = drive(m, "alt+n")
 	l := m.ws.current().cardsView()
 	for _, c := range l.rows {
 		if mtg.IsLand(c.Card) {

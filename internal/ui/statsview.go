@@ -17,10 +17,10 @@ import (
 
 // Statistics, in the information panel.
 //
-// s takes you there and s brings you back: while the statistics are up they
-// have the keys, and j/k walk the categories without touching the list. A
-// category narrows the list only when you add it — a to add it with AND, o
-// with OR — so reading the bars and filtering by them are separate acts, and
+// s takes you there and s brings you back. While the statistics are up they
+// take the information panel's keys, J/K walking the categories, and leave
+// the list its own: j, k, a, x, esc. A category narrows the list only when
+// you add it — alt+a to add it with AND, alt+o with OR — so reading the bars and filtering by them are separate acts, and
 // several categories can narrow at once. h and l still move between lists,
 // and the bars follow.
 //
@@ -44,7 +44,7 @@ type statsState struct {
 	// path is the highlighted row's place in the Scryfall Tagger tree,
 	// where the same tag can sit under two parents.
 	path string
-	// top is the group drawn first. J and K turn the order over, so the
+	// top is the group drawn first. ctrl+j and ctrl+k turn the order over, so the
 	// group you want to read sits at the top rather than off the bottom.
 	top string
 	// editing is S: the deck you're editing, wherever you are.
@@ -438,17 +438,6 @@ func (m *Model) statsKey(key string) bool {
 			m.pointAt(r)
 		}
 		m.stats.tagsByName = !m.stats.tagsByName
-	case keymap.StatsBack:
-		// Back, a step at a time: the categories, then the text filter,
-		// then out of the statistics.
-		l := m.statList()
-		switch {
-		case clearStatFilter(l):
-		case l != nil && l.filter != "":
-			l.setFilter("")
-		default:
-			m.info.mode = infoCard
-		}
 	default:
 		return false
 	}
@@ -511,7 +500,7 @@ func statHeading(groups []stats.Group, row int) int {
 // the highlight reaches an edge.
 //
 // At the top edge it goes far enough back to show the group's heading too,
-// whenever the two fit together. J and K turn a group to the top and put
+// whenever the two fit together. ctrl+j and ctrl+k turn a group to the top and put
 // the highlight on its first category; scrolling only as far as the
 // category left the heading — the one line saying what the bars count —
 // just above the top edge.

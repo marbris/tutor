@@ -474,7 +474,6 @@ func (m Model) statsHints() [][2]string {
 		hint("clear stats-filter", keymap.Stats, keymap.StatsClear),
 		hint("odds", keymap.Stats, keymap.StatsOddsNext, keymap.StatsOddsPrev),
 		hint("close", keymap.Stats, keymap.StatsClose),
-		hint("back", keymap.Stats, keymap.StatsBack),
 	}
 	if m.onTags() {
 		order := "tags by name"
