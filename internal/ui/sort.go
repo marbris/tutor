@@ -44,12 +44,12 @@ var allSorts = []cardSort{
 	sortPower, sortToughness, sortUSD, sortInclusion,
 }
 
-// defaultCycle is the order . and , step through as it ships. Name is left
-// out: a list in alphabetical order is one you could only want for finding
-// a card, and / does that better.
+// defaultCycle is the order . and , step through as it ships. Name comes
+// last: it's rarely the order you want, but it shouldn't be one you have
+// to configure to get.
 var defaultCycle = []cardSort{
 	sortArrival, sortMana, sortColor, sortType, sortPower, sortToughness,
-	sortEDHREC, sortUSD, sortRarity, sortInclusion,
+	sortEDHREC, sortUSD, sortRarity, sortInclusion, sortName,
 }
 
 // sortCycle is the cycle in force, which config.json can reorder and trim.

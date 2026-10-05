@@ -339,7 +339,7 @@ func TestDotCyclesTheSortAndTheHeaderSaysSo(t *testing.T) {
 		t.Error("the panel does not say what it is sorted by")
 	}
 	m = drive(m, ">", ">")
-	if got := m.ws.current().cardsView().order; got != sortInclusion {
+	if got := m.ws.current().cardsView().order; got != sortName {
 		t.Errorf("> wrapped to %v", got)
 	}
 }

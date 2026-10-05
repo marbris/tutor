@@ -29,9 +29,9 @@ func cardNames(l *cardList) []string {
 	return out
 }
 
-func TestTheCycleRunsInTheNewOrderAndLeavesNameOut(t *testing.T) {
+func TestTheCycleRunsInTheNewOrderWithNameLast(t *testing.T) {
 	want := []cardSort{sortArrival, sortMana, sortColor, sortType, sortPower,
-		sortToughness, sortEDHREC, sortUSD, sortRarity, sortInclusion}
+		sortToughness, sortEDHREC, sortUSD, sortRarity, sortInclusion, sortName}
 	s := sortArrival
 	for i, w := range want {
 		if s != w {
@@ -41,11 +41,6 @@ func TestTheCycleRunsInTheNewOrderAndLeavesNameOut(t *testing.T) {
 	}
 	if s != sortArrival {
 		t.Errorf("the cycle didn't wrap: %v", s)
-	}
-	for s := sortArrival.next(1); s != sortArrival; s = s.next(1) {
-		if s == sortName {
-			t.Error("name is in the cycle by default")
-		}
 	}
 }
 
