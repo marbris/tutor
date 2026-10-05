@@ -595,9 +595,14 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	case keymap.CardsTag:
 		p.ask(askTag, "tag", "")
 	case keymap.CardsAddTagged:
-		// Add + tag with the last tag used. It lives on A, beside a for add,
-		// because it is an add that also tags — not a second kind of tag.
-		m.tagWithLast(l.selection())
+		// Add and tag, the last tag filled in. It lives on A, beside a for
+		// add, because it is an add that also tags — not a second kind of tag.
+		if _, why := m.editTarget(); why != "" {
+			m.notice = why
+			break
+		}
+		p.ask(askAddTag, "add + tag", m.lastTag)
+		p.askInput.Placeholder = "ramp -draw … · tab completes · empty: just add"
 	case keymap.CardsCommander:
 		return true, m.commander(currentOr(l))
 	case keymap.CardsUndo:

@@ -120,19 +120,14 @@ func (m *Model) tagsInto(from *cardList, addMissing bool, only []string) {
 		m.notice = "no card here has " + strings.Join(only, " or ")
 		return
 	}
-	target.pushUndo("tags from " + from.name)
-	all, tagged, added := deck.TransferTags(target.all, src, addMissing)
-	if tagged == 0 && added == 0 {
-		target.undoLast()
+	_, r := m.bring(bringing{what: "tags from " + from.name, cards: src, carry: true, addMissing: addMissing})
+	if !r.changed() {
 		m.notice = "nothing to bring over — no card here has a tag the deck's copy lacks"
 		return
 	}
-	target.all = all
-	target.refresh()
-	target.recheck()
-	m.notice = itoa(tagged) + " tagged"
+	m.notice = itoa(r.tagged) + " tagged"
 	if addMissing {
-		m.notice += ", " + itoa(added) + " added"
+		m.notice += ", " + itoa(r.added) + " added"
 	}
 	m.notice += " in " + target.name
 }

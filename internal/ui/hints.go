@@ -400,7 +400,7 @@ func (m Model) editHints() [][2]string {
 	}
 	keys := [][2]string{
 		hint("add", keymap.Cards, keymap.CardsAdd),
-		hint("add + tag latest", keymap.Cards, keymap.CardsAddTagged),
+		hint("add + tag", keymap.Cards, keymap.CardsAddTagged),
 		hint("remove", keymap.Cards, keymap.CardsRemove),
 		hint("commander", keymap.Cards, keymap.CardsCommander),
 		hint("undo", keymap.Cards, keymap.CardsUndo),

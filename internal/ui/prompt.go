@@ -39,6 +39,8 @@ const (
 	// askTagMove is T t and T a: which of this list's tags to bring into
 	// the editing deck, every one when left empty.
 	askTagMove
+	// askAddTag is A: the tags to add the cards with.
+	askAddTag
 )
 
 // Labels of the two sides of the i bar, which tab swaps between.
@@ -92,7 +94,7 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.ws.current()
 
 	key := msg.String()
-	if (p.asking == askTag || p.asking == askTagMove) && (key == "tab" || key == "shift+tab") {
+	if (p.asking == askTag || p.asking == askTagMove || p.asking == askAddTag) && (key == "tab" || key == "shift+tab") {
 		delta := 1
 		if key == "shift+tab" {
 			delta = -1
@@ -120,7 +122,8 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		kind, answer := p.asking, p.askInput.Value()
 		p.stopAsking()
 		// Empty is no answer, except to which tags T moves: then it's all.
-		if strings.TrimSpace(answer) == "" && kind != askTagMove {
+		// For A it's just an add.
+		if strings.TrimSpace(answer) == "" && kind != askTagMove && kind != askAddTag {
 			return m, nil
 		}
 
@@ -151,6 +154,11 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case askTag:
 			if l := p.cardsView(); l != nil {
 				m.tag(l.selection(), answer)
+			}
+
+		case askAddTag:
+			if l := p.cardsView(); l != nil {
+				m.addTagged(l.selection(), answer)
 			}
 
 		case askAddCard:

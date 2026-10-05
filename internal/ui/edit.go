@@ -77,17 +77,152 @@ func (l *cardList) indexOfCard(name string) int {
 
 // ── Adding and removing ─────────────────────────────────────────
 
-// add puts a copy of each card into the deck, or another copy of one already
-// there. a a a on a basic land gives you three of it, which is why this
-// counts up rather than refusing.
-func (m *Model) add(cards []deck.Card) {
+// ── Bringing cards and tags into the editing deck ───────────────
+
+// bringing is one tag or add edit: cards from the list in front of you, or
+// from Scryfall Tagger or the global tags, into the editing deck. a, A, t,
+// T t, T a, T o, T O and T g are all one of these, differing only in the
+// fields below (log/design/keymap.md, "Tags").
+type bringing struct {
+	what  string // the undo step's name
+	cards []deck.Card
+	// carry brings the cards' own tags along.
+	carry bool
+	// add and remove are typed tags, put on every card and taken off.
+	add, remove []string
+	// addMissing adds a card the deck lacks; without it, such a card is
+	// left out.
+	addMissing bool
+	// another gives a card the deck has another copy — a pressed in the
+	// editing deck itself. Brought from anywhere else, a card the deck has
+	// only takes the tags.
+	another bool
+}
+
+// brought is what a bringing did.
+type brought struct {
+	added   int // cards new to the deck
+	raised  int // cards given another copy
+	tagged  int // cards whose tags changed
+	present int // cards the deck had
+	absent  int // cards it lacked and didn't take
+}
+
+func (r brought) changed() bool { return r.added+r.raised+r.tagged > 0 }
+
+// bring is every tag and add edit, into the editing deck, as one undo step.
+// It returns the deck, or nil (and the notice says why) when there is none.
+func (m *Model) bring(b bringing) (*cardList, brought) {
+	var r brought
 	l, why := m.editTarget()
 	if l == nil {
 		m.notice = why
+		return nil, r
+	}
+	l.pushUndo(b.what)
+	for _, c := range b.cards {
+		i := l.indexOfCard(c.Card.Name)
+		if i < 0 {
+			if !b.addMissing {
+				r.absent++
+				continue
+			}
+			nc := deck.Card{Card: c.Card, Qty: 1}
+			if b.carry {
+				nc.Tags = append([]string(nil), c.Tags...)
+			}
+			nc.Tags = deck.ApplyTagEdits(nc.Tags, b.add, b.remove)
+			l.all = append(l.all, nc)
+			r.added++
+			continue
+		}
+		r.present++
+		if b.another {
+			l.all[i].Qty++
+			r.raised++
+		}
+		next := l.all[i].Tags
+		if b.carry {
+			next = deck.ApplyTagEdits(next, c.Tags, nil)
+		}
+		next = deck.ApplyTagEdits(next, b.add, b.remove)
+		if !sameTags(next, l.all[i].Tags) {
+			l.all[i].Tags = next
+			r.tagged++
+		}
+	}
+	if !r.changed() {
+		l.undoLast() // nothing changed, so there is nothing to undo
+		return l, r
+	}
+	l.refresh()
+	l.recheck()
+	return l, r
+}
+
+func sameTags(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// fromEditing reports whether the list in front of you is the editing deck,
+// where a gives another copy rather than bringing the card in.
+func (m *Model) fromEditing() bool {
+	p := m.ws.current()
+	return p != nil && p.cardsView() != nil && p.cardsView() == m.ws.editingList()
+}
+
+// add is a: the cards into the editing deck, with their tags. In the deck
+// itself it gives another copy — a a a on a basic land gives you three.
+// From anywhere else a card the deck already has takes the tags and no
+// copy, so copying from another deck never doubles a card by accident.
+func (m *Model) add(cards []deck.Card) {
+	l, r := m.bring(bringing{what: label("+", cards), cards: cards, carry: true, addMissing: true, another: m.fromEditing()})
+	if l == nil {
 		return
 	}
+	m.notice = bringNotice(cards, r, l.name)
+}
 
-	m.notice = addTo(l, cards)
+// bringNotice says what an add did.
+func bringNotice(cards []deck.Card, r brought, deckName string) string {
+	if len(cards) == 1 {
+		name := cards[0].Card.Name
+		switch {
+		case r.raised == 1:
+			return "another " + name
+		case r.added == 1:
+			return "+1 " + name
+		case r.tagged == 1:
+			return name + " is in " + deckName + " already — it took the tags"
+		}
+		return name + " is in " + deckName + " already"
+	}
+	var parts []string
+	if r.added > 0 {
+		parts = append(parts, "+"+itoa(r.added)+" cards")
+	}
+	if r.raised > 0 {
+		parts = append(parts, itoa(r.raised)+" more copies")
+	}
+	if n := r.present - r.raised; n > 0 {
+		said := itoa(n) + " already there"
+		if r.tagged > 0 {
+			said += " (" + itoa(r.tagged) + " took tags)"
+		}
+		parts = append(parts, said)
+	}
+	if len(parts) == 0 {
+		return "nothing to add"
+	}
+	return strings.Join(parts, ", ")
 }
 
 // addTo is the body of an add, against whichever list it is given: a for the
@@ -216,60 +351,46 @@ func (m *Model) put(l *cardList) {
 
 // ── Tagging ─────────────────────────────────────────────────────
 
-// tag applies an edit to the tags of the selected cards, in the editing
-// deck. Cards that aren't in the deck aren't tagged: a tag is something the
-// deck's author said about a card in their deck.
+// tag is t: an edit to the tags of the selected cards, in the editing deck.
+// Cards that aren't in the deck aren't tagged: a tag is something the deck's
+// author said about a card in their deck.
 func (m *Model) tag(cards []deck.Card, input string) {
-	l, why := m.editTarget()
-	if l == nil {
-		m.notice = why
-		return
-	}
-
 	add, remove := parseTagEdit(input)
 	if len(add) == 0 && len(remove) == 0 {
 		return
 	}
-
-	l.pushUndo("tag " + itoa(len(cards)) + " cards")
-	changed, absent := 0, 0
-	for _, c := range cards {
-		i := l.indexOfCard(c.Card.Name)
-		if i < 0 {
-			absent++
-			continue
-		}
-		l.all[i].Tags = deck.ApplyTagEdits(l.all[i].Tags, add, remove)
-		changed++
+	l, r := m.bring(bringing{what: "tag " + itoa(len(cards)) + " cards", cards: cards, add: add, remove: remove})
+	if l == nil {
+		return
 	}
-	l.refresh()
-
 	if len(add) > 0 {
 		m.lastTag = add[len(add)-1]
 	}
 	switch {
-	case changed == 0:
-		l.undoLast()
+	case r.present == 0:
 		m.notice = "none of those are in the deck"
-	case absent > 0:
-		m.notice = itoa(changed) + " tagged, " + itoa(absent) + " not in the deck"
+	case r.absent > 0:
+		m.notice = itoa(r.present) + " tagged, " + itoa(r.absent) + " not in the deck"
 	default:
-		m.notice = itoa(changed) + " tagged"
+		m.notice = itoa(r.present) + " tagged"
 	}
 }
 
-// tagWithLast is A: add the cards to the deck and tag them with the tag you
-// last used, in one keystroke. Sorting a search into a deck is dozens of
-// these, and having to retype the tag each time is what makes people stop.
-func (m *Model) tagWithLast(cards []deck.Card) {
-	if m.lastTag == "" {
-		m.notice = "no tag used yet — " + keymap.Hint(keymap.Cards, keymap.CardsTag) + " first"
+// addTagged is A: a, and the typed tags put on as well. The prompt opens
+// with the tag you last used, so sorting a search into a deck is A enter,
+// A enter, … — having to retype the tag each time is what makes people stop.
+func (m *Model) addTagged(cards []deck.Card, input string) {
+	add, remove := parseTagEdit(input)
+	l, r := m.bring(bringing{what: label("+", cards), cards: cards, carry: true, add: add, remove: remove, addMissing: true, another: m.fromEditing()})
+	if l == nil {
 		return
 	}
-	m.add(cards)
-	if l, _ := m.editTarget(); l != nil {
-		m.tag(cards, m.lastTag)
-		m.notice = itoa(len(cards)) + " added and tagged " + m.lastTag
+	if len(add) > 0 {
+		m.lastTag = add[len(add)-1]
+	}
+	m.notice = bringNotice(cards, r, l.name)
+	if len(add) > 0 && r.changed() {
+		m.notice += " · tagged " + strings.Join(add, " ")
 	}
 }
 

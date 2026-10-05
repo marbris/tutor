@@ -42,9 +42,9 @@ func TestAddingACardFromASearch(t *testing.T) {
 	}
 }
 
-func TestAddingAgainAddsAnotherCopy(t *testing.T) {
-	// a a a on a basic land gives you three of it, which is why this counts
-	// up rather than refusing.
+func TestAddingFromAnotherListAddsOnceAndInTheDeckAddsCopies(t *testing.T) {
+	// From another list, a card the deck has is never doubled by accident;
+	// in the deck itself, a a a on a basic land gives you three of it.
 	m, search, target := editing(t)
 	m = focusOn(m, 0)
 	search.selectByName("Forest")
@@ -54,8 +54,35 @@ func TestAddingAgainAddsAnotherCopy(t *testing.T) {
 	if i < 0 {
 		t.Fatal("the land is not in the deck")
 	}
+	if target.all[i].Qty != 1 {
+		t.Errorf("a from a search gave %d copies, want 1", target.all[i].Qty)
+	}
+	if !strings.Contains(m.notice, "already") {
+		t.Errorf("notice %q should say the deck has it", m.notice)
+	}
+
+	m = focusOn(m, 1)
+	target.selectByName("Forest")
+	m = drive(m, "a", "a")
 	if target.all[i].Qty != 3 {
-		t.Errorf("quantity is %d, want 3", target.all[i].Qty)
+		t.Errorf("a in the deck gave %d copies, want 3", target.all[i].Qty)
+	}
+}
+
+func TestAddingFromAnotherDeckBringsItsTags(t *testing.T) {
+	m, search, target := editing(t)
+	search.all[2].Tags = []string{"ramp"} // Sol Ring, which the deck has
+	search.refresh()
+	m = focusOn(m, 0)
+	search.selectByName("Sol Ring")
+	m = drive(m, "a")
+	i := target.indexOfCard("Sol Ring")
+	if target.all[i].Qty != 1 || !hasTag(target.all[i].Tags, "ramp") {
+		t.Errorf("Sol Ring should take ramp and no copy: %+v", target.all[i])
+	}
+	m.undo()
+	if len(target.all[i].Tags) != 0 {
+		t.Error("u didn't take the tag off again")
 	}
 }
 
@@ -64,6 +91,8 @@ func TestRemovingTakesOneCopyThenTheRow(t *testing.T) {
 	m = focusOn(m, 0)
 	search.selectByName("Sol Ring")
 
+	m = focusOn(m, 1)
+	target.selectByName("Sol Ring")
 	m = drive(m, "a") // now two
 	m = drive(m, "x")
 	if i := target.indexOfCard("Sol Ring"); i < 0 || target.all[i].Qty != 1 {
@@ -236,7 +265,7 @@ func TestBigAAddsAndTagsInOneKey(t *testing.T) {
 
 	m = focusOn(m, 0)
 	search.selectByName("Llanowar Elves")
-	m = drive(m, "A")
+	m = drive(m, "A", "enter") // the prompt opens with the last tag
 
 	i := target.indexOfCard("Llanowar Elves")
 	if i < 0 {
@@ -247,13 +276,29 @@ func TestBigAAddsAndTagsInOneKey(t *testing.T) {
 	}
 }
 
-func TestBigAWithNoTagYetSaysSo(t *testing.T) {
-	m, search, _ := editing(t)
+func TestBigAWithNothingTypedJustAdds(t *testing.T) {
+	m, search, target := editing(t)
 	m = focusOn(m, 0)
 	search.selectByName("Llanowar Elves")
 	m = drive(m, "A")
-	if !strings.Contains(stripANSI(m.View()), "no tag used yet") {
-		t.Errorf("got:\n%s", stripANSI(m.View()))
+	if m.ws.current().asking != askAddTag || m.ws.current().askInput.Value() != "" {
+		t.Fatal("A with no tag used yet should ask, with nothing filled in")
+	}
+	m = drive(m, "r", "a", "m", "p", "enter")
+	i := target.indexOfCard("Llanowar Elves")
+	if i < 0 || !hasTag(target.all[i].Tags, "ramp") {
+		t.Fatalf("A ramp didn't add and tag: %v", target.all)
+	}
+	if m.lastTag != "ramp" {
+		t.Errorf("last tag is %q", m.lastTag)
+	}
+
+	search.selectByName("Forest")
+	m = drive(m, "A")
+	m.ws.current().askInput.SetValue("")
+	m = drive(m, "enter")
+	if j := target.indexOfCard("Forest"); j < 0 || len(target.all[j].Tags) != 0 {
+		t.Error("A with the prompt emptied should just add")
 	}
 }
 

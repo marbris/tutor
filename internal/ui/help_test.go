@@ -188,12 +188,12 @@ func TestTheHintBarSaysWhichDeckTheEditingKeysChange(t *testing.T) {
 	m.hintsExpanded = true
 	deckPanel := stripANSI(m.viewPanel(m.ws.panels[0], 0, 60, 30, 2))
 	searchPanel := stripANSI(m.viewPanel(m.ws.panels[1], 1, 60, 30, 2))
-	for _, want := range []string{"add", "add + tag latest", "remove", "undo"} {
+	for _, want := range []string{"add", "add + tag", "remove", "undo"} {
 		if !strings.Contains(deckPanel, want) {
 			t.Errorf("%q isn't under the editing deck:\n%s", want, deckPanel)
 		}
 	}
-	if strings.Contains(searchPanel, "add + tag latest") {
+	if strings.Contains(searchPanel, "add + tag") {
 		t.Errorf("the editing keys are under the search, not the deck:\n%s", searchPanel)
 	}
 	if !strings.Contains(searchPanel, "sort 1 & 2") {
