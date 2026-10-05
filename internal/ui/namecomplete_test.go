@@ -59,8 +59,46 @@ func TestSeveralNamesGrowToWhatTheyShareThenWalk(t *testing.T) {
 		t.Errorf("second tab made %q, want the first fit", got)
 	}
 	m = drive(m, "shift+tab")
-	if got := p.askInput.Value(); got != "Solemn Simulacrum" && got != "Soldevi Golem" {
-		t.Errorf("shift+tab made %q, want to step back round", got)
+	if got := p.askInput.Value(); got != "Sol" {
+		t.Errorf("shift+tab made %q, want back to Sol", got)
+	}
+	m = drive(m, "shift+tab")
+	if got := p.askInput.Value(); got != "Solemn Simulacrum" {
+		t.Errorf("shift+tab again made %q, want the last fit", got)
+	}
+}
+
+func TestTabWithNothingToFinishKeepsWhatYouTyped(t *testing.T) {
+	// "ins": every fit shares only what's typed, so the first tab lists
+	// them and leaves the input; the walk starts on the second, and comes
+	// back round to "ins" rather than losing it.
+	old := catalog.Current()
+	catalog.SetCurrent(&catalog.Data{Lists: map[string][]string{catalog.CardNames: {
+		"Inspiring Unicorn", "Insatiable Avarice", "Insight",
+	}}})
+	t.Cleanup(func() { catalog.SetCurrent(old) })
+	m, _ := ownDeck(sized(140, 30))
+	m = typeIn(drive(m, "i"), "ins")
+	p := m.ws.current()
+
+	m = drive(m, "tab")
+	if got := p.askInput.Value(); got != "ins" {
+		t.Fatalf("first tab made %q, want ins left alone", got)
+	}
+	if !strings.Contains(m.notice, "3 cards") {
+		t.Errorf("the fits aren't listed: %q", m.notice)
+	}
+	for _, want := range []string{"Insatiable Avarice", "Insight", "Inspiring Unicorn", "ins"} {
+		m = drive(m, "tab")
+		if got := p.askInput.Value(); got != want {
+			t.Errorf("tab made %q, want %q", got, want)
+		}
+	}
+	// Narrowing by typing, then tab again, finishes the one that's left.
+	m = typeIn(m, "p")
+	m = drive(m, "tab")
+	if got := p.askInput.Value(); got != "Inspiring Unicorn" {
+		t.Errorf("insp + tab made %q", got)
 	}
 }
 

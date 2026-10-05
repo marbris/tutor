@@ -17,9 +17,12 @@ import (
 // way a shell finishes a filename:
 //
 //   - one tag fits: it is filled in, with a space after it for the next;
-//   - several fit: the word grows to what they have in common, and they are
-//     listed on the notice line;
-//   - nothing more in common: tab walks through them, shift+tab back.
+//   - several fit: the word grows to what they have in common, if anything,
+//     and they are listed on the notice line;
+//   - tab again walks through them, shift+tab back, and the walk passes
+//     through what the first tab left on its way round — so tab when you
+//     don't know whether there's anything to finish never costs you what
+//     you typed.
 //
 // A leading - (take the tag off) is kept, and the completion is of the tag
 // after it.
@@ -29,8 +32,32 @@ import (
 type tagCompletion struct {
 	before string   // the input up to the word being completed, and its "-"
 	fits   []string // the tags that fit, in order
-	at     int      // which one is showing; -1 before the walk starts
+	at     int      // which one is showing; -1 is origin
+	origin string   // what the first tab left, the walk's stop between last and first
 	shown  string   // what the input held after the last tab
+}
+
+// step moves the walk one along (delta 1) or back (-1), origin included,
+// and says what the input should hold.
+func (c *tagCompletion) step(delta int) string {
+	n := len(c.fits) + 1
+	c.at = (c.at+1+delta+n)%n - 1
+	if c.at < 0 {
+		return c.origin
+	}
+	return c.before + c.fits[c.at]
+}
+
+// startWalk begins a walk on the first tab: the input grows to filled, what
+// every fit shares, where that's longer than what was typed, and otherwise
+// stays as it is. Nothing is walked until the next tab.
+func startWalk(before string, fits []string, value, filled string, typed int, set func(string) string) *tagCompletion {
+	c := &tagCompletion{before: before, fits: fits, at: -1, origin: value}
+	if len(filled) > typed {
+		c.origin = set(filled)
+	}
+	c.shown = c.origin
+	return c
 }
 
 // knownTags is every tag in the decks on screen, the editing deck's among
@@ -90,15 +117,7 @@ func (m *Model) complete(comp **tagCompletion, value string, set func(string) st
 	delta int, before, word string, known []string) {
 	// Still walking: the input is what the last tab left, so step on.
 	if c := *comp; c != nil && c.shown == value && len(c.fits) > 1 {
-		switch {
-		case c.at < 0 && delta > 0:
-			c.at = 0
-		case c.at < 0:
-			c.at = len(c.fits) - 1
-		default:
-			c.at = (c.at + delta + len(c.fits)) % len(c.fits)
-		}
-		c.shown = set(c.before + c.fits[c.at])
+		c.shown = set(c.step(delta))
 		m.notice = tagList(c.fits, c.at)
 		return
 	}
@@ -123,19 +142,8 @@ func (m *Model) complete(comp **tagCompletion, value string, set func(string) st
 		return
 	}
 
-	c := &tagCompletion{before: before, fits: fits, at: -1}
-	if common := commonPrefix(fits); len(common) > len(word) {
-		c.shown = set(before + common)
-	} else {
-		// Nothing to add: start the walk straight away.
-		c.at = 0
-		if delta < 0 {
-			c.at = len(fits) - 1
-		}
-		c.shown = set(before + fits[c.at])
-	}
-	*comp = c
-	m.notice = tagList(fits, c.at)
+	*comp = startWalk(before, fits, value, before+commonPrefix(fits), len(before)+len(word), set)
+	m.notice = tagList(fits, -1)
 }
 
 // otagFields are the search keywords that take an oracle tag.

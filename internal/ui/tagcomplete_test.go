@@ -67,7 +67,9 @@ func TestTabGrowsToWhatTheTagsShareThenWalksThem(t *testing.T) {
 	}{
 		{false, "removal"},
 		{false, "remove-artifact"},
-		{false, "removal"}, // wraps
+		{false, "remov"},   // back to what the first tab left
+		{false, "removal"}, // and round again
+		{true, "remov"},
 		{true, "remove-artifact"},
 	} {
 		m = tab(m, step.back)
@@ -77,13 +79,26 @@ func TestTabGrowsToWhatTheTagsShareThenWalksThem(t *testing.T) {
 	}
 }
 
-func TestWithNothingSharedTabWalksAtOnce(t *testing.T) {
+func TestWithNothingSharedTheFirstTabOnlyLists(t *testing.T) {
+	// Tab when there is nothing to finish leaves what you typed alone; the
+	// second tab walks, and shift+tab comes back to it.
 	m := tab(tagging(t, "r"), false)
+	if got := asked(m); got != "r" {
+		t.Errorf("first tab made %q, want r left alone", got)
+	}
+	if !strings.Contains(m.notice, "ramp") || strings.Contains(m.notice, "[") {
+		t.Errorf("the fits should be listed with none marked: %q", m.notice)
+	}
+	m = tab(m, false)
 	if got := asked(m); got != "ramp" {
-		t.Errorf("got %q, want the first tag that fits", got)
+		t.Errorf("second tab made %q, want the first tag that fits", got)
 	}
 	if !strings.Contains(m.notice, "[ramp]") {
 		t.Errorf("the one showing isn't marked: %q", m.notice)
+	}
+	m = tab(m, true)
+	if got := asked(m); got != "r" {
+		t.Errorf("shift+tab made %q, want back to r", got)
 	}
 }
 

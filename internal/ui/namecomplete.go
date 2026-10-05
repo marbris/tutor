@@ -15,8 +15,8 @@ import (
 // tab completes what is being typed: a card's name, or on the otag side the
 // tag at the end. With nothing being typed, tab swaps the sides, as it
 // always has. The completion is the tag prompt's, shell-style: one fit is
-// filled in; several grow to what they share and are listed; tab again
-// walks them, shift+tab back.
+// filled in; several grow to what they share, if anything, and are listed;
+// tab again walks them, shift+tab back, by way of what the first tab left.
 
 // nameIndex is the card names, sorted, with their lowercased forms for
 // matching, built once for each set of catalogs.
@@ -103,8 +103,7 @@ func (m *Model) completeName(p *panel, delta int) {
 
 	// Still walking: the input is what the last tab left, so step on.
 	if c := p.tagComp; c != nil && c.shown == value && len(c.fits) > 1 {
-		c.at = stepWalk(c.at, delta, len(c.fits))
-		c.shown = set(c.fits[c.at])
+		c.shown = set(c.step(delta))
 		m.notice = nameList(c.fits, c.at)
 		return
 	}
@@ -126,26 +125,8 @@ func (m *Model) completeName(p *panel, delta int) {
 		return
 	}
 
-	c := &tagCompletion{fits: fits, at: -1}
-	if common := commonPrefixFold(fits); len(common) > len(typed) {
-		c.shown = set(common)
-	} else {
-		c.at = stepWalk(-1, delta, len(fits))
-		c.shown = set(fits[c.at])
-	}
-	p.tagComp = c
-	m.notice = nameList(fits, c.at)
-}
-
-// stepWalk is the next place in a walk of n, from at (-1 before it starts).
-func stepWalk(at, delta, n int) int {
-	switch {
-	case at < 0 && delta > 0:
-		return 0
-	case at < 0:
-		return n - 1
-	}
-	return (at + delta + n) % n
+	p.tagComp = startWalk("", fits, value, commonPrefixFold(fits), len(typed), set)
+	m.notice = nameList(fits, -1)
 }
 
 // commonPrefixFold is what every name starts with, ignoring case, in the
