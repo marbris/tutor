@@ -32,7 +32,7 @@ const (
 	// into the deck in front of you.
 	askAddCard
 	// askOtag is T o and T O: oracle tags whose cards in the editing deck
-	// in front of you get tagged otag-<tag>.
+	// in front of you get tagged otag-<tag> (config.json's otag_prefix).
 	askOtag
 	// askRemote is enter on the git remote in the settings panel.
 	askRemote

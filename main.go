@@ -55,6 +55,7 @@ func main() {
 	if err := ui.SetSortConfig(config.Load().Sort); err != nil {
 		fmt.Fprintln(os.Stderr, "Warning:", err)
 	}
+	ui.SetOtagPrefix(config.Load().Otag())
 
 	args := os.Args[1:]
 	if len(args) == 0 {

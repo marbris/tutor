@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/config"
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
 	"ttr/internal/scryfall"
@@ -293,5 +294,44 @@ func TestTOFromAnotherListTagsTheEditingDeck(t *testing.T) {
 	m = drive(m, "T", "o", "r", "a", "m", "p", "enter")
 	if !hasTag(tagged(l, "sol"), "otag-ramp") {
 		t.Errorf("sol has %v, want otag-ramp in the editing deck", tagged(l, "sol"))
+	}
+}
+
+func TestTheOtagPrefixIsConfigJSONs(t *testing.T) {
+	for _, c := range []struct{ prefix, want string }{
+		{"o/", "o/removal"},
+		{"", "removal"},
+	} {
+		SetOtagPrefix(c.prefix)
+		withTagger(t)
+		m, l := ownDeck(sized(160, 30))
+		l.all = taggedCards()
+		l.refresh()
+		m = drive(m, "T", "o")
+		for _, r := range "removal" {
+			m = drive(m, string(r))
+		}
+		press(m, "enter")
+		n := 0
+		for _, card := range l.all {
+			for _, tg := range card.Tags {
+				if tg == c.want {
+					n++
+				}
+			}
+		}
+		if n != 2 {
+			t.Errorf("prefix %q: %q went on %d cards, want 2", c.prefix, c.want, n)
+		}
+	}
+	SetOtagPrefix(config.DefaultOtagPrefix)
+}
+
+func TestATypedOtagPrefixIsTakenOff(t *testing.T) {
+	SetOtagPrefix("o/")
+	defer SetOtagPrefix(config.DefaultOtagPrefix)
+	got := otagNames("o/ramp otag-removal otag:draw")
+	if strings.Join(got, " ") != "ramp removal draw" {
+		t.Errorf("got %v", got)
 	}
 }

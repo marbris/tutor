@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/config"
 	"ttr/internal/deck"
 	"ttr/internal/fetch"
 	"ttr/internal/keymap"
@@ -43,8 +44,12 @@ import (
 // Lengths here are bytes, which are never fewer than characters.
 const otagQueryLen = 1000
 
-// otagPrefix is put in front of an oracle tag to make it one of yours.
-const otagPrefix = "otag-"
+// otagPrefix is put in front of an oracle tag to make it one of yours:
+// config.json's otag_prefix, otag- unless it says otherwise.
+var otagPrefix = config.DefaultOtagPrefix
+
+// SetOtagPrefix puts config.json's otag prefix in force.
+func SetOtagPrefix(prefix string) { otagPrefix = prefix }
 
 // otagMsg carries the answer back: for each tag, the names in the list
 // Scryfall gave it.
@@ -62,7 +67,11 @@ func otagNames(input string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, w := range strings.Fields(strings.ToLower(input)) {
-		w = strings.TrimPrefix(strings.TrimPrefix(w, "otag:"), otagPrefix)
+		w = strings.TrimPrefix(w, "otag:")
+		w = strings.TrimPrefix(w, config.DefaultOtagPrefix)
+		if otagPrefix != "" {
+			w = strings.TrimPrefix(w, otagPrefix)
+		}
 		if w != "" && !seen[w] {
 			seen[w] = true
 			out = append(out, w)
@@ -222,7 +231,7 @@ func (m Model) handleOtag(msg otagMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Each card the deck has, with the otag- tags it is due.
+	// Each card the deck has, with the otag tags it is due.
 	due := map[string][]string{}
 	var said []string
 	for _, tag := range msg.tags {

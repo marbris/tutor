@@ -71,10 +71,12 @@ func runInit(args []string) {
 // initTemplates is every template, with its defaults as they ship.
 func initTemplates() ([]template, error) {
 	sortDefaults := ui.SortDefaults()
+	otag := config.DefaultOtagPrefix
 	cfg := config.Config{
-		Theme: theme.DefaultName,
-		Sync:  &config.Sync{Remote: "git@github.com:you/mtg-decks.git", Branch: "main"},
-		Sort:  &sortDefaults,
+		OtagPrefix: &otag,
+		Theme:      theme.DefaultName,
+		Sync:       &config.Sync{Remote: "git@github.com:you/mtg-decks.git", Branch: "main"},
+		Sort:       &sortDefaults,
 	}
 	cfgBody, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -99,6 +101,9 @@ and edit them. // to the end of a line is ignored.
 "sort" is the list orders: "cycle" is the orders . and , step through, in
 that order — leave one out and it isn't offered; "name" is left out as it
 ships. "direction" is which way each starts, "asc" or "desc".
+
+"otag_prefix" goes in front of a Scryfall Tagger tag when T o or T O tags
+your cards by it: removal becomes otag-removal. "" for none.
 
 "sync" is where ttr sync pushes your decks; set it with ttr sync remote.
 Note that ttr theme and ttr sync rewrite this file, and drop its comments.`

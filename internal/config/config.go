@@ -24,6 +24,21 @@ type Config struct {
 	Theme string `json:"theme,omitempty"`
 	Sync  *Sync  `json:"sync,omitempty"`
 	Sort  *Sort  `json:"sort,omitempty"`
+	// OtagPrefix goes in front of a Scryfall Tagger tag to make it one of
+	// yours: T o and T O tag by removal as otag-removal. A pointer, so ""
+	// (no prefix at all) isn't mistaken for unset.
+	OtagPrefix *string `json:"otag_prefix,omitempty"`
+}
+
+// DefaultOtagPrefix is the otag prefix when config.json doesn't set one.
+const DefaultOtagPrefix = "otag-"
+
+// Otag is the prefix in force: the one set, or the default.
+func (c Config) Otag() string {
+	if c.OtagPrefix == nil {
+		return DefaultOtagPrefix
+	}
+	return *c.OtagPrefix
 }
 
 // Sort is how the list orders behave: which ones . and , step through, in
