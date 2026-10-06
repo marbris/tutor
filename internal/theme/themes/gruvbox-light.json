@@ -2,18 +2,18 @@
   "name": "gruvbox-light",
   "palette": {
     "bg":       "#fbf1c7",
-    "bgAlt":    "#ebdbb2",
+    "bgAlt":    "#bdae93",
     "bgSel":    "#d5c4a1",
     "fg":       "#3c3836",
     "fgBright": "#282828",
     "fgDim":    "#7c6f64",
     "fgMuted":  "#928374",
     "red":      "#9d0006",
-    "green":    "#79740e",
-    "yellow":   "#b57614",
+    "green":    "#74700d",
+    "yellow":   "#a67504",
     "blue":     "#076678",
     "purple":   "#8f3f71",
-    "aqua":     "#427b58",
-    "orange":   "#af3a03"
+    "aqua":     "#417957",
+    "orange":   "#b35101"
   }
 }

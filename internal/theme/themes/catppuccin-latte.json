@@ -2,19 +2,19 @@
   "name": "catppuccin-latte",
   "palette": {
     "bg":       "#eff1f5",
-    "bgAlt":    "#ccd0da",
-    "bgSel":    "#dce0e8",
+    "bgAlt":    "#acb0be",
+    "bgSel":    "#ccd0da",
     "fg":       "#4c4f69",
     "fgBright": "#303446",
     "fgDim":    "#6c6f85",
-    "fgMuted":  "#9ca0b0",
+    "fgMuted":  "#7c7f93",
     "red":      "#d20f39",
-    "green":    "#40a02b",
-    "yellow":   "#df8e1d",
-    "blue":     "#1e66f5",
+    "green":    "#327c21",
+    "yellow":   "#b27117",
+    "blue":     "#1761f5",
     "purple":   "#8839ef",
-    "aqua":     "#179299",
-    "orange":   "#fe640b"
+    "aqua":     "#13797e",
+    "orange":   "#be4601"
   },
   "roles": {
     "borderFocus": "purple",

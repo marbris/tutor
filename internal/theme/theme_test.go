@@ -323,6 +323,15 @@ func TestBuiltinThemesAreReadable(t *testing.T) {
 			}
 			return contrast(a, b)
 		}
+		// Colored text on a light background is harder to read than on a
+		// dark one at the same contrast, and the published light palettes
+		// are pale; so a light theme's hues are held to more. Yellow sets
+		// the bar: darker than this and it reads as brown, too close to
+		// orange to tell apart.
+		hue := 2.0
+		if l, _ := luminance(lipgloss.Color(th.Palette["bg"])); l > 0.5 {
+			hue = 3.5
+		}
 		for _, c := range []struct {
 			fg, bg string
 			min    float64
@@ -331,8 +340,8 @@ func TestBuiltinThemesAreReadable(t *testing.T) {
 			{"fg", "bgSel", 4.5},
 			{"fgBright", "bgSel", 4.5},
 			{"fgDim", "bg", 3},
-			{"red", "bg", 2}, {"green", "bg", 2}, {"yellow", "bg", 2}, {"blue", "bg", 2},
-			{"purple", "bg", 2}, {"aqua", "bg", 2}, {"orange", "bg", 2},
+			{"red", "bg", hue}, {"green", "bg", hue}, {"yellow", "bg", hue}, {"blue", "bg", hue},
+			{"purple", "bg", hue}, {"aqua", "bg", hue}, {"orange", "bg", hue},
 		} {
 			if got := on(c.fg, c.bg); got < c.min {
 				t.Errorf("%s: %s on %s has contrast %.1f, want at least %.1f", name, c.fg, c.bg, got, c.min)
