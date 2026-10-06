@@ -499,12 +499,35 @@ func (v *rulesView) info(width int) []string {
 	if actual, ok := v.data.Rule(r.number); ok {
 		text = actual.Text
 	}
-	out = append(out, wrapStyled(text, width, body)...)
+	out = append(out, ruleText(text, width, body)...)
 
 	for _, s := range v.data.Subrules(r.number) {
 		out = append(out, "")
 		out = append(out, sub.Render(fit(s.Number, width)))
-		out = append(out, wrapStyled(s.Text, width, body)...)
+		out = append(out, ruleText(s.Text, width, body)...)
+	}
+	return out
+}
+
+// ruleText is a rule's text with its examples set apart under it: each one
+// headed "Example" and indented, rather than run on as if the rule said it.
+func ruleText(text string, width int, style lipgloss.Style) []string {
+	body, examples := rules.SplitExamples(text)
+	var out []string
+	if body != "" {
+		out = wrapStyled(body, width, style)
+	}
+	label := lipgloss.NewStyle().Foreground(theme.Accent)
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+	const indent = "  "
+	for _, ex := range examples {
+		if len(out) > 0 {
+			out = append(out, "")
+		}
+		out = append(out, indent+label.Render(fit("Example", maxInt(width-len(indent), 1))))
+		for _, line := range wrap(ex, maxInt(width-len(indent), 1)) {
+			out = append(out, indent+dim.Render(line))
+		}
 	}
 	return out
 }

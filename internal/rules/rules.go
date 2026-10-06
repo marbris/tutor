@@ -792,3 +792,19 @@ func Cached() bool {
 	_, err := os.Stat(FilePath())
 	return err == nil
 }
+
+// exampleMark is how the rulebook starts an example. Each one is a line of
+// its own in the file, which the parser joins onto the rule with a space.
+const exampleMark = "Example: "
+
+// SplitExamples separates a rule's text from the examples that follow it, so
+// they can be set apart. Text keeps them, so a search still finds a word that
+// only an example uses.
+func SplitExamples(text string) (body string, examples []string) {
+	parts := strings.Split(text, " "+exampleMark)
+	body = parts[0]
+	if strings.HasPrefix(body, exampleMark) {
+		return "", append([]string{strings.TrimPrefix(body, exampleMark)}, parts[1:]...)
+	}
+	return body, parts[1:]
+}

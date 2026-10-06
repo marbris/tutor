@@ -77,3 +77,29 @@ func TestMatchCard(t *testing.T) {
 		}
 	}
 }
+
+func TestSplitExamplesSeparatesEachExample(t *testing.T) {
+	data := Parse(strings.Join([]string{
+		"1. Game Concepts",
+		"107. Numbers and Symbols",
+		"107.1b Most of the time, the game uses only positive numbers and zero.",
+		"Example: If a 3/4 creature gets -5/-0, it’s a -2/4 creature.",
+		"Example: Viridian Joiner is a 1/2 creature.",
+		"Example: Chameleon Colossus is a 4/4 creature.",
+		"",
+	}, "\n"))
+	r, ok := data.Rule("107.1b")
+	if !ok {
+		t.Fatal("107.1b wasn't parsed")
+	}
+	body, examples := SplitExamples(r.Text)
+	if body != "Most of the time, the game uses only positive numbers and zero." {
+		t.Errorf("body is %q", body)
+	}
+	if len(examples) != 3 || examples[1] != "Viridian Joiner is a 1/2 creature." {
+		t.Errorf("examples are %q", examples)
+	}
+	if body, examples := SplitExamples("No examples here."); body != "No examples here." || len(examples) != 0 {
+		t.Errorf("a rule without examples split into %q, %q", body, examples)
+	}
+}

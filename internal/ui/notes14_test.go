@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"ttr/internal/mtg"
+	"ttr/internal/rules"
 )
 
 // printingUp is a list with Sol Ring's picture already fetched and gx
@@ -99,5 +101,34 @@ func TestTheEditingDecksCardKeysHideWhileTheRulesAreFocused(t *testing.T) {
 		if has(m, label) {
 			t.Errorf("%q is offered under the deck while the rules are focused", label)
 		}
+	}
+}
+
+func TestRuleExamplesAreSetApartInTheInfoPanel(t *testing.T) {
+	data := rules.Parse(strings.Join([]string{
+		"1. Game Concepts",
+		"107. Numbers and Symbols",
+		"107.1b The game uses only positive numbers and zero.",
+		"Example: If a 3/4 creature gets -5/-0, it’s a -2/4 creature.",
+		"Example: Viridian Joiner is a 1/2 creature.",
+		"",
+	}, "\n"))
+	v := newRuleSearch(data, "positive")
+	lines := strings.Split(stripANSI(strings.Join(v.info(60), "\n")), "\n")
+	want := []string{
+		"The game uses only positive numbers and zero.",
+		"",
+		"  Example",
+		"  If a 3/4 creature gets -5/-0, it’s a -2/4 creature.",
+		"",
+		"  Example",
+		"  Viridian Joiner is a 1/2 creature.",
+	}
+	got := lines[2:]
+	for i := range got {
+		got[i] = strings.TrimRight(got[i], " ")
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("the rule reads:\n%s", strings.Join(lines, "\n"))
 	}
 }
