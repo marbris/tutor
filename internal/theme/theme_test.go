@@ -3,6 +3,7 @@ package theme
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
@@ -18,7 +19,7 @@ func configHome(t *testing.T) string {
 }
 
 func TestAPaletteIsAWholeTheme(t *testing.T) {
-	// The point of the split: thirteen colours and no roles at all still
+	// The point of the split: fourteen colours and no roles at all still
 	// produces a complete, coherent interface, because the default mapping
 	// resolves against whatever palette it's given.
 	Use(Theme{
@@ -142,38 +143,69 @@ func TestYourThemeShadowsTheBuiltin(t *testing.T) {
 	}
 }
 
-func TestSeedBuiltinsWritesReadableThemeFiles(t *testing.T) {
-	configHome(t)
-	SeedBuiltins()
-
-	// The default has to land as a real file, and read back as a theme.
-	path := filepath.Join(Dir(), DefaultName+".json")
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("the default theme was not seeded: %v", err)
-	}
-	if _, err := readTheme(path); err != nil {
-		t.Errorf("the seeded theme did not parse: %v", err)
-	}
-}
-
-func TestSeedBuiltinsLeavesAnExistingFileAlone(t *testing.T) {
+func TestLoadRemovesTheCopiesTtrSeededButKeepsEdits(t *testing.T) {
 	configHome(t)
 	if err := os.MkdirAll(Dir(), 0755); err != nil {
 		t.Fatal(err)
 	}
-	// A file already there — a built-in you have edited — must not be
-	// overwritten by the seed.
-	path := filepath.Join(Dir(), DefaultName+".json")
-	mine := []byte(`{"name":"gruvbox","palette":{"bg":"#000000"}}` + "\n")
-	if err := os.WriteFile(path, mine, 0644); err != nil {
-		t.Fatal(err)
+	// nord.json exactly as the first version of ttr copied it, and a
+	// gruvbox.json somebody changed by one colour.
+	seededNord := `{
+  "name": "nord",
+  "palette": {
+    "bg":     "#2e3440",
+    "bgAlt":  "#3b4252",
+    "fg":     "#d8dee9",
+    "fgDim":  "#7b88a1",
+    "white":  "#eceff4",
+    "gray":   "#616e88",
+    "red":    "#bf616a",
+    "green":  "#a3be8c",
+    "yellow": "#ebcb8b",
+    "blue":   "#81a1c1",
+    "purple": "#b48ead",
+    "aqua":   "#88c0d0",
+    "orange": "#d08770"
+  },
+  "roles": {
+    "borderFocus": "aqua"
+  }
+}
+`
+	edited := `{"name":"gruvbox","palette":{"orange":"#fe8019"}}` + "\n"
+	for name, body := range map[string]string{"nord": seededNord, "gruvbox": edited, "mine": seededNord} {
+		if err := os.WriteFile(filepath.Join(Dir(), name+".json"), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	SeedBuiltins()
+	if err := Load(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(Dir(), "nord.json")); !os.IsNotExist(err) {
+		t.Error("the seeded nord.json is still there, shadowing the built-in")
+	}
+	for _, name := range []string{"gruvbox", "mine"} {
+		if _, err := os.Stat(filepath.Join(Dir(), name+".json")); err != nil {
+			t.Errorf("%s.json was removed: %v", name, err)
+		}
+	}
+}
 
-	got, _ := os.ReadFile(path)
-	if string(got) != string(mine) {
-		t.Error("SeedBuiltins overwrote a theme file that was already there")
+func TestThePalettesOldNamesStillWork(t *testing.T) {
+	Use(Theme{
+		Palette: map[string]string{"bg": "#000000", "bgAlt": "#111111", "white": "#fafafa", "gray": "#777777"},
+		Roles:   map[string]string{"accent": "white"},
+	})
+	if FgBright != "#fafafa" || TextBright != "#fafafa" || Accent != "#fafafa" {
+		t.Errorf("white didn't stand for fgBright: %s %s %s", FgBright, TextBright, Accent)
+	}
+	if FgMuted != "#777777" || TextMuted != "#777777" {
+		t.Errorf("gray didn't stand for fgMuted: %s %s", FgMuted, TextMuted)
+	}
+	// No bgSel: the selection takes the theme's own raised background.
+	if SelectionBg != "#111111" {
+		t.Errorf("SelectionBg = %s, want the theme's bgAlt", SelectionBg)
 	}
 }
 
@@ -207,7 +239,22 @@ func TestExportWritesEveryRole(t *testing.T) {
 	}
 	th, err := parse(body)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%v in:\n%s", err, body)
+	}
+	// In reading order, under comments, not alphabetically.
+	text := string(body)
+	if !(strings.Index(text, `"bg"`) < strings.Index(text, `"fg"`) &&
+		strings.Index(text, `"fg"`) < strings.Index(text, `"aqua"`) &&
+		strings.Index(text, `"surface"`) < strings.Index(text, `"accent"`)) {
+		t.Errorf("not in reading order:\n%s", text)
+	}
+	if !strings.Contains(text, "// Backgrounds") || !strings.Contains(text, "// Mana") {
+		t.Errorf("no comments naming the groups:\n%s", text)
+	}
+	for _, name := range paletteNames {
+		if _, ok := th.Palette[name]; !ok {
+			t.Errorf("exported theme is missing colour %q", name)
+		}
 	}
 	for role := range roleVars {
 		if _, ok := th.Roles[role]; !ok {
@@ -219,13 +266,13 @@ func TestExportWritesEveryRole(t *testing.T) {
 func TestOnColourPicksTheLegibleSide(t *testing.T) {
 	Use(Theme{Palette: fallbackPalette})
 	for bg, want := range map[lipgloss.Color]lipgloss.Color{
-		"#fabd2f": Bg,    // yellow wants dark text
-		"#ebdbb2": Bg,    // the light foreground, as a bar
-		"#282828": White, // near-black wants light text
-		"#076678": White, // dark blue
-		"#fff":    Bg,    // short hex
-		"11":      Bg,    // bright yellow, from the terminal's scheme
-		"4":       White, // blue, from the terminal's scheme
+		"#fabd2f": Bg,       // yellow wants dark text
+		"#ebdbb2": Bg,       // the light foreground, as a bar
+		"#282828": FgBright, // near-black wants light text
+		"#076678": FgBright, // dark blue
+		"#fff":    Bg,       // short hex
+		"11":      Bg,       // bright yellow, from the terminal's scheme
+		"4":       FgBright, // blue, from the terminal's scheme
 	} {
 		if got := OnColour(bg); got != want {
 			t.Errorf("OnColour(%s) = %s, want %s", bg, got, want)
@@ -234,5 +281,22 @@ func TestOnColourPicksTheLegibleSide(t *testing.T) {
 	// Something unreadable still gets an answer rather than a panic.
 	if OnColour("nonsense") == "" {
 		t.Error("an unreadable colour got no text colour")
+	}
+}
+
+func TestEveryRoleIsInAGroup(t *testing.T) {
+	seen := map[string]bool{}
+	for _, g := range roleGroups {
+		for _, r := range g.names {
+			if _, ok := roleVars[r]; !ok {
+				t.Errorf("group %q lists %q, which is no role", g.comment, r)
+			}
+			seen[r] = true
+		}
+	}
+	for r := range roleVars {
+		if !seen[r] {
+			t.Errorf("role %q is in no group, so a theme file wouldn't list it", r)
+		}
 	}
 }

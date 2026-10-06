@@ -7,7 +7,7 @@
 // mythic rare.
 //
 // Splitting them is what makes a theme cheap to write. Porting an existing
-// scheme means listing thirteen colours and nothing else: every role falls
+// scheme means listing fourteen colours and nothing else: every role falls
 // back to the default *mapping* — accent is the orange one, error is the red
 // one — resolved against whatever palette you supplied. Override a role only
 // where your scheme disagrees.
@@ -45,31 +45,57 @@ func Transparent() bool { return transparent }
 // ── The palette in use ──────────────────────────────────────────
 
 var (
-	Bg     lipgloss.Color
-	BgAlt  lipgloss.Color
-	Fg     lipgloss.Color
-	FgDim  lipgloss.Color
-	White  lipgloss.Color
-	Gray   lipgloss.Color
-	Red    lipgloss.Color
-	Green  lipgloss.Color
-	Yellow lipgloss.Color
-	Blue   lipgloss.Color
-	Purple lipgloss.Color
-	Aqua   lipgloss.Color
-	Orange lipgloss.Color
+	Bg       lipgloss.Color
+	BgAlt    lipgloss.Color
+	BgSel    lipgloss.Color
+	Fg       lipgloss.Color
+	FgBright lipgloss.Color
+	FgDim    lipgloss.Color
+	FgMuted  lipgloss.Color
+	Red      lipgloss.Color
+	Green    lipgloss.Color
+	Yellow   lipgloss.Color
+	Blue     lipgloss.Color
+	Purple   lipgloss.Color
+	Aqua     lipgloss.Color
+	Orange   lipgloss.Color
 )
 
 // paletteNames is every colour a theme may name, in the order `ttr theme`
-// prints them.
+// prints them and a theme file lists them: the backgrounds, the text from
+// strongest to faintest, then the hues.
+//
+// The names say what a colour is for rather than what it looks like. "white"
+// was the brightest text, which in a light theme is black.
 var paletteNames = []string{
-	"bg", "bgAlt", "fg", "fgDim", "white", "gray",
+	"bg", "bgAlt", "bgSel",
+	"fg", "fgBright", "fgDim", "fgMuted",
 	"red", "green", "yellow", "blue", "purple", "aqua", "orange",
 }
 
+// paletteGroups is paletteNames in its three groups, with what each is for.
+var paletteGroups = []group{
+	{"Backgrounds: the screen, raised things (borders, empty bars), the selection.", paletteNames[0:3]},
+	{"Text: ordinary, strongest, secondary, faintest.", paletteNames[3:7]},
+	{"Colors.", paletteNames[7:]},
+}
+
+// group is a run of names a theme file lists together, under a comment.
+type group struct {
+	comment string
+	names   []string
+}
+
+// paletteAliases are the names the palette had before, still read so a theme
+// written with them means what it meant.
+var paletteAliases = map[string]string{
+	"white": "fgBright",
+	"gray":  "fgMuted",
+}
+
 var paletteVars = map[string]*lipgloss.Color{
-	"bg": &Bg, "bgAlt": &BgAlt, "fg": &Fg, "fgDim": &FgDim,
-	"white": &White, "gray": &Gray,
+	"bg": &Bg, "bgAlt": &BgAlt, "bgSel": &BgSel,
+	"fg": &Fg, "fgBright": &FgBright, "fgDim": &FgDim, "fgMuted": &FgMuted,
 	"red": &Red, "green": &Green, "yellow": &Yellow,
 	"blue": &Blue, "purple": &Purple, "aqua": &Aqua, "orange": &Orange,
 }
@@ -157,25 +183,37 @@ var roleVars = map[string]*lipgloss.Color{
 	"diffAdd": &DiffAdd, "diffRemove": &DiffRemove,
 }
 
+// roleGroups is every role in the order a theme file lists them.
+var roleGroups = []group{
+	{"Surfaces", []string{"surface", "surfaceAlt", "border", "borderFocus", "borderEditing"}},
+	{"Text", []string{"text", "textBright", "textDim", "textMuted"}},
+	{"Meaning", []string{"accent", "highlight", "success", "error", "info", "special"}},
+	{"Picking things out", []string{"selectionBg", "selectionFg", "marked", "member", "memberOther"}},
+	{"Mana", []string{"manaW", "manaU", "manaB", "manaR", "manaG", "manaC", "manaMulti"}},
+	{"Rarity", []string{"rarityCommon", "rarityUncommon", "rarityRare", "rarityMythic", "raritySpecial"}},
+	{"Histograms", []string{"barFill", "barEmpty"}},
+	{"Diffs", []string{"diffAdd", "diffRemove"}},
+}
+
 // defaultRoles is what every role means unless a theme says otherwise. The
 // values are palette names, not colours — which is the point. A theme that
-// lists nothing but thirteen colours still gets a coherent interface,
+// lists nothing but fourteen colours still gets a coherent interface,
 // because these say accent is *the orange one*, whatever orange means to it.
 var defaultRoles = map[string]string{
 	"surface": "bg", "surfaceAlt": "bgAlt",
 	"border": "bgAlt", "borderFocus": "orange", "borderEditing": "aqua",
 
-	"text": "fg", "textBright": "white", "textDim": "fgDim", "textMuted": "gray",
+	"text": "fg", "textBright": "fgBright", "textDim": "fgDim", "textMuted": "fgMuted",
 
 	"accent": "orange", "highlight": "yellow", "success": "green",
 	"error": "red", "info": "blue", "special": "purple",
 
-	"selectionBg": "bgAlt", "selectionFg": "white",
-	"marked": "yellow", "member": "aqua", "memberOther": "gray",
+	"selectionBg": "bgSel", "selectionFg": "fgBright",
+	"marked": "yellow", "member": "aqua", "memberOther": "fgMuted",
 
 	// Black mana is drawn purple: a glyph in the terminal's background colour
 	// is a glyph you can't see.
-	"manaW": "white", "manaU": "blue", "manaB": "purple", "manaR": "red",
+	"manaW": "fgBright", "manaU": "blue", "manaB": "purple", "manaR": "red",
 	"manaG": "green", "manaC": "fgDim", "manaMulti": "yellow",
 
 	"rarityCommon": "fg", "rarityUncommon": "fgDim", "rarityRare": "yellow",
@@ -188,6 +226,7 @@ var defaultRoles = map[string]string{
 // Use makes a theme the one in force. Anything the theme leaves out falls
 // back to the built-in default, so a partial file is a valid file.
 func Use(t Theme) {
+	t = normalize(t)
 	transparent = t.Transparent
 	for name, target := range paletteVars {
 		*target = colorOf(t.Palette[name], fallbackPalette[name])
@@ -203,6 +242,9 @@ func resolveRole(t Theme, role string) lipgloss.Color {
 	ref, ok := t.Roles[role]
 	if !ok || strings.TrimSpace(ref) == "" {
 		ref = defaultRoles[role]
+	}
+	if name, old := paletteAliases[ref]; old {
+		ref = name
 	}
 	// A role may name a palette colour, or give a value outright.
 	if value, isPaletteName := t.Palette[ref]; isPaletteName {
@@ -232,4 +274,29 @@ func literal(s string) bool {
 	}
 	n, err := strconv.Atoi(s)
 	return err == nil && n >= 0 && n <= 15
+}
+
+// normalize reads a theme the way it was meant: the palette's old names as
+// the new ones, and a selection colour from the theme's own raised background
+// when it names none — closer to what it meant than the default theme's.
+func normalize(t Theme) Theme {
+	palette := make(map[string]string, len(t.Palette))
+	for name, value := range t.Palette {
+		palette[name] = value
+	}
+	for old, name := range paletteAliases {
+		if value, ok := palette[old]; ok {
+			if _, set := palette[name]; !set {
+				palette[name] = value
+			}
+			delete(palette, old)
+		}
+	}
+	if _, ok := palette["bgSel"]; !ok {
+		if alt, ok := palette["bgAlt"]; ok {
+			palette["bgSel"] = alt
+		}
+	}
+	t.Palette = palette
+	return t
 }

@@ -1,12 +1,14 @@
 package theme
 
 import (
+	"crypto/sha256"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"ttr/internal/config"
@@ -61,9 +63,7 @@ func Current() string {
 // unreadable is reported, and the default stays up — a typo in a config file
 // shouldn't leave someone staring at an unusable screen.
 func Load() error {
-	// Lay the built-ins down as real files first, so there is always one to
-	// read and one to copy the format from.
-	SeedBuiltins()
+	RemoveSeeded()
 
 	name := Current()
 	t, err := Find(name)
@@ -74,33 +74,37 @@ func Load() error {
 	return nil
 }
 
-// SeedBuiltins writes the built-in themes into your config themes directory,
-// so the theme in force is a file you can read and the format is one you can
-// see and copy. It only ever fills gaps: a theme file already there may be one
-// you have edited — including a built-in you have changed — so it is left
-// exactly as it is. Best-effort throughout; a read-only config directory just
-// means the embedded copies keep serving as the fallback.
-func SeedBuiltins() {
-	dir := Dir()
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return
-	}
+// seeded is the sha256 of every built-in theme file as ttr once copied it
+// into the config directory. It used to, so there would be a file to read;
+// but a file there shadows the built-in of the same name, so those copies
+// kept people on the colours of whichever version first ran, and a fixed
+// built-in never reached them.
+var seeded = map[string]bool{
+	"98691de5b9495eb5ca7547fdb056c547c5d66edc2335920d0d516a9da848568a": true, // gruvbox
+	"52dad0e5e25f2db976cc3bd3d1e61cc935cb7bb58bbca79565c9c28649fdd990": true, // nord, first
+	"e33342d394f494b981d8d94a0ec5f56a6d831ca95c4ea5097401e610c5375e96": true, // nord, editing border
+	"cc037380dab369bbbe3d789b96c626a249343c3ac29d5565aad363a645749f73": true, // terminal
+	"aa5fd86725bf046d4d2b35f3dda0a1b9879df0ff5c728541c47e575aaf828adf": true, // terminal, transparent
+}
 
-	files, _ := builtin.ReadDir("themes")
-	for _, f := range files {
-		name, ok := themeName(f.Name())
-		if !ok {
+// RemoveSeeded deletes the copies of built-ins that ttr itself wrote and
+// nobody has changed since, so the built-ins show through again. A file that
+// differs by a byte is somebody's edit and stays. Best-effort.
+func RemoveSeeded() {
+	entries, _ := os.ReadDir(Dir())
+	for _, e := range entries {
+		name, ok := themeName(e.Name())
+		if !ok || !IsBuiltin(name) {
 			continue
 		}
-		path := filepath.Join(dir, name+".json")
-		if _, err := os.Stat(path); err == nil {
-			continue // already there — leave any edits alone
-		}
-		body, err := builtin.ReadFile("themes/" + f.Name())
+		path := filepath.Join(Dir(), e.Name())
+		body, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
-		os.WriteFile(path, body, 0644)
+		if seeded[fmt.Sprintf("%x", sha256.Sum256(body))] {
+			os.Remove(path)
+		}
 	}
 }
 
@@ -193,32 +197,88 @@ func parse(body []byte) (Theme, error) {
 	if err := json.Unmarshal(jsonc.Strip(body), &t); err != nil {
 		return Theme{}, err
 	}
-	return t, nil
+	return normalize(t), nil
 }
 
-// Export writes a theme out as JSON, for copying a built-in into your config
-// directory and editing it.
+// Export writes a theme out as a file to edit: the palette and then every
+// role, in reading order and under a comment per group, so the file shows
+// every knob there is rather than only the ones this theme happened to change.
 func Export(name string) ([]byte, error) {
 	t, err := Find(name)
 	if err != nil {
 		return nil, err
 	}
-	// Roles are written out in full, so the file shows every knob there is
-	// rather than only the ones this theme happened to change.
-	if t.Roles == nil {
-		t.Roles = map[string]string{}
+
+	var b strings.Builder
+	b.WriteString("{\n")
+	fmt.Fprintf(&b, "  \"name\": %s,\n", strconv.Quote(t.Name))
+	if t.Transparent {
+		b.WriteString("  // The terminal's own background shows through.\n")
+		b.WriteString("  \"transparent\": true,\n")
 	}
-	for role, dflt := range defaultRoles {
-		if _, set := t.Roles[role]; !set {
-			t.Roles[role] = dflt
+
+	b.WriteString("  \"palette\": {\n")
+	writeGroups(&b, paletteGroups, func(name string) (string, bool) {
+		v, ok := t.Palette[name]
+		return v, ok
+	})
+	b.WriteString("  },\n")
+
+	b.WriteString("  // What each color is for: a palette name, or a color outright.\n")
+	b.WriteString("  \"roles\": {\n")
+	writeGroups(&b, roleGroups, func(role string) (string, bool) {
+		ref, ok := t.Roles[role]
+		if !ok || strings.TrimSpace(ref) == "" {
+			ref = defaultRoles[role]
+		}
+		if name, old := paletteAliases[ref]; old {
+			ref = name
+		}
+		return ref, true
+	})
+	b.WriteString("  }\n}\n")
+	return []byte(b.String()), nil
+}
+
+// writeGroups writes the members of a JSON object a group at a time, each
+// under its comment, with the commas JSON wants between them.
+func writeGroups(b *strings.Builder, groups []group, value func(string) (string, bool)) {
+	var lines []string
+	var comments = map[int]string{}
+	for _, g := range groups {
+		first := true
+		for _, name := range g.names {
+			v, ok := value(name)
+			if !ok {
+				continue
+			}
+			if first {
+				comments[len(lines)] = g.comment
+				first = false
+			}
+			lines = append(lines, fmt.Sprintf("%-18s %s", strconv.Quote(name)+":", strconv.Quote(v)))
 		}
 	}
-	body, err := json.MarshalIndent(t, "", "  ")
-	if err != nil {
-		return nil, err
+	for i, line := range lines {
+		if c, ok := comments[i]; ok {
+			b.WriteString("    // " + c + "\n")
+		}
+		comma := ","
+		if i == len(lines)-1 {
+			comma = ""
+		}
+		b.WriteString("    " + line + comma + "\n")
 	}
-	return append(body, '\n'), nil
 }
 
 // PaletteNames is the colours a theme may name, in a sensible reading order.
 func PaletteNames() []string { return paletteNames }
+
+// PaletteGroups is PaletteNames split into backgrounds, text and colors.
+func PaletteGroups() [][]string {
+	var out [][]string
+	for _, g := range paletteGroups {
+		out = append(out, g.names)
+	}
+	return out
+}

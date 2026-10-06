@@ -2,18 +2,19 @@
   "name": "terminal",
   "transparent": true,
   "palette": {
-    "bg":     "0",
-    "bgAlt":  "8",
-    "fg":     "7",
-    "fgDim":  "8",
-    "white":  "15",
-    "gray":   "8",
-    "red":    "1",
-    "green":  "2",
-    "yellow": "3",
-    "blue":   "4",
-    "purple": "5",
-    "aqua":   "6",
-    "orange": "11"
+    "bg":       "0",
+    "bgAlt":    "8",
+    "bgSel":    "8",
+    "fg":       "7",
+    "fgBright": "15",
+    "fgDim":    "8",
+    "fgMuted":  "8",
+    "red":      "1",
+    "green":    "2",
+    "yellow":   "3",
+    "blue":     "4",
+    "purple":   "5",
+    "aqua":     "6",
+    "orange":   "11"
   }
 }

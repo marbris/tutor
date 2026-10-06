@@ -15,10 +15,10 @@ import (
 func OnColour(bg lipgloss.Color) lipgloss.Color {
 	l, ok := luminance(bg)
 	if !ok {
-		return White
+		return FgBright
 	}
 	dark, okDark := luminance(Bg)
-	light, okLight := luminance(White)
+	light, okLight := luminance(FgBright)
 	if !okDark {
 		dark = 0
 	}
@@ -28,7 +28,7 @@ func OnColour(bg lipgloss.Color) lipgloss.Color {
 	if contrast(l, dark) >= contrast(l, light) {
 		return Bg
 	}
-	return White
+	return FgBright
 }
 
 // contrast is the WCAG contrast ratio between two relative luminances.

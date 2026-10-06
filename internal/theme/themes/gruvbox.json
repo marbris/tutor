@@ -1,18 +1,19 @@
 {
   "name": "gruvbox",
   "palette": {
-    "bg":     "#282828",
-    "bgAlt":  "#3c3836",
-    "fg":     "#ebdbb2",
-    "fgDim":  "#a89984",
-    "white":  "#fbf1c7",
-    "gray":   "#928374",
-    "red":    "#cc241d",
-    "green":  "#98971a",
-    "yellow": "#d79921",
-    "blue":   "#458588",
-    "purple": "#b16286",
-    "aqua":   "#689d6a",
-    "orange": "#d65d0e"
+    "bg":       "#282828",
+    "bgAlt":    "#3c3836",
+    "bgSel":    "#504945",
+    "fg":       "#ebdbb2",
+    "fgBright": "#fbf1c7",
+    "fgDim":    "#a89984",
+    "fgMuted":  "#928374",
+    "red":      "#cc241d",
+    "green":    "#98971a",
+    "yellow":   "#d79921",
+    "blue":     "#458588",
+    "purple":   "#b16286",
+    "aqua":     "#689d6a",
+    "orange":   "#d65d0e"
   }
 }

@@ -18,8 +18,9 @@ const themeUsage = `Usage:
   ttr theme edit <name>     Copy a theme into your config to edit
 
 Themes are JSON files in %s.
-A theme names its colours; every role — accent, borders, mana, rarity —
-falls back to the default mapping, so thirteen colours is a whole theme.`
+A theme names its colors; every role — accent, borders, mana, rarity —
+falls back to the default mapping, so fourteen colors is a whole theme.
+"transparent": true leaves the background to the terminal.`
 
 func runTheme(args []string) {
 	switch {
@@ -50,6 +51,16 @@ func runTheme(args []string) {
 func listThemes() {
 	current := theme.Current()
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
+
+	// Over the swatches, what each run of them is.
+	if stdoutIsTerminal() {
+		var head []string
+		for i, g := range theme.PaletteGroups() {
+			label := []string{"background", "text", "colors"}[i]
+			head = append(head, fmt.Sprintf("%-*s", 2*len(g), label))
+		}
+		fmt.Printf("  %-14s %s\n", "", dim.Render(strings.TrimRight(strings.Join(head, " "), " ")))
+	}
 
 	for _, name := range theme.List() {
 		t, err := theme.Find(name)
@@ -90,13 +101,18 @@ func paletteBar(t theme.Theme) string {
 	}
 
 	var b strings.Builder
-	for _, name := range theme.PaletteNames() {
-		value, ok := t.Palette[name]
-		if !ok {
+	for i, g := range theme.PaletteGroups() {
+		if i > 0 {
 			b.WriteString(" ")
-			continue
 		}
-		b.WriteString(lipgloss.NewStyle().Background(lipgloss.Color(value)).Render("  "))
+		for _, name := range g {
+			value, ok := t.Palette[name]
+			if !ok {
+				b.WriteString("  ")
+				continue
+			}
+			b.WriteString(lipgloss.NewStyle().Background(lipgloss.Color(value)).Render("  "))
+		}
 	}
 	return b.String()
 }

@@ -113,7 +113,7 @@ file changes nothing: uncomment a scope's braces and the actions you want to
 move, and change their keys. An action you leave out keeps its default; an
 empty list unbinds it. See ttr keys -h.`
 
-const themeHeader = `A theme to start from: the default one, every colour and role written
+const themeHeader = `A theme to start from: the default one, every color and role written
 out, all commented out — so as it stands it is the default theme. Uncomment
 it, change what you like, and choose it with ttr theme custom.`
 

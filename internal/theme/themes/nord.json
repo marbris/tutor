@@ -1,19 +1,20 @@
 {
   "name": "nord",
   "palette": {
-    "bg":     "#2e3440",
-    "bgAlt":  "#3b4252",
-    "fg":     "#d8dee9",
-    "fgDim":  "#7b88a1",
-    "white":  "#eceff4",
-    "gray":   "#616e88",
-    "red":    "#bf616a",
-    "green":  "#a3be8c",
-    "yellow": "#ebcb8b",
-    "blue":   "#81a1c1",
-    "purple": "#b48ead",
-    "aqua":   "#88c0d0",
-    "orange": "#d08770"
+    "bg":       "#2e3440",
+    "bgAlt":    "#3b4252",
+    "bgSel":    "#434c5e",
+    "fg":       "#d8dee9",
+    "fgBright": "#eceff4",
+    "fgDim":    "#a3acbd",
+    "fgMuted":  "#7b88a1",
+    "red":      "#bf616a",
+    "green":    "#a3be8c",
+    "yellow":   "#ebcb8b",
+    "blue":     "#81a1c1",
+    "purple":   "#b48ead",
+    "aqua":     "#88c0d0",
+    "orange":   "#d08770"
   },
   "roles": {
     "borderFocus": "aqua",
