@@ -52,17 +52,25 @@ func listThemes() {
 	current := theme.Current()
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
+	// The names column is as wide as the longest name, so every row's
+	// swatches start in the same column.
+	names := theme.List()
+	width := 0
+	for _, name := range names {
+		width = max(width, len(name))
+	}
+
 	// Over the swatches, what each run of them is.
 	if stdoutIsTerminal() {
 		var head []string
 		for i, g := range theme.PaletteGroups() {
-			label := []string{"background", "text", "colors"}[i]
+			label := []string{"bg", "text", "colors"}[i]
 			head = append(head, fmt.Sprintf("%-*s", 2*len(g), label))
 		}
-		fmt.Printf("  %-14s %s\n", "", dim.Render(strings.TrimRight(strings.Join(head, " "), " ")))
+		fmt.Printf("  %-*s %s\n", width, "", dim.Render(strings.TrimRight(strings.Join(head, " "), " ")))
 	}
 
-	for _, name := range theme.List() {
+	for _, name := range names {
 		t, err := theme.Find(name)
 		if err != nil {
 			continue
@@ -79,7 +87,7 @@ func listThemes() {
 		if !theme.IsBuiltin(name) {
 			where = "yours"
 		}
-		fmt.Printf("%s%-14s %s  %s\n", marker, name, swatches, dim.Render(where))
+		fmt.Printf("%s%-*s %s  %s\n", marker, width, name, swatches, dim.Render(where))
 	}
 
 	fmt.Println()
