@@ -55,13 +55,18 @@ func MarkDue(kind string) error {
 	return os.WriteFile(duePath(), body, 0644)
 }
 
+// coarse is how far a file's time can lag the clock. The kernel stamps files
+// from a clock that ticks every few milliseconds, so a file written just
+// after MarkDue can carry a time from just before it, and would be due again.
+const coarse = 50 * time.Millisecond
+
 // Due reports whether a file of a kind, written at modTime, was kept from
 // before its kind was last refreshed.
 func Due(kind string, modTime time.Time) bool {
 	dueMu.Lock()
 	defer dueMu.Unlock()
 	at, ok := loadDue()[kind]
-	return ok && modTime.UnixNano() < at
+	return ok && modTime.UnixNano() < at-int64(coarse)
 }
 
 // DueFile is Due for a file on disk. A file that isn't there isn't due.
