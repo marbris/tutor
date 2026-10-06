@@ -324,7 +324,7 @@ func (m Model) viewInfo(width, height int) string {
 // there is one, and otherwise whatever is under the cursor — a panel headed
 // "card" while showing a git diff is a small lie told constantly.
 func (m Model) infoTitle() string {
-	switch m.info.mode {
+	switch m.info.shows(m.ws.current()) {
 	case infoStats:
 		return m.statTitle()
 	case infoVersions:
@@ -352,7 +352,7 @@ func (m Model) infoTitle() string {
 // before it is scrolled — the lines scrolling counts and the view draws
 // from the same place, so they can't disagree about where the bottom is.
 func (m Model) infoContent(inner int) []string {
-	switch m.info.mode {
+	switch m.info.shows(m.ws.current()) {
 	case infoStats:
 		return m.renderStats(inner)
 	case infoVersions:

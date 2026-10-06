@@ -45,6 +45,20 @@ type infoPanel struct {
 	// history is about one card, so it lasts exactly as long as the cursor
 	// stays on that card; see leaveVersions.
 	oracle string
+	// prev is what the statistics were opened over, so closing them goes
+	// back there: the printing view if that is where you were.
+	prev infoMode
+}
+
+// shows is the mode the panel draws in with p focused. The picture follows
+// the cursor through lists of cards; a rules or decks panel has no card
+// under it, so the panel describes what that panel has instead, and the
+// picture is back when a list of cards is.
+func (p *infoPanel) shows(focused *panel) infoMode {
+	if p.mode == infoImage && (focused == nil || focused.cardsView() == nil) {
+		return infoCard
+	}
+	return p.mode
 }
 
 // leaveVersions puts the panel back to describing the card under the cursor

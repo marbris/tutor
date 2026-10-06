@@ -382,15 +382,29 @@ func (m *Model) stepOdds(delta int) {
 // names it.
 func (m *Model) toggleStats(editing bool) {
 	if m.info.mode == infoStats && m.stats.editing == editing {
-		m.info.mode = infoCard
+		m.closeStats()
 		return
 	}
 	if editing && m.ws.editingList() == nil {
 		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
 		return
 	}
+	if m.info.mode != infoStats {
+		m.info.prev = m.info.mode
+	}
 	m.info.mode = infoStats
 	m.stats.editing = editing
+	m.info.offset = 0
+}
+
+// closeStats puts the panel back to what the statistics were opened over:
+// the printing view if that is where you were, otherwise the card.
+func (m *Model) closeStats() {
+	m.info.mode = infoCard
+	if m.info.prev == infoImage {
+		m.info.mode = infoImage
+	}
+	m.info.prev = infoCard
 	m.info.offset = 0
 }
 
@@ -422,7 +436,7 @@ func (m *Model) statsKey(key string) bool {
 	case keymap.StatsOddsPrev:
 		m.stepOdds(-1)
 	case keymap.StatsClose:
-		m.info.mode = infoCard
+		m.closeStats()
 	case keymap.StatsExpand:
 		// Only on a tag with tags under it.
 		if !m.toggleBranch() {
