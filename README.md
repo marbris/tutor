@@ -485,6 +485,7 @@ ttr sync off                    # disconnect (your lists are untouched)
 ttr rules <query>               # search the comprehensive rules
 ttr theme [name]                # list themes, or switch
 ttr keys [--defaults]           # list the key bindings, or print them as a keys.json
+ttr uninstall                   # remove Tutor; asks about your settings and lists
 ttr launcher [remove]           # put Tutor in the application launcher, or take it out
 ttr init                        # write commented-out templates of every settings file
 ttr cache                       # what's downloaded and how much room it takes
@@ -617,8 +618,8 @@ Settings files may have `//` comments.
 `TTR_DECKS_DIR` keeps your lists somewhere else. Tutor used to be called scry; files from then are
 moved to these directories on the first run.
 
-To uninstall, delete the binary and these directories. The data directory holds your lists, so copy
-it first if you want to keep them.
+`ttr uninstall` removes the program, its launcher, the cache and the state. It then asks whether to
+remove your settings and your lists too, each separately, and the answer is no unless you type yes.
 
 ## Credits
 

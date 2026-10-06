@@ -13,6 +13,7 @@ Usage:
   ttr rules …               The comprehensive rules — see ` + "`ttr rules`" + `
   ttr theme …               Colours — see ` + "`ttr theme`" + `
   ttr keys …                Keybindings — see ` + "`ttr keys -h`" + `
+  ttr uninstall             Remove Tutor, asking about your settings and decks
   ttr launcher [remove]     Put Tutor in the application launcher, or take it out
   ttr init                  Write commented-out templates of every settings file
   ttr cache                 What's downloaded, and how much room it takes; clear empties it

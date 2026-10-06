@@ -115,6 +115,10 @@ func main() {
 	case "launcher":
 		runLauncher(args[1:])
 		return
+
+	case "uninstall":
+		runUninstall(args[1:])
+		return
 	}
 
 	query := strings.Join(args, " ")

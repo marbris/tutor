@@ -49,6 +49,9 @@ type Bookmarks struct {
 
 func bookmarksPath() string { return filepath.Join(paths.Data(), bookmarksFile) }
 
+// BookmarksPath is the file of decks you follow, for ttr uninstall.
+func BookmarksPath() string { return bookmarksPath() }
+
 // LoadBookmarks reads them. A missing or unreadable file means none, which
 // is what a first run looks like anyway.
 func LoadBookmarks() Bookmarks {
