@@ -91,3 +91,15 @@ func rgbOf(s string) ([3]uint8, bool) {
 	}
 	return [3]uint8{uint8(v >> 16), uint8(v >> 8), uint8(v)}, true
 }
+
+// Kind says in a word what a theme looks like: "light", "dark", or, for one
+// that leaves the background to the terminal, "terminal's".
+func (t Theme) Kind() string {
+	if t.Transparent {
+		return "terminal's"
+	}
+	if l, ok := luminance(lipgloss.Color(t.Palette["bg"])); ok && l > 0.4 {
+		return "light"
+	}
+	return "dark"
+}

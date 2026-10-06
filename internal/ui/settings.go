@@ -13,8 +13,11 @@ import (
 )
 
 // The settings panel, space c: what used to be ttr sync remote and
-// ttr cache, in the TUI. Three groups of rows:
+// ttr cache, in the TUI. Four groups of rows:
 //
+//   - appearance: the theme. enter drops down every theme; moving through
+//     them puts each in force and saves it, enter keeps the one you're on and
+//     esc puts the one from before back.
 //   - sync: the git remote your decks mirror to. enter sets it, d
 //     disconnects.
 //   - downloads: the bulk files Tutor keeps (downloads.go). enter turns one
@@ -30,6 +33,8 @@ type settingsRowKind int
 
 const (
 	srowHeading settingsRowKind = iota
+	srowTheme
+	srowThemeChoice
 	srowRemote
 	srowDownload
 	srowCacheKind
@@ -46,6 +51,11 @@ type settingsRow struct {
 type settingsView struct {
 	cursor
 	rows []settingsRow
+
+	// picking is whether the theme dropdown is open, and before the theme
+	// that was in force when it opened, for esc to put back.
+	picking bool
+	before  string
 }
 
 func newSettings() *settingsView {
@@ -61,6 +71,14 @@ func (v *settingsView) refresh() {
 	at := v.cursor.at
 	v.rows = nil
 	add := func(r settingsRow) { v.rows = append(v.rows, r) }
+
+	add(settingsRow{kind: srowHeading, label: "appearance"})
+	add(settingsRow{kind: srowTheme, label: "theme", value: theme.Current()})
+	if v.picking {
+		for _, name := range theme.List() {
+			add(settingsRow{kind: srowThemeChoice, name: name, label: "  " + name, value: themeKind(name)})
+		}
+	}
 
 	add(settingsRow{kind: srowHeading, label: "sync"})
 	remote := "not connected"
@@ -117,7 +135,7 @@ func (v *settingsView) current() (settingsRow, bool) {
 }
 
 func (v *settingsView) title() string    { return "settings" }
-func (v *settingsView) subtitle() string { return "sync · downloads · cache" }
+func (v *settingsView) subtitle() string { return "appearance · sync · downloads · cache" }
 func (v *settingsView) clear() bool      { return false }
 
 func (v *settingsView) lines(width, height int, focused bool, m *Model) []string {
@@ -147,6 +165,9 @@ func (v *settingsView) lines(width, height int, focused bool, m *Model) []string
 }
 
 func (v *settingsView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
+	if v.picking {
+		return v.pickKey(k, m)
+	}
 	switch keymap.Lookup(keymap.List, k) {
 	case keymap.ListDown:
 		v.cursor.move(1, len(v.rows))
@@ -164,6 +185,9 @@ func (v *settingsView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	switch keymap.Lookup(keymap.Settings, k) {
 	case keymap.SettingsChange:
 		switch r.kind {
+		case srowTheme:
+			v.openPicker()
+			return true, nil
 		case srowRemote:
 			url, _, _ := deck.SyncRemote()
 			p.ask(askRemote, "git remote", url)
@@ -202,6 +226,20 @@ func (v *settingsView) info(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	var body []string
 	switch r.kind {
+	case srowTheme:
+		body = []string{
+			"The colors everything is drawn in. Your own themes go in " + theme.Dir() + "; ttr theme edit <name> copies one there to start from.",
+			"enter drops down every theme",
+		}
+	case srowThemeChoice:
+		where := "Built in."
+		if !theme.IsBuiltin(r.name) {
+			where = "Yours, from " + theme.Dir() + "."
+		}
+		body = []string{
+			"A " + r.value + " theme. " + where,
+			"j k put each theme on as you move, and save it · enter keeps this one · esc puts " + v.before + " back",
+		}
 	case srowRemote:
 		body = []string{
 			"Your decks are a git repository. Connect a private repository you own, on any git host, " +
@@ -251,6 +289,10 @@ func (v *settingsView) keys() []hintGroup {
 	var acts [][2]string
 	if r, ok := v.current(); ok {
 		switch r.kind {
+		case srowTheme:
+			acts = append(acts, hint("choose", keymap.Settings, keymap.SettingsChange))
+		case srowThemeChoice:
+			acts = append(acts, hint("keep it", keymap.Settings, keymap.SettingsChange))
 		case srowRemote:
 			acts = append(acts, hint("set the remote", keymap.Settings, keymap.SettingsChange))
 			if deck.SyncConfigured() {
@@ -267,6 +309,97 @@ func (v *settingsView) keys() []hintGroup {
 		}
 	}
 	return []hintGroup{{"navigation", nav}, {"settings", acts}}
+}
+
+// ── The theme dropdown ──────────────────────────────────────────
+
+// themeKind is "light", "dark" or "terminal's", for the dropdown's right
+// column.
+func themeKind(name string) string {
+	t, err := theme.Find(name)
+	if err != nil {
+		return "unreadable"
+	}
+	return t.Kind()
+}
+
+// openPicker drops the themes down under the theme row, with the cursor on
+// the one in force.
+func (v *settingsView) openPicker() {
+	v.picking = true
+	v.before = theme.Current()
+	v.refresh()
+	for i, r := range v.rows {
+		if r.kind == srowThemeChoice && r.name == v.before {
+			v.cursor.at = i
+		}
+	}
+}
+
+// pickKey is the keys while the dropdown is open: j and k stay among the
+// themes and put each on as they go, enter keeps the one under the cursor.
+// esc is escStep's, so its hint and its doing can't come apart.
+func (v *settingsView) pickKey(k string, m *Model) (bool, tea.Cmd) {
+	dir := 0
+	switch keymap.Lookup(keymap.List, k) {
+	case keymap.ListDown:
+		dir = 1
+	case keymap.ListUp:
+		dir = -1
+	}
+	if dir != 0 {
+		next := v.cursor.at + dir
+		if next >= 0 && next < len(v.rows) && v.rows[next].kind == srowThemeChoice {
+			v.cursor.at = next
+			m.useTheme(v.rows[next].name)
+			// The theme row follows, without refresh's walk of the cache.
+			for i := range v.rows {
+				if v.rows[i].kind == srowTheme {
+					v.rows[i].value = theme.Current()
+				}
+			}
+		}
+		return true, nil
+	}
+	if keymap.Lookup(keymap.Settings, k) == keymap.SettingsChange {
+		v.closePicker()
+		return true, nil
+	}
+	return false, nil
+}
+
+// closePicker folds the dropdown back into the theme row, cursor on it.
+func (v *settingsView) closePicker() {
+	v.picking = false
+	v.refresh()
+	for i, r := range v.rows {
+		if r.kind == srowTheme {
+			v.cursor.at = i
+		}
+	}
+}
+
+// cancelPick is esc in the dropdown: the theme from before, back on.
+func (v *settingsView) cancelPick(m *Model) {
+	if theme.Current() != v.before {
+		m.useTheme(v.before)
+	}
+	v.closePicker()
+}
+
+// useTheme saves a theme as the one to use and puts it in force at once.
+// Saving as it goes means the screen and config.json never disagree, however
+// the dropdown is left.
+func (m *Model) useTheme(name string) {
+	if err := theme.Set(name); err != nil {
+		m.notice = "error: " + err.Error()
+		return
+	}
+	if err := theme.Load(); err != nil {
+		m.notice = "error: " + err.Error()
+		return
+	}
+	m.notice = "theme: " + name
 }
 
 // ── Doing it, off the main thread ───────────────────────────────

@@ -16,6 +16,7 @@ import (
 	"ttr/internal/mtg"
 	"ttr/internal/paths"
 	"ttr/internal/tagger"
+	"ttr/internal/theme"
 )
 
 func settingsPanel(t *testing.T, m Model) (Model, *settingsView) {
@@ -204,5 +205,86 @@ func TestRSaysWhenADownloadIsOff(t *testing.T) {
 	m, cmd := press(m, "r")
 	if cmd != nil || !strings.Contains(m.notice, "turned off") {
 		t.Errorf("r on a download that's off: notice %q", m.notice)
+	}
+}
+
+func TestTheThemeDropdownPutsEachThemeOnAndEscPutsTheOldOneBack(t *testing.T) {
+	t.Cleanup(func() { theme.Set(theme.DefaultName); theme.Load() })
+	theme.Set("gruvbox")
+	theme.Load()
+
+	m := withCards(sized(160, 40), "d", deckSample(), sortArrival)
+	m, v := settingsPanel(t, m)
+	pointRow(t, v, "theme")
+	m = drive(m, "enter")
+	if !v.picking {
+		t.Fatal("enter on the theme row didn't open the dropdown")
+	}
+	if r, _ := v.current(); r.kind != srowThemeChoice || r.name != "gruvbox" {
+		t.Fatalf("the dropdown opened on %q, not the theme in force", r.name)
+	}
+	view := stripANSI(m.View())
+	for _, want := range []string{"nord", "gruvbox-light", "light", "dark"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the dropdown doesn't show %q", want)
+		}
+	}
+
+	m = drive(m, "j")
+	r, _ := v.current()
+	if theme.Current() != r.name {
+		t.Fatalf("j moved to %q but the saved theme is %q", r.name, theme.Current())
+	}
+	for _, row := range v.rows {
+		if row.kind == srowTheme && row.value != r.name {
+			t.Errorf("the theme row says %q while %q is on", row.value, r.name)
+		}
+	}
+	want, _ := theme.Find(r.name)
+	if string(theme.Bg) != want.Palette["bg"] {
+		t.Errorf("the background is %s, not %s's %s", theme.Bg, r.name, want.Palette["bg"])
+	}
+	if !strings.Contains(fmt.Sprint(m.hintGroups()), "put gruvbox back") {
+		t.Error("esc's hint doesn't say it puts gruvbox back")
+	}
+
+	m = drive(m, "esc")
+	if v.picking {
+		t.Error("esc left the dropdown open")
+	}
+	if theme.Current() != "gruvbox" {
+		t.Errorf("esc left %q on, not gruvbox", theme.Current())
+	}
+	if m.ws.count() != 2 {
+		t.Error("esc took the panel too")
+	}
+}
+
+func TestEnterKeepsTheThemeUnderTheCursor(t *testing.T) {
+	t.Cleanup(func() { theme.Set(theme.DefaultName); theme.Load() })
+	theme.Set("gruvbox")
+	theme.Load()
+
+	m := withCards(sized(160, 40), "d", deckSample(), sortArrival)
+	m, v := settingsPanel(t, m)
+	pointRow(t, v, "theme")
+	m = drive(m, "enter", "k", "enter")
+	if v.picking {
+		t.Fatal("enter didn't close the dropdown")
+	}
+	if theme.Current() == "gruvbox" {
+		t.Fatal("enter after k kept gruvbox")
+	}
+	kept := theme.Current()
+	if r, _ := v.current(); r.kind != srowTheme || r.value != kept {
+		t.Errorf("the cursor is on %q (%q), not the theme row saying %q", r.label, r.value, kept)
+	}
+	// Up and down off the ends of the dropdown stay in it.
+	m = drive(m, "enter")
+	for i := 0; i < 40; i++ {
+		m = drive(m, "k")
+	}
+	if r, _ := v.current(); r.kind != srowThemeChoice {
+		t.Errorf("k walked out of the dropdown onto %q", r.label)
 	}
 }

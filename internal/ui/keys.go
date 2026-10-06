@@ -300,6 +300,9 @@ func (m *Model) escStep(p *panel) (string, func()) {
 	// apart.
 	case m.info.mode == infoVersions:
 		return "close printed text", func() { m.info.back() }
+	case func() bool { v, ok := p.top().(*settingsView); return ok && v.picking }():
+		v := p.top().(*settingsView)
+		return "put " + v.before + " back", func() { v.cancelPick(m) }
 	case p.cardsView() != nil && p.cardsView().markCount() > 0:
 		return "drop picks", func() { p.top().clear() }
 	case func() bool { v, ok := p.top().(filterable); return ok && v.filterText() != "" }():

@@ -565,6 +565,8 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 
 `space c` opens the settings panel:
 
+- **appearance**: the theme. `enter` drops down every theme, and each one goes on as you move to it.
+  `enter` keeps it, `esc` puts the old one back.
 - **sync**: the git remote your lists mirror to. `enter` sets it, `d` disconnects.
 - **downloads**: the files Tutor keeps from Scryfall: the Tagger tags, every card's rulings, and its
   lists of keywords, types and card names. Each has its size, and `enter` turns it off or on. Off,
@@ -585,7 +587,7 @@ uncomment a line.
 - `~/.config/ttr/config.json`: which sorts `.` and `,` step through, in what order, and which way
   each one starts; and `otag_prefix`, what `T o` and `T O` put in front of a Scryfall Tagger tag
   (`otag-` unless you change it, `""` for nothing).
-- Themes: `ttr theme` lists them, and `ttr theme <name>` switches. Dark: gruvbox, nord, tokyonight,
+- Themes: `ttr theme` lists them, and `ttr theme <name>` switches (or the settings panel). Dark: gruvbox, nord, tokyonight,
   dracula, catppuccin-mocha. Light: gruvbox-light, catppuccin-latte. `terminal` uses your
   terminal's own colors and background. `ttr theme edit <name>` copies one into
   `~/.config/ttr/themes/` to change. A theme is fourteen palette colors (backgrounds, text, hues).
