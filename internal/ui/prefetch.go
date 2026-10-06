@@ -54,6 +54,7 @@ func (m *Model) gxAll(p *panel) tea.Cmd {
 		return nil
 	}
 	m.info.mode = infoImage
+	m.info.prev = infoCard
 	m.info.offset = 0
 
 	// From the cursor down, then round from the top; each card once.

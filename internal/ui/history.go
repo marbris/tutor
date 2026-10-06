@@ -71,8 +71,7 @@ func (m *Model) openHistory(c mtg.Card) tea.Cmd {
 		return nil
 	}
 
-	m.info.mode = infoVersions
-	m.info.offset = 0
+	m.info.open(infoVersions)
 	m.info.oracle = c.OracleID
 	if h, ok := m.histories[c.OracleID]; ok && h.state != histFailed {
 		return nil // already have it, or already asking

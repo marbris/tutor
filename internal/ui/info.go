@@ -45,8 +45,9 @@ type infoPanel struct {
 	// history is about one card, so it lasts exactly as long as the cursor
 	// stays on that card; see leaveVersions.
 	oracle string
-	// prev is what the statistics were opened over, so closing them goes
-	// back there: the printing view if that is where you were.
+	// prev is what the statistics or a printed history were opened over,
+	// so closing them goes back there: the printing view if that is where
+	// you were.
 	prev infoMode
 }
 
@@ -73,9 +74,36 @@ func (p *infoPanel) shows(focused *panel) infoMode {
 // adds to and forgets.
 func (p *infoPanel) leaveVersions(oracle string) {
 	if p.mode == infoVersions && oracle != p.oracle {
-		p.mode = infoCard
-		p.offset = 0
+		p.back()
 	}
+}
+
+// open puts a view over what the panel shows, remembering the printing view
+// if it goes over one — directly, or under another view that went over it.
+func (p *infoPanel) open(mode infoMode) {
+	switch p.mode {
+	case mode:
+	case infoImage:
+		p.prev = infoImage
+	case infoStats, infoVersions:
+		// Over a view that is itself over something: what's under that
+		// is still what to go back to.
+	default:
+		p.prev = infoCard
+	}
+	p.mode = mode
+	p.offset = 0
+}
+
+// back takes down whatever open put up: back to the printing view if that
+// is what was under it, otherwise to the card.
+func (p *infoPanel) back() {
+	p.mode = infoCard
+	if p.prev == infoImage {
+		p.mode = infoImage
+	}
+	p.prev = infoCard
+	p.offset = 0
 }
 
 // toggle switches to a mode, or back to the card if already there. One key

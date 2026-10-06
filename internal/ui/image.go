@@ -185,6 +185,7 @@ func (m *Model) gxCard(c mtg.Card) tea.Cmd {
 		return openPrintingInBrowser(c)
 	}
 	m.info.mode = infoImage
+	m.info.prev = infoCard
 	m.info.offset = 0
 	return m.fetchImage(c)
 }

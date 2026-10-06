@@ -299,10 +299,7 @@ func (m *Model) escStep(p *panel) (string, func()) {
 	// comes off from here too, before esc starts taking the panel itself
 	// apart.
 	case m.info.mode == infoVersions:
-		return "close printed text", func() {
-			m.info.mode = infoCard
-			m.info.offset = 0
-		}
+		return "close printed text", func() { m.info.back() }
 	case p.cardsView() != nil && p.cardsView().markCount() > 0:
 		return "drop picks", func() { p.top().clear() }
 	case func() bool { v, ok := p.top().(filterable); return ok && v.filterText() != "" }():
@@ -536,6 +533,7 @@ func (m *Model) gx(p *panel) tea.Cmd {
 		// left for the panel's own steps back.
 		if m.info.mode == infoImage {
 			m.info.mode = infoCard
+			m.info.prev = infoCard
 			m.info.offset = 0
 			return nil
 		}

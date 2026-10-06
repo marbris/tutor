@@ -389,24 +389,13 @@ func (m *Model) toggleStats(editing bool) {
 		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
 		return
 	}
-	if m.info.mode != infoStats {
-		m.info.prev = m.info.mode
-	}
-	m.info.mode = infoStats
+	m.info.open(infoStats)
 	m.stats.editing = editing
-	m.info.offset = 0
 }
 
 // closeStats puts the panel back to what the statistics were opened over:
 // the printing view if that is where you were, otherwise the card.
-func (m *Model) closeStats() {
-	m.info.mode = infoCard
-	if m.info.prev == infoImage {
-		m.info.mode = infoImage
-	}
-	m.info.prev = infoCard
-	m.info.offset = 0
-}
+func (m *Model) closeStats() { m.info.back() }
 
 // statsKey is the keymap while the statistics are up. It returns false for
 // anything it leaves to the workspace — h and l among them, which still move

@@ -17,8 +17,8 @@ import (
 func printingUp(t *testing.T) Model {
 	t.Helper()
 	withKitty(t, true)
-	card := mtg.Card{Name: "Sol Ring", OracleID: "sol"}
-	m := withCards(sized(160, 40), "f", sample()[2:3], sortArrival)
+	card := mtg.Card{Name: "Sol Ring", OracleID: "sol", PrintsSearchURI: "https://example.invalid/sol"}
+	m := withCards(sized(160, 40), "f", sample()[2:4], sortArrival)
 	m.ws.current().cardsView().all[0].Card = card
 	m.ws.current().cardsView().refresh()
 	m.images[imageKey(card)] = &cardPrintings{state: imgReady, list: []mtg.Card{
@@ -43,6 +43,30 @@ func TestClosingTheStatisticsGoesBackToThePrinting(t *testing.T) {
 		if m.kitty.key != "cmm1" {
 			t.Errorf("%v: the picture wasn't put back", keys)
 		}
+	}
+}
+
+func TestClosingThePrintedHistoryGoesBackToThePrinting(t *testing.T) {
+	for _, out := range [][]string{{"esc"}, {"j"}} {
+		m := printingUp(t)
+		// Already asked for, so gv asks Scryfall nothing.
+		m.histories["sol"] = &cardHistory{state: histPrintings}
+		m = drive(m, "g", "v")
+		if m.info.mode != infoVersions {
+			t.Fatalf("gv left the panel in %v", m.info.mode)
+		}
+		m = drive(m, out...)
+		if m.info.mode != infoImage {
+			t.Errorf("%v out of gv over the printing ended in %v", out, m.info.mode)
+		}
+	}
+
+	// gv on a plain card goes back to the card.
+	m := printingUp(t)
+	m.histories["sol"] = &cardHistory{state: histPrintings}
+	m = drive(m, "g", "x", "g", "v", "esc")
+	if m.info.mode != infoCard {
+		t.Errorf("gv without the printing view came back to %v", m.info.mode)
 	}
 }
 
