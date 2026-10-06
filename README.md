@@ -431,6 +431,14 @@ mv ttr-darwin-arm64 /usr/local/bin/ttr
 
 Windows: rename `ttr-windows-amd64.exe` to `ttr.exe` and put it somewhere on your `PATH`.
 
+### In the application launcher
+
+The first time it runs, `ttr` puts Tutor in your desktop's application launcher, so you can start it
+like any other program. It opens a terminal running `ttr`. On Linux that's a `.desktop` file in
+`~/.local/share/applications`, on macOS `Tutor.app` in `~/Applications` (opened in Terminal), and on
+Windows a shortcut in the Start menu. It has no icon yet. `ttr launcher remove` takes it out, and it
+stays out. `ttr launcher` puts it back.
+
 ### From source
 
 Needs [Go 1.26+](https://go.dev/dl/).
@@ -477,6 +485,7 @@ ttr sync off                    # disconnect (your lists are untouched)
 ttr rules <query>               # search the comprehensive rules
 ttr theme [name]                # list themes, or switch
 ttr keys [--defaults]           # list the key bindings, or print them as a keys.json
+ttr launcher [remove]           # put Tutor in the application launcher, or take it out
 ttr init                        # write commented-out templates of every settings file
 ttr cache                       # what's downloaded and how much room it takes
 ttr cache clear [kind]          # delete it, all of it or one kind

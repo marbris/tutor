@@ -10,6 +10,7 @@ import (
 	"ttr/internal/config"
 	"ttr/internal/deck"
 	"ttr/internal/keymap"
+	"ttr/internal/launcher"
 	"ttr/internal/moxfield"
 	"ttr/internal/paths"
 	"ttr/internal/rules"
@@ -58,6 +59,16 @@ func main() {
 	ui.SetOtagPrefix(config.Load().Otag())
 
 	args := os.Args[1:]
+
+	// The first run puts Tutor in the desktop's application launcher. Not
+	// on the way to removing it, nor for a question about ttr itself.
+	if len(args) == 0 || !map[string]bool{"uninstall": true, "launcher": true,
+		"-h": true, "--help": true, "help": true, "-v": true, "--version": true, "version": true}[args[0]] {
+		if said := launcher.FirstRun(); said != "" {
+			fmt.Fprintln(os.Stderr, said)
+		}
+	}
+
 	if len(args) == 0 {
 		// Back to the workspace you left, or the splash if there is none.
 		run(ui.NewRestored())
@@ -99,6 +110,10 @@ func main() {
 
 	case "sync":
 		runSync(args[1:])
+		return
+
+	case "launcher":
+		runLauncher(args[1:])
 		return
 	}
 
