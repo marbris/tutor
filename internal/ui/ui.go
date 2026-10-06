@@ -383,15 +383,18 @@ func (m Model) View() string {
 	}
 
 	base := lipgloss.NewStyle().
-		Background(theme.Surface).
 		Foreground(theme.Text).
 		Width(m.width).
 		Height(m.height).
 		MaxWidth(m.width).
 		MaxHeight(m.height)
 
-	if m.ws.empty() {
-		return base.Render(m.viewSplash())
+	body := m.viewSplash
+	if !m.ws.empty() {
+		body = m.viewWorkspace
 	}
-	return base.Render(m.viewWorkspace())
+	if theme.Transparent() {
+		return base.Render(body())
+	}
+	return paintBackground(base.Background(theme.Surface).Render(body()), theme.Surface)
 }

@@ -774,3 +774,26 @@ func wrapStyled(s string, width int, style lipgloss.Style) []string {
 	}
 	return lines
 }
+
+// paintBackground lays a background colour under the whole frame.
+//
+// A background on the outer box alone shows only in the gaps: every styled
+// word ends in a reset, and a reset goes back to the terminal's background,
+// not the theme's. So a theme whose background isn't the terminal's came out
+// as boxes of one colour behind words of the other. Setting the background
+// again after every reset is what makes it one even colour. Resets that only
+// touch the foreground (the picture's placeholders) leave it alone anyway.
+func paintBackground(frame string, bg lipgloss.Color) string {
+	seq := lipgloss.ColorProfile().Color(string(bg)).Sequence(true)
+	if seq == "" {
+		return frame
+	}
+	set := "\x1b[" + seq + "m"
+	lines := strings.Split(frame, "\n")
+	for i, line := range lines {
+		line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+set)
+		line = strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+set)
+		lines[i] = set + line + "\x1b[0m"
+	}
+	return strings.Join(lines, "\n")
+}

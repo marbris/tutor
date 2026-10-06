@@ -4,8 +4,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
+
 	"ttr/internal/mtg"
 	"ttr/internal/rules"
+	"ttr/internal/theme"
 )
 
 // printingUp is a list with Sol Ring's picture already fetched and gx
@@ -130,5 +134,50 @@ func TestRuleExamplesAreSetApartInTheInfoPanel(t *testing.T) {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("the rule reads:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+func TestTheThemesBackgroundIsSetAgainAfterEveryReset(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := withCards(sized(100, 20), "f", sample(), sortArrival)
+	set := "\x1b[48;2;" // what the theme's background starts with
+	view := m.View()
+	for i, line := range strings.Split(view, "\n") {
+		if !strings.HasPrefix(line, set) {
+			t.Fatalf("line %d doesn't start on the background: %q", i, line)
+		}
+		rest := line
+		for {
+			at := strings.Index(rest, "\x1b[0m")
+			if at < 0 {
+				break
+			}
+			rest = rest[at+len("\x1b[0m"):]
+			if rest != "" && !strings.HasPrefix(rest, set) {
+				t.Fatalf("line %d drops to the terminal's background after a reset: %q", i, line)
+			}
+		}
+	}
+}
+
+func TestATransparentThemePaintsNoBackground(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+	terminal, err := theme.Find("terminal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	theme.Use(terminal)
+	defer theme.Use(theme.Theme{})
+
+	m := withCards(sized(100, 20), "f", sample(), sortArrival)
+	for i, line := range strings.Split(m.View(), "\n") {
+		if strings.HasPrefix(line, "\x1b[4") {
+			t.Fatalf("line %d starts on a background: %q", i, line)
+		}
 	}
 }

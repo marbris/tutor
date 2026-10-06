@@ -1,5 +1,6 @@
 {
   "name": "terminal",
+  "transparent": true,
   "palette": {
     "bg":     "0",
     "bgAlt":  "8",

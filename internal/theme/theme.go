@@ -29,7 +29,18 @@ type Theme struct {
 	// Roles maps a role to a palette name, or to a literal value for a
 	// colour the palette doesn't carry. Anything omitted is inherited.
 	Roles map[string]string `json:"roles,omitempty"`
+	// Transparent leaves the background to the terminal: nothing is painted
+	// behind the text but selections and bars. For a theme that takes its
+	// colours from the terminal's own scheme, and for see-through terminals.
+	Transparent bool `json:"transparent,omitempty"`
 }
+
+// transparent is whether the theme in force paints its background.
+var transparent bool
+
+// Transparent reports whether the theme in force leaves the background to
+// the terminal.
+func Transparent() bool { return transparent }
 
 // ── The palette in use ──────────────────────────────────────────
 
@@ -177,6 +188,7 @@ var defaultRoles = map[string]string{
 // Use makes a theme the one in force. Anything the theme leaves out falls
 // back to the built-in default, so a partial file is a valid file.
 func Use(t Theme) {
+	transparent = t.Transparent
 	for name, target := range paletteVars {
 		*target = colorOf(t.Palette[name], fallbackPalette[name])
 	}
