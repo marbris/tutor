@@ -400,14 +400,11 @@ func (m Model) editHints() [][2]string {
 	if target == nil || target.deck == nil {
 		return nil
 	}
-	keys := [][2]string{
-		hint("add", keymap.Cards, keymap.CardsAdd),
-		hint("add + tag", keymap.Cards, keymap.CardsAddTagged),
-		hint("tag", keymap.Cards, keymap.CardsTag),
-		hint("tag a whole list…", keymap.Cards, keymap.CardsTagMove),
-		hint("remove", keymap.Cards, keymap.CardsRemove),
-		hint("commander", keymap.Cards, keymap.CardsCommander),
-		hint("undo", keymap.Cards, keymap.CardsUndo),
+	var keys [][2]string
+	// The card keys are the focused list's: from the rules, the decks or
+	// the settings there is no card to add and nothing of theirs to undo.
+	if p := m.ws.current(); p != nil && p.cardsView() != nil {
+		keys = cardEditHints()
 	}
 	// e and E move the editing deck on, so they sit under the deck they
 	// move away from — but only when there is another deck to move to.
@@ -427,6 +424,19 @@ func (m Model) editHints() [][2]string {
 		return nil
 	}
 	return out
+}
+
+// cardEditHints is what the card keys do to the editing deck.
+func cardEditHints() [][2]string {
+	return [][2]string{
+		hint("add", keymap.Cards, keymap.CardsAdd),
+		hint("add + tag", keymap.Cards, keymap.CardsAddTagged),
+		hint("tag", keymap.Cards, keymap.CardsTag),
+		hint("tag a whole list…", keymap.Cards, keymap.CardsTagMove),
+		hint("remove", keymap.Cards, keymap.CardsRemove),
+		hint("commander", keymap.Cards, keymap.CardsCommander),
+		hint("undo", keymap.Cards, keymap.CardsUndo),
+	}
 }
 
 // infoKeys are the information-panel keys for a card list — statistics, and

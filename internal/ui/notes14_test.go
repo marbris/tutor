@@ -76,3 +76,28 @@ func TestTheRulesOpenedFromThePrintingViewShowTheRule(t *testing.T) {
 		t.Error("the picture didn't come back with the list")
 	}
 }
+
+func TestTheEditingDecksCardKeysHideWhileTheRulesAreFocused(t *testing.T) {
+	m := editingDeckModel()
+	m.rules = fakeRules(t)
+	has := func(m Model, label string) bool {
+		for _, k := range m.editHints() {
+			if k[1] == label {
+				return true
+			}
+		}
+		return false
+	}
+	if !has(m, "add") || !has(m, "undo") {
+		t.Fatalf("on the deck itself the card keys are missing: %v", m.editHints())
+	}
+	m = drive(m, "space", "r")
+	if m.ws.current().kind != KindRules {
+		t.Fatalf("space r focused a %v panel", m.ws.current().kind)
+	}
+	for _, label := range []string{"add", "add + tag", "tag", "remove", "commander", "undo"} {
+		if has(m, label) {
+			t.Errorf("%q is offered under the deck while the rules are focused", label)
+		}
+	}
+}
