@@ -300,3 +300,53 @@ func TestEveryRoleIsInAGroup(t *testing.T) {
 		}
 	}
 }
+
+// TestBuiltinThemesAreReadable keeps the built-ins honest, the light ones
+// especially: text has to stand out from the background and from the
+// selection, and the three backgrounds have to be told apart.
+func TestBuiltinThemesAreReadable(t *testing.T) {
+	files, _ := builtin.ReadDir("themes")
+	for _, f := range files {
+		name, _ := themeName(f.Name())
+		th, err := builtinTheme(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if th.Transparent {
+			continue // its colours are the terminal's, which nobody here can see
+		}
+		on := func(fg, bg string) float64 {
+			a, okA := luminance(lipgloss.Color(th.Palette[fg]))
+			b, okB := luminance(lipgloss.Color(th.Palette[bg]))
+			if !okA || !okB {
+				t.Fatalf("%s: %s or %s is not a colour", name, fg, bg)
+			}
+			return contrast(a, b)
+		}
+		for _, c := range []struct {
+			fg, bg string
+			min    float64
+		}{
+			{"fg", "bg", 4.5},
+			{"fg", "bgSel", 4.5},
+			{"fgBright", "bgSel", 4.5},
+			{"fgDim", "bg", 3},
+			{"red", "bg", 2}, {"green", "bg", 2}, {"yellow", "bg", 2}, {"blue", "bg", 2},
+			{"purple", "bg", 2}, {"aqua", "bg", 2}, {"orange", "bg", 2},
+		} {
+			if got := on(c.fg, c.bg); got < c.min {
+				t.Errorf("%s: %s on %s has contrast %.1f, want at least %.1f", name, c.fg, c.bg, got, c.min)
+			}
+		}
+		for _, pair := range [][2]string{{"bg", "bgAlt"}, {"bg", "bgSel"}, {"bgAlt", "bgSel"}} {
+			if th.Palette[pair[0]] == th.Palette[pair[1]] {
+				t.Errorf("%s: %s and %s are the same colour", name, pair[0], pair[1])
+			}
+		}
+		for _, p := range paletteNames {
+			if _, ok := th.Palette[p]; !ok {
+				t.Errorf("%s has no %s", name, p)
+			}
+		}
+	}
+}

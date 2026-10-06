@@ -1,0 +1,23 @@
+{
+  "name": "catppuccin-mocha",
+  "palette": {
+    "bg":       "#1e1e2e",
+    "bgAlt":    "#313244",
+    "bgSel":    "#45475a",
+    "fg":       "#cdd6f4",
+    "fgBright": "#eff1f5",
+    "fgDim":    "#a6adc8",
+    "fgMuted":  "#6c7086",
+    "red":      "#f38ba8",
+    "green":    "#a6e3a1",
+    "yellow":   "#f9e2af",
+    "blue":     "#89b4fa",
+    "purple":   "#cba6f7",
+    "aqua":     "#94e2d5",
+    "orange":   "#fab387"
+  },
+  "roles": {
+    "borderFocus": "purple",
+    "borderEditing": "aqua"
+  }
+}

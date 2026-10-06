@@ -1,0 +1,23 @@
+{
+  "name": "dracula",
+  "palette": {
+    "bg":       "#282a36",
+    "bgAlt":    "#343746",
+    "bgSel":    "#44475a",
+    "fg":       "#f8f8f2",
+    "fgBright": "#ffffff",
+    "fgDim":    "#bfbfbf",
+    "fgMuted":  "#6272a4",
+    "red":      "#ff5555",
+    "green":    "#50fa7b",
+    "yellow":   "#f1fa8c",
+    "blue":     "#bd93f9",
+    "purple":   "#ff79c6",
+    "aqua":     "#8be9fd",
+    "orange":   "#ffb86c"
+  },
+  "roles": {
+    "borderFocus": "blue",
+    "borderEditing": "green"
+  }
+}

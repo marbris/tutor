@@ -1,0 +1,23 @@
+{
+  "name": "tokyonight",
+  "palette": {
+    "bg":       "#1a1b26",
+    "bgAlt":    "#292e42",
+    "bgSel":    "#283457",
+    "fg":       "#a9b1d6",
+    "fgBright": "#c0caf5",
+    "fgDim":    "#737aa2",
+    "fgMuted":  "#565f89",
+    "red":      "#f7768e",
+    "green":    "#9ece6a",
+    "yellow":   "#e0af68",
+    "blue":     "#7aa2f7",
+    "purple":   "#bb9af7",
+    "aqua":     "#7dcfff",
+    "orange":   "#ff9e64"
+  },
+  "roles": {
+    "borderFocus": "blue",
+    "borderEditing": "green"
+  }
+}
