@@ -359,3 +359,10 @@ func TestBuiltinThemesAreReadable(t *testing.T) {
 		}
 	}
 }
+
+func TestWithNothingChosenTheTerminalsOwnColorsAreUsed(t *testing.T) {
+	configHome(t)
+	if Current() != "terminal" {
+		t.Errorf("Current = %s, want terminal", Current())
+	}
+}

@@ -24,6 +24,9 @@ func TestMain(m *testing.M) {
 	os.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
 	os.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 	os.Setenv("TTR_DECKS_DIR", filepath.Join(root, "decks"))
+	// Nothing goes to the real terminal: a theme switch would set its
+	// background. Tests that want the bytes catch them themselves.
+	writeTerminal = func([]byte) {}
 
 	code := m.Run()
 	os.RemoveAll(root)

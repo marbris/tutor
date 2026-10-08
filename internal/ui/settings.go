@@ -399,6 +399,7 @@ func (m *Model) useTheme(name string) {
 		m.notice = "error: " + err.Error()
 		return
 	}
+	theme.SyncTerminalBackground(terminalWriter{})
 	m.notice = "theme: " + name
 }
 

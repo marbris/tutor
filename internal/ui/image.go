@@ -67,6 +67,11 @@ var kittyGraphics = func() bool {
 // the same moment. A variable, so the tests can catch it.
 var writeTerminal = func(b []byte) { os.Stdout.Write(b) }
 
+// terminalWriter is writeTerminal as an io.Writer.
+type terminalWriter struct{}
+
+func (terminalWriter) Write(b []byte) (int, error) { writeTerminal(b); return len(b), nil }
+
 type imgState int
 
 const (

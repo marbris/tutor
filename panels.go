@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/theme"
 	"ttr/internal/ui"
 )
 
@@ -18,7 +19,12 @@ func run(m ui.Model, cmd tea.Cmd) {
 		// on screen while the fetching happens.
 		go func() { p.Send(cmd()) }()
 	}
-	if _, err := p.Run(); err != nil {
+	// The terminal's background takes the theme's, so the strips outside
+	// the cells match too; it's put back before anything else is printed.
+	theme.SyncTerminalBackground(os.Stdout)
+	_, err := p.Run()
+	theme.RestoreTerminalBackground(os.Stdout)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}

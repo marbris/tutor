@@ -600,8 +600,9 @@ uncomment a line.
   each one starts; and `otag_prefix`, what `T o` and `T O` put in front of a Scryfall Tagger tag
   (`otag-` unless you change it, `""` for nothing).
 - Themes: `ttr theme` lists them, and `ttr theme <name>` switches (or the settings panel). Dark: gruvbox, nord, tokyonight,
-  dracula, catppuccin-mocha. Light: gruvbox-light, catppuccin-latte. `terminal` uses your
-  terminal's own colors and background. `ttr theme edit <name>` copies one into
+  dracula, catppuccin-mocha. Light: gruvbox-light, catppuccin-latte. `terminal`, the default, uses your
+  terminal's own colors and background. Any other theme sets the terminal's background to its own
+  while ttr runs, so the edges match, and puts it back on quit. `ttr theme edit <name>` copies one into
   `~/.config/ttr/themes/` to change. A theme is fourteen palette colors (backgrounds, text, hues).
   Every role (borders, mana, rarity) follows from those, and you can point any role elsewhere.
   `"transparent": true` leaves the background to your terminal.

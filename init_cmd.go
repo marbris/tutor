@@ -82,7 +82,7 @@ func initTemplates() ([]template, error) {
 	if err != nil {
 		return nil, err
 	}
-	themeBody, err := theme.Export(theme.DefaultName)
+	themeBody, err := theme.Export(theme.BaseName)
 	if err != nil {
 		return nil, err
 	}

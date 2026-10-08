@@ -19,17 +19,23 @@ import (
 //go:embed themes/*.json
 var builtin embed.FS
 
-// DefaultName is the theme in force when nothing says otherwise, and the
-// source of every fallback.
-const DefaultName = "gruvbox"
+// DefaultName is the theme in force when nothing says otherwise: the
+// terminal's own colours, which paint no background and so can't disagree
+// with the terminal about it.
+const DefaultName = "terminal"
 
-// fallbackPalette is the default theme's colours, used for anything a theme
+// BaseName is the theme every other falls back to for the colours it leaves
+// out, and the one `ttr init` offers to copy. Not the default: the terminal
+// theme's palette is ANSI indices, a poor fill for a theme written in hex.
+const BaseName = "gruvbox"
+
+// fallbackPalette is the base theme's colours, used for anything a theme
 // leaves out. Filled in at startup from the embedded file, so there is one
 // definition of gruvbox rather than two that can drift.
 var fallbackPalette = map[string]string{}
 
 func init() {
-	if t, err := builtinTheme(DefaultName); err == nil {
+	if t, err := builtinTheme(BaseName); err == nil {
 		fallbackPalette = t.Palette
 	}
 	// A palette before any config is read, so a program that never calls

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -286,5 +287,27 @@ func TestEnterKeepsTheThemeUnderTheCursor(t *testing.T) {
 	}
 	if r, _ := v.current(); r.kind != srowThemeChoice {
 		t.Errorf("k walked out of the dropdown onto %q", r.label)
+	}
+}
+
+func TestSwitchingThemeSetsTheTerminalsBackgroundAndTerminalPutsItBack(t *testing.T) {
+	var sent []string
+	old := writeTerminal
+	writeTerminal = func(b []byte) { sent = append(sent, string(b)) }
+	t.Cleanup(func() {
+		writeTerminal = old
+		theme.Set(theme.DefaultName)
+		theme.Load()
+		theme.RestoreTerminalBackground(io.Discard)
+	})
+
+	m := sized(160, 40)
+	m.useTheme("gruvbox")
+	if len(sent) != 1 || !strings.HasPrefix(sent[0], "\x1b]11;#") {
+		t.Fatalf("gruvbox sent %q, want the terminal's background set", sent)
+	}
+	m.useTheme("terminal")
+	if len(sent) != 2 || sent[1] != "\x1b]111\x1b\\" {
+		t.Errorf("terminal sent %q, want the background put back", sent)
 	}
 }
