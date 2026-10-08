@@ -207,6 +207,7 @@ Artifact. Build a filter from the rows, and the list and the bars narrow to the 
 | `alt+n` | add AND NOT *row* to the filter |
 | `alt+x` | take *row* out of the filter |
 | `alt+X` | clear the filter |
+| | on a row already in the filter, `alt+a` `alt+o` `alt+n` switch it to that join; the same key twice takes it out |
 | `alt+p` | show the odds of drawing each row in your opening hand |
 
 The list keeps its own keys while the panel is open: `j` `k` move through the cards, `a` `x` add

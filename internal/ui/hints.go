@@ -479,7 +479,7 @@ func (m Model) statsHints() [][2]string {
 	keys := [][2]string{
 		hint("category", keymap.Stats, keymap.StatsDown, keymap.StatsUp),
 		hint("turn groups", keymap.Stats, keymap.StatsNextGroup, keymap.StatsPrevGroup),
-		hint("filter and/or/not", keymap.Stats, keymap.StatsAnd, keymap.StatsOr, keymap.StatsNot),
+		hint("filter and/or/not (again: off)", keymap.Stats, keymap.StatsAnd, keymap.StatsOr, keymap.StatsNot),
 		hint("remove from filter", keymap.Stats, keymap.StatsDrop),
 		hint("clear stats-filter", keymap.Stats, keymap.StatsClear),
 		hint("odds", keymap.Stats, keymap.StatsOddsNext, keymap.StatsOddsPrev),

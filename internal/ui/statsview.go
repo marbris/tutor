@@ -305,19 +305,15 @@ func (m *Model) rotateStat(delta int) {
 }
 
 // addStat narrows the list by the highlighted category, joined to whatever
-// already narrows it with op.
+// already narrows it with op — or, with the category already in, switches it
+// to op, or takes it out if it already had op (stats.Expr.Toggle).
 func (m *Model) addStat(op stats.Op) {
 	l := m.statList()
 	r, ok := m.statUnder()
 	if l == nil || !ok {
 		return
 	}
-	expr, added := l.statFilter.Add(op, r)
-	if !added {
-		m.notice = r.Label + " is already in the filter"
-		return
-	}
-	l.statFilter = expr
+	l.statFilter = l.statFilter.Toggle(op, r)
 	l.refresh()
 }
 

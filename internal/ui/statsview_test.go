@@ -181,6 +181,16 @@ func TestAddingCategoriesFoldsAndAndOr(t *testing.T) {
 	if l.count() != 2 {
 		t.Errorf("creatures ∧ 1: %d cards", l.count())
 	}
+	// The same key twice takes a category out; another key switches it.
+	m = drive(m, "alt+o", "alt+o")
+	if got := l.statFilter.String(); got != "Creature ∧ 1" {
+		t.Errorf("alt+o twice on Artifact: filter reads %q", got)
+	}
+	m = pointStat(t, m, "Mana Value", "1")
+	m = drive(m, "alt+n")
+	if got := l.statFilter.String(); got != "Creature ∧¬ 1" {
+		t.Errorf("alt+n on 1: filter reads %q", got)
+	}
 	// X clears the rest: x, only more.
 	m = drive(m, "alt+X")
 	if len(l.statFilter) != 0 || l.count() != 6 {

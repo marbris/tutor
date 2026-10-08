@@ -161,3 +161,45 @@ func everyType() []Row {
 	}
 	return out
 }
+
+func TestToggleTakesOutTheSameOpAndSwitchesAnother(t *testing.T) {
+	creature := find(t, everyType(), "Creature")
+	black := find(t, colorRows(), "Black")
+	five := find(t, cmcRows(), "5")
+
+	var e Expr
+	e = e.Toggle(And, creature)
+	e = e.Toggle(And, black)
+	e = e.Toggle(And, five)
+	if got := e.String(); got != "(Creature ∧ Black) ∧ 5" {
+		t.Fatalf("built %q", got)
+	}
+
+	// Another op switches it in place.
+	e = e.Toggle(Or, black)
+	if got := e.String(); got != "(Creature ∨ Black) ∧ 5" {
+		t.Errorf("alt+o on Black: %q", got)
+	}
+	e = e.Toggle(AndNot, black)
+	if got := e.String(); got != "(Creature ∧¬ Black) ∧ 5" {
+		t.Errorf("alt+n on Black: %q", got)
+	}
+	// The same op again takes it out.
+	e = e.Toggle(AndNot, black)
+	if got := e.String(); got != "Creature ∧ 5" {
+		t.Errorf("alt+n twice on Black: %q", got)
+	}
+
+	// On the first category And and Or are one thing, so either takes it out.
+	if got := e.Toggle(Or, creature).String(); got != "5" {
+		t.Errorf("alt+o on the first (and) category: %q", got)
+	}
+	// But a negated first category is switched back, not taken out.
+	e = e.Toggle(AndNot, creature)
+	if got := e.String(); got != "¬Creature ∧ 5" {
+		t.Errorf("alt+n on the first category: %q", got)
+	}
+	if got := e.Toggle(And, creature).String(); got != "Creature ∧ 5" {
+		t.Errorf("alt+a on a negated first category: %q", got)
+	}
+}

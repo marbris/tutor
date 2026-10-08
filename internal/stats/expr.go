@@ -89,6 +89,29 @@ func (e Expr) Add(op Op, r Row) (Expr, bool) {
 	return append(append(Expr(nil), e...), Clause{Op: op, Row: r}), true
 }
 
+// Toggle is alt+a, alt+o and alt+n: a category not in the narrowing is
+// added with op; one already in with op is taken out; one in with another op
+// takes this one, keeping its place. So pressing the same key twice always
+// undoes it. The first category's And and Or are the same thing, so there
+// either one counts as op.
+func (e Expr) Toggle(op Op, r Row) Expr {
+	i := e.Index(r)
+	if i < 0 {
+		out, _ := e.Add(op, r)
+		return out
+	}
+	same := e[i].Op == op
+	if i == 0 && op != AndNot && e[0].Op != AndNot {
+		same = true
+	}
+	if same {
+		return e.Without(r)
+	}
+	out := append(Expr(nil), e...)
+	out[i].Op = op
+	return out
+}
+
 // Without drops one category from the narrowing, leaving the rest as they
 // were. If it was the first, the next one starts afresh and its own op is
 // simply ignored.
