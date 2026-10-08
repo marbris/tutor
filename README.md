@@ -264,6 +264,7 @@ list: the cards selected with `v`, or every card showing, so filter first to bri
 | `T o` | Scryfall Tagger's tag, as `otag-…`, on the editing list's cards that have it |
 | `T O` | the same, and every other card with that tag is added |
 | `T g` | the global tags, written into the editing list |
+| `T X` | clear every tag from the editing list's copies of this list's cards (or the `v` picks) |
 
 `T t`, `T a` and `T g` ask which tags to bring: type one or a few (`tab` completes), or leave it
 empty for all of them. Each of these is one step for `u` to undo.

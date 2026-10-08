@@ -203,3 +203,43 @@ func TestPinnedListsFromBeforeTheRenameAreStillPinned(t *testing.T) {
 		t.Error("taglists.json should go once globaltags.json is written")
 	}
 }
+
+func TestTXClearsTheEditingDecksTagsAndUBringsThemBack(t *testing.T) {
+	m, l := openDeckPanel(t, sized(160, 30), "ghen", "Ghen", []deck.Card{
+		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}, Tags: []string{"ramp", "artifact"}},
+		{Qty: 1, Card: mtg.Card{Name: "Rancor"}, Tags: []string{"aura"}},
+	})
+	m = drive(m, "T", "X")
+	if len(tagged(l, "Sol Ring"))+len(tagged(l, "Rancor")) != 0 {
+		t.Errorf("tags left: %v", l.all)
+	}
+	if !strings.Contains(m.notice, "tags cleared from 2 cards") {
+		t.Errorf("notice %q", m.notice)
+	}
+	m = drive(m, "T", "X")
+	if !strings.Contains(m.notice, "no card here has tags") {
+		t.Errorf("second T X: notice %q", m.notice)
+	}
+	m.undo()
+	if !hasTag(tagged(l, "Sol Ring"), "ramp") || !hasTag(tagged(l, "Rancor"), "aura") {
+		t.Errorf("u didn't bring the tags back: %v", l.all)
+	}
+}
+
+func TestTXFromAnotherListClearsOnlyThePickedCardsInTheEditingDeck(t *testing.T) {
+	m, l := openDeckPanel(t, sized(160, 30), "ghen", "Ghen", []deck.Card{
+		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}, Tags: []string{"ramp"}},
+		{Qty: 1, Card: mtg.Card{Name: "Rancor"}, Tags: []string{"aura"}},
+	})
+	m = withCards(m, "f", []deck.Card{
+		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}},
+		{Qty: 1, Card: mtg.Card{Name: "Rancor"}},
+	}, sortArrival)
+	m = drive(m, "v", "T", "X") // v picks the first: Sol Ring
+	if len(tagged(l, "Sol Ring")) != 0 {
+		t.Errorf("Sol Ring kept %v", tagged(l, "Sol Ring"))
+	}
+	if !hasTag(tagged(l, "Rancor"), "aura") {
+		t.Error("Rancor lost its tag, though it wasn't picked")
+	}
+}

@@ -23,8 +23,9 @@ import (
 //	T o  Scryfall Tagger's tag, on the editing deck's cards that carry it
 //	T O  the same, and every other card that carries it added
 //	T g  the global tags made the editing deck's own
+//	T X  the editing deck's copies of this list's cards lose every tag
 //
-// All but T o and T O ask which tags first, completing with tab; left empty,
+// All but T o, T O and T X ask which tags first, completing with tab; left empty,
 // every tag moves. "This list's cards" are the ones picked out with v, or
 // failing that every card showing — so / and the statistics narrow what
 // moves. Each is one undo step on the editing deck.
@@ -41,6 +42,7 @@ var tagMoveMenu = []tagMoveCmd{
 	{keymap.TagMoveOtag, "otag → editing deck"},
 	{keymap.TagMoveOtagAdd, "otag + cards → editing deck"},
 	{keymap.TagMoveGlobal, "global tags → editing deck"},
+	{keymap.TagMoveClear, "clear tags in editing deck"},
 }
 
 // tagMoveParts is the menu, an entry each, led by T so it reads as what was
@@ -110,8 +112,37 @@ func (m Model) handleTagMove(key string) (tea.Model, tea.Cmd) {
 	case keymap.TagMoveGlobal:
 		p.ask(askGlobalTags, "global tags → "+target.name, "")
 		p.askInput.Placeholder = "ramp removal … · tab completes · empty: every tag"
+	case keymap.TagMoveClear:
+		m.clearTags(l.shownOrPicked())
 	}
 	return m, nil
+}
+
+// clearTags is T X: every tag off the editing deck's copies of the cards —
+// the ones in front of you, picked or showing. No question first: u puts
+// them back.
+func (m *Model) clearTags(cards []deck.Card) {
+	target, why := m.editTarget()
+	if target == nil {
+		m.notice = why
+		return
+	}
+	var tags []string
+	for _, c := range cards {
+		if i := target.indexOfCard(c.Card.Name); i >= 0 {
+			tags = append(tags, target.all[i].Tags...)
+		}
+	}
+	r := bringInto(target, bringing{what: "clear tags", cards: cards, remove: tags})
+	if !r.changed() {
+		m.notice = "no card here has tags in " + target.name
+		return
+	}
+	what := " cards in "
+	if r.tagged == 1 {
+		what = " card in "
+	}
+	m.notice = "tags cleared from " + itoa(r.tagged) + what + target.name
 }
 
 // tagsInto is T t and T a: from the list in front of you into the editing
