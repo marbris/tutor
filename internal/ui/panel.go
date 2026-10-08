@@ -139,6 +139,11 @@ type panel struct {
 	// filterBefore is the filter the prompt opened on, which esc puts back.
 	filterBefore string
 	filterInput  textinput.Model
+	// filterAll means the prompt narrows every list of cards, not just this
+	// one (ctrl+/). filterAllBefore is each list's own filter from before,
+	// by panel id, so esc can put every one back.
+	filterAll       bool
+	filterAllBefore map[int]string
 
 	// asking is the one-line prompt — a new deck's name, a rename, a URL
 	// to follow — open only while you're answering it.

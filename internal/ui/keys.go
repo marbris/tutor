@@ -472,6 +472,7 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		p.filtering = false
+		p.filterAll = false
 		p.filterInput.Blur()
 		return m, nil
 
@@ -480,6 +481,15 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// opened, rather than leaving a half-typed narrowing in place.
 		p.filtering = false
 		p.filterInput.Blur()
+		if p.filterAll {
+			p.filterAll = false
+			for _, q := range m.ws.panels {
+				if before, ok := p.filterAllBefore[q.id]; ok {
+					q.setFilter(before)
+				}
+			}
+			return m, nil
+		}
 		p.setFilter(p.filterBefore)
 		return m, nil
 
@@ -489,8 +499,31 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	p.filterInput, cmd = p.filterInput.Update(msg)
+	if p.filterAll {
+		for _, q := range m.ws.panels {
+			if q.cardsView() != nil {
+				q.setFilter(p.filterInput.Value())
+			}
+		}
+		return m, cmd
+	}
 	p.setFilter(p.filterInput.Value())
 	return m, cmd
+}
+
+// openFilterAll raises the / prompt to narrow every list of cards with the
+// same query. ctrl+/. It starts from this list's filter, and remembers every
+// list's own so esc can undo the lot.
+func (m *Model) openFilterAll(p *panel, l *cardList) {
+	p.openFilter(l.filter)
+	p.filterAll = true
+	p.filterAllBefore = map[int]string{}
+	for _, q := range m.ws.panels {
+		if ql := q.cardsView(); ql != nil {
+			p.filterAllBefore[q.id] = ql.filter
+		}
+	}
+	p.filterInput.Placeholder = "every list: words, or t:creature mv<=3 c:rg otag:ramp tag:wincon …"
 }
 
 // handleGoto runs the g-prefixed keys.

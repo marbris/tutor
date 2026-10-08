@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -42,5 +43,31 @@ func TestSlashOtagCountsTheTagsUnderIt(t *testing.T) {
 	m = drive(m, "enter")
 	if l.count() != 1 || l.rows[0].Card.Name != "shatter" {
 		t.Errorf("otag:removal -otag:removal-enchantment left %d cards", l.count())
+	}
+}
+
+func TestCtrlSlashFiltersEveryList(t *testing.T) {
+	m := withCards(sized(200, 30), "d", deckSample(), sortArrival)
+	a := m.ws.current().cardsView()
+	m = withCards(m, "d", deckSample(), sortArrival)
+	b := m.ws.current().cardsView()
+	m = drive(typeIn(drive(m, "/"), "wincon"), "enter") // b had its own filter
+	all, wincon := a.count(), b.count()
+
+	m = typeIn(drive(m, "ctrl+_"), " t:creature mv<=3")
+	if a.filter != "wincon t:creature mv<=3" || b.filter != a.filter {
+		t.Errorf("ctrl+/ left the filters %q and %q, want the same query on both", a.filter, b.filter)
+	}
+	m = drive(m, "esc")
+	if a.count() != all || b.count() != wincon || b.filter != "wincon" {
+		t.Errorf("esc left %d and %d cards (%q), want %d and %d", a.count(), b.count(), b.filter, all, wincon)
+	}
+
+	m = drive(typeIn(drive(m, "ctrl+_"), " t:creature"), "enter")
+	if a.filter != "wincon t:creature" || b.filter != a.filter {
+		t.Errorf("enter kept %q and %q, want the query on both", a.filter, b.filter)
+	}
+	if hints := fmt.Sprint(m.hintGroups()); !strings.Contains(hints, "/ ctrl+/") {
+		t.Errorf("the hints don't name ctrl+/: %s", hints)
 	}
 }

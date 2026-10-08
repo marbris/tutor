@@ -580,6 +580,8 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		p.openFilter(l.filter)
 		// A list of cards takes some of Scryfall's syntax (internal/query).
 		p.filterInput.Placeholder = "words, or t:creature mv<=3 c:rg otag:ramp tag:wincon -t:land …"
+	case keymap.CardsFilterAll:
+		m.openFilterAll(p, l)
 
 	// ── Editing ─────────────────────────────────────────────────
 
@@ -660,7 +662,7 @@ func (l *cardList) keys() []hintGroup {
 		hint("sort 1 & 2", keymap.Cards, keymap.CardsSort1Next, keymap.CardsSort1Prev,
 			keymap.CardsSort2Next, keymap.CardsSort2Prev),
 		hint("flip sort 1/2", keymap.Cards, keymap.CardsSort1Dir, keymap.CardsSort2Dir),
-		hint("filter", keymap.Cards, keymap.CardsFilter),
+		hint("filter/all lists", keymap.Cards, keymap.CardsFilter, keymap.CardsFilterAll),
 	}
 
 	sel := [][2]string{

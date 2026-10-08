@@ -88,6 +88,7 @@ const (
 	CardsSelect    Action = "select"
 	CardsSelectAll Action = "select-all"
 	CardsFilter    Action = "filter"
+	CardsFilterAll Action = "filter-all"
 	CardsAdd       Action = "add"
 	CardsAddTagged Action = "add-tagged"
 	CardsRemove    Action = "remove"
@@ -222,6 +223,9 @@ var defaults = []binding{
 	{Cards, CardsSort1Dir, k("alt+.")},
 	{Cards, CardsSort2Dir, k("alt+,")},
 	{Cards, CardsFilter, k("/")},
+	// ctrl+/: a terminal sends it as the same byte as ctrl+_, and that is
+	// the name it arrives under.
+	{Cards, CardsFilterAll, k("ctrl+_")},
 	{Cards, CardsSelect, k("v")},
 	{Cards, CardsSelectAll, k("V")},
 	{Cards, CardsAdd, k("a")},
@@ -419,6 +423,8 @@ func Display(key string) string {
 		return "←"
 	case "right":
 		return "→"
+	case "ctrl+_":
+		return "ctrl+/"
 	}
 	return key
 }

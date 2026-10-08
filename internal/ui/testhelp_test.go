@@ -68,6 +68,8 @@ func keyMsg(k string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyCtrlJ}
 	case "ctrl+k":
 		return tea.KeyMsg{Type: tea.KeyCtrlK}
+	case "ctrl+_":
+		return tea.KeyMsg{Type: tea.KeyCtrlUnderscore}
 	}
 	if r, ok := strings.CutPrefix(k, "alt+"); ok {
 		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(r), Alt: true}
