@@ -1,5 +1,5 @@
 APP=ttr
-VERSION=9.2.0
+VERSION=10.0.0
 LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 
 build:
