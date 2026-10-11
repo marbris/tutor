@@ -388,12 +388,15 @@ From the shell, `ttr rules <query>` searches the rules too.
 Measured on my laptop (Intel i7-1355U, Linux):
 
 - One 14 MB binary.
-- It opens in about 20 ms, with the panels you left back on screen. A Scryfall search among them
+- It opens in about 30 ms, with the panels you left back on screen. Pinned tag lists add to that:
+  with twelve of them, 21,000 cards in all, it's about 90 ms. A Scryfall search among the panels
   arrives a quarter of a second later.
 - A key press is drawn in about 13 ms.
-- It uses 45 to 60 MB of memory.
-- What it downloads is kept on disk: about 40 MB, half of it every card's rulings so they show
-  without asking Scryfall, plus about 100 KB for each card picture you've looked at. `ttr cache`
+- It uses 80 to 130 MB of memory with those twelve tag lists pinned. Every card it has looked up
+  is kept in memory, about 3 KB each, so a list of thousands of cards adds tens of megabytes once
+  it's been opened.
+- What it downloads is kept on disk: about 75 MB, mostly every card's printings and rulings so they
+  show without asking Scryfall, plus about 100 KB for each card picture you've looked at. `ttr cache`
   shows what's there.
 
 Anything that waits, waits on Scryfall, which asks apps to send no more than ten requests and two
