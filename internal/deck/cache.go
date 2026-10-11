@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -87,6 +88,48 @@ func loadCardCache() *cardCache {
 		c.cards = map[string]mtg.Card{}
 	}
 	return c
+}
+
+// shared is the one card cache this process works from. Reading cards.json
+// is the slow part — 13 MB of JSON is ~65 ms and ~40 MB of garbage — and
+// the decks panel asks once per list, all at once, so it is read once and
+// kept. It is read again only when the files on disk aren't the ones it was
+// read from or last wrote: another ttr, ttr cache, MarkCardsStale.
+var shared struct {
+	sync.Mutex
+	cache *cardCache
+	stamp string
+}
+
+func fileStamp(path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return path + ":-"
+	}
+	return fmt.Sprintf("%s:%d:%d", path, fi.Size(), fi.ModTime().UnixNano())
+}
+
+func cacheStamp() string {
+	return fileStamp(CachePath()) + "|" + fileStamp(filepath.Join(paths.Cache(), cardFetchedFile))
+}
+
+// withCards runs f on the shared cache, and writes it back if f changed
+// it. f mustn't wait on the network: every other caller waits on f.
+func withCards(f func(c *cardCache)) {
+	shared.Lock()
+	defer shared.Unlock()
+	// Stamped before reading, so a write that lands meanwhile is read next time.
+	if stamp := cacheStamp(); shared.cache == nil || stamp != shared.stamp {
+		shared.cache = loadCardCache()
+		shared.stamp = stamp
+	}
+	f(shared.cache)
+	if shared.cache.dirty {
+		// A failed write costs nothing but the next load's speed.
+		if shared.cache.save() == nil {
+			shared.stamp = cacheStamp()
+		}
+	}
 }
 
 func (c *cardCache) get(e Entry) (mtg.Card, bool) {
@@ -171,24 +214,24 @@ func (e UnresolvedError) Error() string {
 // returned even when others don't; the misses come back as an
 // UnresolvedError so the caller can show both.
 func Resolve(entries []Entry) ([]Card, error) {
-	cache := loadCardCache()
-
 	// Only the entries the cache can't answer go to Scryfall, and each
 	// distinct key is asked for once however many lines want it.
 	var idents []map[string]string
 	askedFor := map[string]bool{}
-	for _, e := range entries {
-		key := entryKey(e)
-		if _, ok := cache.get(e); ok || askedFor[key] {
-			continue
+	withCards(func(cache *cardCache) {
+		for _, e := range entries {
+			key := entryKey(e)
+			if _, ok := cache.get(e); ok || askedFor[key] {
+				continue
+			}
+			askedFor[key] = true
+			if e.Set != "" && e.Collector != "" {
+				idents = append(idents, map[string]string{"set": e.Set, "collector_number": e.Collector})
+			} else {
+				idents = append(idents, map[string]string{"name": searchableName(e.Name)})
+			}
 		}
-		askedFor[key] = true
-		if e.Set != "" && e.Collector != "" {
-			idents = append(idents, map[string]string{"set": e.Set, "collector_number": e.Collector})
-		} else {
-			idents = append(idents, map[string]string{"name": searchableName(e.Name)})
-		}
-	}
+	})
 
 	// A fetch that fails isn't fatal: the cache may still hold most of the
 	// deck, and a deck that opens on a train missing its two newest cards
@@ -201,34 +244,36 @@ func Resolve(entries []Entry) ([]Card, error) {
 			fetchErr = err
 		} else {
 			index := indexCards(found)
-			for _, e := range entries {
-				if _, ok := cache.get(e); ok {
-					continue
+			withCards(func(cache *cardCache) {
+				for _, e := range entries {
+					if _, ok := cache.get(e); ok {
+						continue
+					}
+					if card, ok := index.lookup(e); ok {
+						cache.put(e, card)
+					}
 				}
-				if card, ok := index.lookup(e); ok {
-					cache.put(e, card)
-				}
-			}
-			// A failed write costs nothing but the next load's speed.
-			_ = cache.save()
+			})
 		}
 	}
 
 	cards := make([]Card, 0, len(entries))
 	var missing []string
-	for _, e := range entries {
-		card, ok := cache.get(e)
-		if !ok {
-			missing = append(missing, e.Name)
-			continue
+	withCards(func(cache *cardCache) {
+		for _, e := range entries {
+			card, ok := cache.get(e)
+			if !ok {
+				missing = append(missing, e.Name)
+				continue
+			}
+			cards = append(cards, Card{
+				Card:      card,
+				Qty:       e.Qty,
+				Commander: e.commander(),
+				Tags:      e.Tags,
+			})
 		}
-		cards = append(cards, Card{
-			Card:      card,
-			Qty:       e.Qty,
-			Commander: e.commander(),
-			Tags:      e.Tags,
-		})
-	}
+	})
 
 	if len(missing) > 0 {
 		// If the lookup never happened, say so — "no card named X" would be
@@ -264,23 +309,24 @@ func RefreshStale(slug string) (map[string]mtg.Card, error) {
 	if err != nil {
 		return nil, err
 	}
-	cache := loadCardCache()
 	var stale []Entry
 	var idents []map[string]string
 	asked := map[string]bool{}
-	for _, e := range d.MainEntries() {
-		key := entryKey(e)
-		if _, ok := cache.get(e); !ok || !cache.stale(e) || asked[key] {
-			continue
+	withCards(func(cache *cardCache) {
+		for _, e := range d.MainEntries() {
+			key := entryKey(e)
+			if _, ok := cache.get(e); !ok || !cache.stale(e) || asked[key] {
+				continue
+			}
+			asked[key] = true
+			stale = append(stale, e)
+			if e.Set != "" && e.Collector != "" {
+				idents = append(idents, map[string]string{"set": e.Set, "collector_number": e.Collector})
+			} else {
+				idents = append(idents, map[string]string{"name": searchableName(e.Name)})
+			}
 		}
-		asked[key] = true
-		stale = append(stale, e)
-		if e.Set != "" && e.Collector != "" {
-			idents = append(idents, map[string]string{"set": e.Set, "collector_number": e.Collector})
-		} else {
-			idents = append(idents, map[string]string{"name": searchableName(e.Name)})
-		}
-	}
+	})
 	if len(idents) == 0 {
 		return nil, nil
 	}
@@ -290,16 +336,17 @@ func RefreshStale(slug string) (map[string]mtg.Card, error) {
 	}
 	index := indexCards(found)
 	out := map[string]mtg.Card{}
-	for _, e := range stale {
-		card, ok := index.lookup(e)
-		if !ok {
-			continue
+	withCards(func(cache *cardCache) {
+		for _, e := range stale {
+			card, ok := index.lookup(e)
+			if !ok {
+				continue
+			}
+			old, _ := cache.get(e)
+			out[old.ID] = card
+			cache.put(e, card)
 		}
-		old, _ := cache.get(e)
-		out[old.ID] = card
-		cache.put(e, card)
-	}
-	_ = cache.save()
+	})
 	return out, nil
 }
 
@@ -351,26 +398,27 @@ func (idx cardIndex) lookup(e Entry) (mtg.Card, bool) {
 //
 // This is what lets the decks panel report legality for a directory of decks
 // the moment it opens. Checking a dozen decks properly would mean a dozen
-// rounds of requests; checking them from the cache costs a file read, and a
-// deck it can't finish is reported as unknown rather than guessed at.
+// rounds of requests; checking them from the kept cache costs a few map
+// lookups, and a deck it can't finish is reported as unknown rather than
+// guessed at.
 func ResolveCached(entries []Entry) ([]Card, bool) {
-	cache := loadCardCache()
-
 	out := make([]Card, 0, len(entries))
 	complete := true
-	for _, e := range entries {
-		card, ok := cache.get(e)
-		if !ok {
-			complete = false
-			continue
+	withCards(func(cache *cardCache) {
+		for _, e := range entries {
+			card, ok := cache.get(e)
+			if !ok {
+				complete = false
+				continue
+			}
+			out = append(out, Card{
+				Card:      card,
+				Qty:       e.Qty,
+				Commander: e.commander(),
+				Tags:      e.Tags,
+			})
 		}
-		out = append(out, Card{
-			Card:      card,
-			Qty:       e.Qty,
-			Commander: e.commander(),
-			Tags:      e.Tags,
-		})
-	}
+	})
 	return out, complete
 }
 
@@ -382,12 +430,14 @@ func CachedByOracle(ids []string) map[string]mtg.Card {
 		want[id] = true
 	}
 	out := map[string]mtg.Card{}
-	for _, c := range loadCardCache().cards {
-		if want[c.OracleID] {
-			if _, ok := out[c.OracleID]; !ok {
-				out[c.OracleID] = c
+	withCards(func(cache *cardCache) {
+		for _, c := range cache.cards {
+			if want[c.OracleID] {
+				if _, ok := out[c.OracleID]; !ok {
+					out[c.OracleID] = c
+				}
 			}
 		}
-	}
+	})
 	return out
 }

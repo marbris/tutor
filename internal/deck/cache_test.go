@@ -220,3 +220,23 @@ func TestACachedCardCarriesWhenItWasFetched(t *testing.T) {
 		t.Errorf("a card just fetched says %v", card.PricedAt)
 	}
 }
+
+func TestTheKeptCardCacheNoticesAnotherWriter(t *testing.T) {
+	// The cache is read once and kept, but another ttr, or ttr cache clear,
+	// can change the file underneath it.
+	seedCache(t, map[string]mtg.Card{"sol ring": {Name: "Sol Ring"}})
+	if _, complete := ResolveCached([]Entry{{Qty: 1, Name: "Sol Ring"}}); !complete {
+		t.Fatal("the seeded card wasn't found")
+	}
+	body, _ := json.Marshal(map[string]mtg.Card{"mana crypt": {Name: "Mana Crypt"}})
+	if err := os.WriteFile(CachePath(), body, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, complete := ResolveCached([]Entry{{Qty: 1, Name: "Mana Crypt"}}); !complete {
+		t.Error("a card written by someone else wasn't seen")
+	}
+	os.Remove(CachePath())
+	if _, complete := ResolveCached([]Entry{{Qty: 1, Name: "Mana Crypt"}}); complete {
+		t.Error("a cleared cache still answered")
+	}
+}
