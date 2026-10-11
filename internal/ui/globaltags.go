@@ -51,6 +51,25 @@ type tagIndex struct {
 	// sig is what the lists on screen were at the last rebuild, to know
 	// when to rebuild again.
 	sig string
+	// read is what each pinned list off screen said when its file was last
+	// read, by slug. Pinned lists run to thousands of lines and rebuild runs
+	// after every edit, so a file is read again only once it has changed.
+	read map[string]readList
+}
+
+type readList struct {
+	stamp string
+	tags  map[string][]string
+}
+
+// fileStamp is a file's size and modification time, or "" if it can't be
+// read.
+func fileStamp(path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d:%d", fi.Size(), fi.ModTime().UnixNano())
 }
 
 // globalTags is the one index, shared by every list, because the lists
@@ -162,14 +181,14 @@ func (x *tagIndex) all() []string {
 func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 	x.gen++
 	x.from = map[string]map[string][]string{}
-	add := func(key, name string, tags []string) {
+	add := func(from map[string]map[string][]string, key, name string, tags []string) {
 		if len(tags) == 0 {
 			return
 		}
-		into := x.from[key]
+		into := from[key]
 		if into == nil {
 			into = map[string][]string{}
-			x.from[key] = into
+			from[key] = into
 		}
 		k := strings.ToLower(name)
 		into[k] = deck.ApplyTagEdits(into[k], tags, nil)
@@ -182,19 +201,33 @@ func (x *tagIndex) rebuild(open map[string][]deck.Card) {
 			continue
 		}
 		for _, c := range cards {
-			add(key, c.Card.Name, c.Tags)
+			add(x.from, key, c.Card.Name, c.Tags)
 		}
+	}
+	if x.read == nil {
+		x.read = map[string]readList{}
 	}
 	for _, slug := range x.slugs {
 		if _, ok := open[slug]; ok || x.muted[slug] {
 			continue
 		}
-		f, err := deck.Read(slug)
-		if err != nil {
-			continue
+		stamp := fileStamp(deck.Path(slug))
+		r, ok := x.read[slug]
+		if !ok || stamp == "" || r.stamp != stamp {
+			f, err := deck.Read(slug)
+			if err != nil {
+				delete(x.read, slug)
+				continue
+			}
+			one := map[string]map[string][]string{}
+			for _, e := range f.Entries {
+				add(one, slug, e.Name, e.Tags)
+			}
+			r = readList{stamp: stamp, tags: one[slug]}
+			x.read[slug] = r
 		}
-		for _, e := range f.Entries {
-			add(slug, e.Name, e.Tags)
+		if r.tags != nil {
+			x.from[slug] = r.tags
 		}
 	}
 }

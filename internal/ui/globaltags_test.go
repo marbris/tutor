@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"testing"
 
 	"ttr/internal/deck"
@@ -101,5 +102,30 @@ func TestAnEditToALendingListReachesTheOthers(t *testing.T) {
 	}
 	if tagCount(other, "draw") != 1 {
 		t.Error("list 2 doesn't see the tag just put on in list 1")
+	}
+}
+
+// A pinned list off screen is read once and kept, since rebuild runs after
+// every edit, but a change to its file is still seen.
+func TestAPinnedListIsReadAgainOnlyWhenItsFileChanges(t *testing.T) {
+	resetDecks(t)
+	freshGlobalTags(t)
+	withPinned(t, "ramp-cards", "name: ramp-cards\nformat: tags\n[mainboard]\n1 Sol Ring [ramp]\n")
+	globalTags.toggle("ramp-cards")
+
+	globalTags.rebuild(nil)
+	first := globalTags.from["ramp-cards"]
+	globalTags.rebuild(nil)
+	if fmt.Sprintf("%p", globalTags.from["ramp-cards"]) != fmt.Sprintf("%p", first) {
+		t.Error("an unchanged pinned list was read again")
+	}
+
+	seedDeck(t, "ramp-cards", "name: ramp-cards\nformat: tags\n[mainboard]\n1 Sol Ring [ramp, rock]\n1 Arcane Signet [ramp]\n")
+	globalTags.rebuild(nil)
+	if got := globalTags.of("Arcane Signet", ""); len(got) != 1 || got[0] != "ramp" {
+		t.Errorf("after the file changed, Arcane Signet has %v, want [ramp]", got)
+	}
+	if got := globalTags.of("Sol Ring", ""); len(got) != 2 {
+		t.Errorf("after the file changed, Sol Ring has %v, want [ramp rock]", got)
 	}
 }
