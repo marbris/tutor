@@ -373,15 +373,24 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 
 	// The card's own tags, then in another list's colour the ones the global
 	// tags give it — they count the same, but they aren't in this list's file.
+	// Wrapped like Tagger's below: a well-tagged card has more than a line's worth.
 	if global := c.Borrowed; len(c.Tags) > 0 || len(global) > 0 {
-		line := lipgloss.NewStyle().Foreground(theme.Highlight).Render(strings.Join(c.Tags, " "))
-		if len(global) > 0 {
-			if len(c.Tags) > 0 {
-				line += " "
+		var parts []string
+		for _, set := range []struct {
+			tags  []string
+			style lipgloss.Style
+		}{
+			{c.Tags, lipgloss.NewStyle().Foreground(theme.Highlight)},
+			{global, lipgloss.NewStyle().Foreground(theme.MemberOther)},
+		} {
+			for _, tag := range set.tags {
+				for _, piece := range hardWrap(tag, width) {
+					parts = append(parts, set.style.Render(piece))
+				}
 			}
-			line += lipgloss.NewStyle().Foreground(theme.MemberOther).Render(strings.Join(global, " "))
 		}
-		out = append(out, "", lipgloss.NewStyle().MaxWidth(width).Render(line))
+		out = append(out, "")
+		out = append(out, packStyled(parts, " ", width)...)
 	}
 
 	// What Scryfall Tagger says the card does: its own tags, not the
