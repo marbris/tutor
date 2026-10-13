@@ -341,6 +341,24 @@ func (p *panel) header(width int) (string, bool) {
 	return name, false
 }
 
+// headLines is the header laid out at a width. An open text field is its
+// one line, already styled; otherwise the panel's name, wrapped onto as many
+// lines as it needs — a deck name or a query cut short is a header that
+// can't tell two panels apart.
+func (p *panel) headLines(width int) (lines []string, styled bool) {
+	text, styled := p.header(width)
+	if styled {
+		return []string{text}, true
+	}
+	return hardWrap(text, width), false
+}
+
+// headHeight is how many lines the header and the rows under it take.
+func (p *panel) headHeight(width int) int {
+	head, _ := p.headLines(width)
+	return len(head) + len(p.subLines(width))
+}
+
 // fitInput sizes a text field to the panel. An empty one draws its
 // placeholder, and the text field takes its prompt off the width for that
 // itself: given the room left after the prompt, as typed text needs, it

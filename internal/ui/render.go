@@ -21,15 +21,15 @@ func (m Model) viewWorkspace() string {
 
 	// Every visible panel's header is as tall as the tallest, so the rules
 	// under them — and the first rows of cards — line up across the row.
-	subHeight := 0
+	headHeight := 0
 	for i, width := range l.panels {
-		subHeight = maxInt(subHeight, len(ws.panels[l.first+i].subLines(maxInt(width-2, 1))))
+		headHeight = maxInt(headHeight, ws.panels[l.first+i].headHeight(maxInt(width-2, 1)))
 	}
 
 	var columns []string
 	for i, width := range l.panels {
 		at := l.first + i
-		columns = append(columns, m.viewPanel(ws.panels[at], at, width, l.height, subHeight))
+		columns = append(columns, m.viewPanel(ws.panels[at], at, width, l.height, headHeight))
 	}
 	if l.info > 0 {
 		columns = append(columns, m.viewInfo(l.info, l.height))
@@ -40,9 +40,9 @@ func (m Model) viewWorkspace() string {
 }
 
 // viewPanel draws one panel: a border, its header, and its contents.
-// subHeight is how many lines the header under the title takes; the panel
-// pads its own to that, so neighbours stay level.
-func (m Model) viewPanel(p *panel, index, width, height, subHeight int) string {
+// headHeight is how many lines the title and the rows under it take; the
+// panel pads its own to that, so neighbours stay level.
+func (m Model) viewPanel(p *panel, index, width, height, headHeight int) string {
 	focused := index == m.ws.focused
 	editing := index == m.ws.editing
 
@@ -64,18 +64,19 @@ func (m Model) viewPanel(p *panel, index, width, height, subHeight int) string {
 		head = lipgloss.NewStyle().Foreground(theme.TextDim)
 	}
 
-	text, styled := p.header(inner)
-	headLine := text
-	if !styled {
-		headLine = head.Render(fit(text, inner))
+	title, styled := p.headLines(inner)
+	var lines []string
+	for _, t := range title {
+		if !styled {
+			t = head.Render(fit(t, inner))
+		}
+		lines = append(lines, t)
 	}
-	lines := []string{headLine}
 	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
-	sub := p.subLines(inner)
-	for _, s := range sub {
+	for _, s := range p.subLines(inner) {
 		lines = append(lines, muted.Render(pad(s, inner)))
 	}
-	for i := len(sub); i < subHeight; i++ {
+	for len(lines) < headHeight {
 		lines = append(lines, strings.Repeat(" ", inner))
 	}
 	lines = append(lines, lipgloss.NewStyle().

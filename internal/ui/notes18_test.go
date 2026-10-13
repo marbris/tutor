@@ -56,3 +56,31 @@ func TestALongDeckNameWrapsInTheInfoPanel(t *testing.T) {
 	}
 	checkWrapped(t, "the name", lines[:end], 20, strings.Fields(name)...)
 }
+
+func TestAListPanelsTitleWrapsAndTheHeadersStayLevel(t *testing.T) {
+	// A narrow search panel beside a deck: the query wraps onto a second
+	// line, and the deck's rule moves down with it.
+	m := withCards(sized(90, 30), "f", sample(), sortArrival)
+	query := "t:creature o:draw id<=sultai -t:legendary"
+	m.ws.current().title = query
+	m.ws.current().cardsView().name = query
+	m, l := ownDeck(m)
+	l.name = "Ghen, Arcanum Weaver and the enchantment pile"
+	m.ws.current().title = l.name
+
+	view := stripANSI(m.View())
+	for _, want := range append(strings.Fields(query), strings.Fields(l.name)...) {
+		if !strings.Contains(view, want) {
+			t.Errorf("%q isn't in the headers:\n%s", want, view)
+		}
+	}
+	level := false
+	for _, line := range splitLines(view) {
+		if strings.Count(line, "│─") >= 2 {
+			level = true
+		}
+	}
+	if !level {
+		t.Errorf("the panels' rules aren't level:\n%s", view)
+	}
+}
