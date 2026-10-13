@@ -342,8 +342,8 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 			out = append(out, "")
 		}
 		out = append(out, faceHeading(f, width))
-		if line := typeLine(f, width); line != "" {
-			out = append(out, dim.Render(line))
+		for _, line := range typeLine(f, width) {
+			out = append(out, dim.Render(fit(line, width)))
 		}
 		if text := f.OracleText; text != "" {
 			out = append(out, "")
@@ -450,13 +450,14 @@ func faceHeading(f mtg.Card, width int) string {
 	return name.Render(fit(f.Name, room-1)) + " " + cost
 }
 
-// typeLine is the card's type line on its own, so a narrow panel gives up
-// the end of the type before it gives up the power/toughness beside it.
-func typeLine(f mtg.Card, width int) string {
+// typeLine is the card's type line on its own rows, wrapped: a long one
+// ("Legendary Creature — Elf Archer Warrior") loses the subtypes you were
+// looking for when it is cut.
+func typeLine(f mtg.Card, width int) []string {
 	if f.TypeLine == "" {
-		return ""
+		return nil
 	}
-	return fit(f.TypeLine, width)
+	return hardWrap(f.TypeLine, width)
 }
 
 // statsLine is power/toughness, or a planeswalker's loyalty — the numbers a

@@ -38,7 +38,9 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 			fmt.Println()
 		}
 		fmt.Println(faceHeading(f, width))
-		fmt.Println(lipgloss.NewStyle().Foreground(theme.TextDim).Render(typeLine(f, width)))
+		for _, line := range typeLine(f, width) {
+			fmt.Println(lipgloss.NewStyle().Foreground(theme.TextDim).Render(line))
+		}
 		if f.OracleText != "" {
 			fmt.Println()
 			for _, line := range highlightOracle(f.OracleText, f, width, rd) {

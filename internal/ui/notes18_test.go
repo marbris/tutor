@@ -3,6 +3,8 @@ package ui
 import (
 	"strings"
 	"testing"
+
+	"ttr/internal/rules"
 )
 
 // Things that ran off the edge, or were cut with "…", now wrap.
@@ -83,4 +85,18 @@ func TestAListPanelsTitleWrapsAndTheHeadersStayLevel(t *testing.T) {
 	if !level {
 		t.Errorf("the panels' rules aren't level:\n%s", view)
 	}
+}
+
+func TestALongTypeLineWrapsInTheInfoPanel(t *testing.T) {
+	card := sample()[0] // Legendary Creature — Elf Archer
+	lines := splitLines(stripANSI(strings.Join(cardInfo(card, 20, rules.Data{}, nil, nil), "\n")))
+	// The type line follows the name, up to the blank line before the text.
+	end := 1
+	for end < len(lines) && strings.TrimSpace(lines[end]) != "" {
+		end++
+	}
+	if end < 3 {
+		t.Fatalf("the type line didn't wrap:\n%s", strings.Join(lines, "\n"))
+	}
+	checkWrapped(t, "the type line", lines[1:end], 20, strings.Fields(card.Card.TypeLine)...)
 }
