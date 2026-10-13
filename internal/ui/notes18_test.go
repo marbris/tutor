@@ -38,3 +38,21 @@ func TestACardsTagsWrapInTheInfoPanel(t *testing.T) {
 	}
 	checkWrapped(t, "the tags", lines[:end], 24, append(card.Tags, card.Borrowed...)...)
 }
+
+func TestALongDeckNameWrapsInTheInfoPanel(t *testing.T) {
+	name := "Isshin, Two Heavens as One — the attack trigger pile"
+	l := &deckList{order: byName, all: []deckEntry{
+		{kind: entryLocal, name: name, slug: "isshin", count: 100},
+	}}
+	l.refresh()
+
+	lines := splitLines(stripANSI(strings.Join(l.info(20), "\n")))
+	end := 0
+	for end < len(lines) && strings.TrimSpace(lines[end]) != "" {
+		end++
+	}
+	if end < 2 {
+		t.Fatalf("the name didn't wrap:\n%s", strings.Join(lines, "\n"))
+	}
+	checkWrapped(t, "the name", lines[:end], 20, strings.Fields(name)...)
+}

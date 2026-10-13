@@ -911,7 +911,13 @@ func (l *deckList) info(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
-	out := []string{head.Render(fit(e.name, width)), ""}
+	// A long name wraps rather than losing its end: decks in a series often
+	// differ only there.
+	var out []string
+	for _, line := range hardWrap(e.name, width) {
+		out = append(out, head.Render(fit(line, width)))
+	}
+	out = append(out, "")
 	switch e.kind {
 	case entryFolder:
 		out = append(out, dim.Render(fit("folder", width)))
@@ -934,7 +940,9 @@ func (l *deckList) info(width int) []string {
 		if e.folder != "" {
 			location = "in " + e.folder
 		}
-		out = append(out, dim.Render(fit(location, width)))
+		for _, line := range hardWrap(location, width) {
+			out = append(out, dim.Render(fit(line, width)))
+		}
 		out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
 		if age := shortAge(e.modified); age != "" {
 			out = append(out, dim.Render(fit("touched "+age+" ago", width)))
