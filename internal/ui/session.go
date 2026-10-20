@@ -207,7 +207,7 @@ func (m *Model) restore() tea.Cmd {
 			if ps.Query != "" {
 				p.pending = &ps
 				p.search.SetValue(ps.Query)
-				cmds = append(cmds, m.search(p))
+				cmds = append(cmds, m.search(p, false))
 			}
 
 		case "decks":

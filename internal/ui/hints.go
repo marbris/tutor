@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/keymap"
 	"ttr/internal/stats"
 )
@@ -365,10 +366,11 @@ func (m Model) barKeys(p *panel) [][2]string {
 			hint("result order ↑↓", keymap.Search, keymap.SearchQuerySort, keymap.SearchQueryDir),
 		)
 	}
-	return append(out,
-		hint(p.kind.prompt(), keymap.Search, keymap.SearchRun),
-		hint("leave the bar", keymap.Search, keymap.SearchBack),
-	)
+	out = append(out, hint(p.kind.prompt(), keymap.Search, keymap.SearchRun))
+	if p.kind == KindFind && cardstore.Current() != nil {
+		out = append(out, hint("ask scryfall instead", keymap.Search, keymap.SearchScryfall))
+	}
+	return append(out, hint("leave the bar", keymap.Search, keymap.SearchBack))
 }
 
 // addBarKeys is the i bar's keys, and T o's. Its keys are the prompt's own,

@@ -368,7 +368,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case keymap.SearchRun:
 		if p.kind == KindFind {
-			cmd := m.search(p)
+			cmd := m.search(p, false)
 			return m, cmd
 		}
 		if p.kind == KindRules {
@@ -410,6 +410,13 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			p.title = p.kind.String() + ": " + q
 			p.searchOpen = false
 			p.search.Blur()
+		}
+		return m, nil
+
+	case keymap.SearchScryfall:
+		if p.kind == KindFind {
+			cmd := m.search(p, true)
+			return m, cmd
 		}
 		return m, nil
 

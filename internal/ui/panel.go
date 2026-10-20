@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/theme"
 )
 
@@ -59,6 +60,9 @@ func (k Kind) String() string {
 func (k Kind) prompt() string {
 	switch k {
 	case KindFind:
+		if cardstore.Current() != nil {
+			return "search every card"
+		}
 		return "scryfall"
 	case KindDecks:
 		return "moxfield user or deck url"
@@ -74,6 +78,9 @@ func (k Kind) prompt() string {
 func (k Kind) barLabel() string {
 	switch k {
 	case KindFind:
+		if cardstore.Current() != nil {
+			return "search every card"
+		}
 		return "search scryfall"
 	case KindDecks:
 		return "search moxfield"
@@ -173,6 +180,8 @@ type panel struct {
 	// querySort is the order the *request* asks for — which cards come back
 	// — as an index into scryfall.SortOptions.
 	querySort int
+	// awaitingStore is a search held until the cards on disk are in.
+	awaitingStore bool
 	// queryDir is which way that order runs, as an index into
 	// scryfall.DirOptions. Zero is auto: Scryfall's choice.
 	queryDir int

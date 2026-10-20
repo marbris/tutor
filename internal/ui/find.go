@@ -1,14 +1,25 @@
 package ui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/deck"
 	"ttr/internal/fetch"
+	"ttr/internal/keymap"
+	"ttr/internal/query"
 	"ttr/internal/scryfall"
 )
 
-// Searching Scryfall.
+// Searching for cards.
+//
+// With the cards on disk (internal/cardstore), a search runs over them, in
+// Tutor's own part of Scryfall's syntax (internal/query), and asks nobody.
+// A word it doesn't know is named in the notice, and alt+enter sends the
+// query to Scryfall instead. Without them — turned off, or not downloaded
+// yet — a search asks Scryfall, as it always did.
 //
 // Two orders are in play and they are not the same thing. The query sort —
 // ctrl+o, with ctrl+r for its direction — is part of the request: it
@@ -22,6 +33,10 @@ import (
 // maxResults is one Scryfall page, which is the whole result set kept.
 const maxResults = 175
 
+// maxLocal is how many cards a local search keeps, in its order. More is
+// cheap to find but no use to scroll; the header says how many matched.
+const maxLocal = 1000
+
 // searchDoneMsg carries a finished search back to the panel that asked for
 // it. Panels are identified by id rather than by index because the row can
 // be reordered or closed while a request is in flight.
@@ -31,6 +46,38 @@ type searchDoneMsg struct {
 	cards []deck.Card
 	total int
 	err   error
+	// local is a search of the cards on disk; unknown is the words in it
+	// that it couldn't read.
+	local   bool
+	unknown []string
+}
+
+// runLocalSearch searches the cards on disk, off the main thread.
+func runLocalSearch(s *cardstore.Store, panelID int, q, order, dir string) tea.Cmd {
+	return func() tea.Msg {
+		parsed := query.ParseSearch(q)
+		var found []int
+		// Nothing left once the words it couldn't read are out is no
+		// question at all, not one every card answers.
+		if !parsed.Empty() {
+			found = query.Search(s, parsed, order, dir)
+		}
+		msg := searchDoneMsg{panel: panelID, query: q, total: len(found), local: true, unknown: parsed.Unknown()}
+		if len(found) == 0 {
+			msg.err = fetch.NotFound{}
+			return msg
+		}
+		found = found[:min(len(found), maxLocal)]
+		msg.cards = make([]deck.Card, 0, len(found))
+		for _, i := range found {
+			c, err := s.Card(i)
+			if err != nil {
+				return searchDoneMsg{panel: panelID, query: q, err: err}
+			}
+			msg.cards = append(msg.cards, deck.Card{Card: c})
+		}
+		return msg
+	}
 }
 
 // runSearch asks Scryfall, off the main thread.
@@ -51,8 +98,10 @@ func runSearch(panelID int, query, order, dir string) tea.Cmd {
 	}
 }
 
-// search starts one for the focused panel and puts it into its waiting state.
-func (m *Model) search(p *panel) tea.Cmd {
+// search starts one for the focused panel and puts it into its waiting
+// state: over the cards on disk if they're in, or asking Scryfall when
+// askScryfall says to or they aren't.
+func (m *Model) search(p *panel, askScryfall bool) tea.Cmd {
 	query := p.search.Value()
 	if query == "" {
 		return nil
@@ -68,7 +117,51 @@ func (m *Model) search(p *panel) tea.Cmd {
 	p.search.Blur()
 	p.title = query
 
-	return runSearch(p.id, query, p.queryOrder(), p.queryDirection())
+	if !askScryfall && m.storeLoading {
+		// A search at the start, from the session or the command line:
+		// the cards on disk are a moment from loaded, and it waits for
+		// them rather than asking Scryfall.
+		p.awaitingStore = true
+		return nil
+	}
+	return p.runSearch(askScryfall)
+}
+
+// runSearch sends the search in the panel's bar.
+func (p *panel) runSearch(askScryfall bool) tea.Cmd {
+	if s := cardstore.Current(); s != nil && !askScryfall {
+		return runLocalSearch(s, p.id, p.title, p.queryOrder(), p.queryDirection())
+	}
+	return runSearch(p.id, p.title, p.queryOrder(), p.queryDirection())
+}
+
+// searchesWaiting sends the searches that waited for the cards on disk, to
+// them if they loaded and to Scryfall if they didn't.
+func (m *Model) searchesWaiting() tea.Cmd {
+	m.storeLoading = false
+	var cmds []tea.Cmd
+	for _, p := range m.ws.panels {
+		if p.awaitingStore {
+			p.awaitingStore = false
+			cmds = append(cmds, p.runSearch(false))
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
+// unknownNotice is what a local search says about the words it couldn't
+// read.
+func unknownNotice(words []string) string {
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		quoted[i] = "“" + w + "”"
+	}
+	verb := " isn't"
+	if len(words) > 1 {
+		verb = " aren't"
+	}
+	return strings.Join(quoted, ", ") + verb + " searched locally · " +
+		keymap.Hint(keymap.Search, keymap.SearchScryfall) + " asks Scryfall"
 }
 
 // handleSearchDone files a finished search, if the panel that asked for it
@@ -82,6 +175,9 @@ func (m Model) handleSearchDone(msg searchDoneMsg) (tea.Model, tea.Cmd) {
 	}
 
 	p.loading = false
+	if len(msg.unknown) > 0 {
+		m.notice = unknownNotice(msg.unknown)
+	}
 	if msg.err != nil {
 		// The orders outlive a failed search too, so the next one that
 		// works still comes back laid out the way you had it.
@@ -97,7 +193,11 @@ func (m Model) handleSearchDone(msg searchDoneMsg) (tea.Model, tea.Cmd) {
 	// how you read a list, not part of the question. A panel's first search
 	// starts at the head of the cycle — Scryfall's own order, as it ships,
 	// which is the answer to the order the query asked for.
-	l := newCardList(msg.cards, firstSort(), "scryfall order")
+	arrival := "scryfall order"
+	if msg.local {
+		arrival = "search order"
+	}
+	l := newCardList(msg.cards, firstSort(), arrival)
 	if prev := p.cardsView(); prev != nil {
 		l.keepSorts(prev)
 	} else if p.lastSorts != nil {

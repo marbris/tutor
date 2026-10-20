@@ -239,8 +239,8 @@ func (p *parser) and() node {
 			if n == nil {
 				continue
 			}
-		} else {
-			n = p.term(t.text)
+		} else if n = p.term(t.text); n == nil {
+			continue
 		}
 		if t.neg {
 			n = notNode{n}

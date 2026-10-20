@@ -14,8 +14,9 @@ type termFunc func(*cardstore.Facts) bool
 func (f termFunc) match(c *cardstore.Facts) bool { return f(c) }
 
 // term turns one word into what it matches. A keyword it knows, with a value
-// it can read, is that keyword; anything else is plain text, and a word that
-// looked like a keyword is noted as unknown.
+// it can read, is that keyword; anything else is plain text. A word that
+// looked like a keyword is noted as unknown — and in a search, left out
+// (nil), so the rest of the query still finds what it would.
 func (p *parser) term(w string) node {
 	if name, ok := strings.CutPrefix(w, "!"); ok && name != "" {
 		return termFunc(func(c *cardstore.Facts) bool { return strings.EqualFold(c.Name, name) })
@@ -27,6 +28,9 @@ func (p *parser) term(w string) node {
 		}
 		if val != "" {
 			p.unknown = append(p.unknown, key+op+val)
+			if p.namesOnly {
+				return nil
+			}
 		}
 	}
 	if p.namesOnly {

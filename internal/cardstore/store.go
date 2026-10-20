@@ -188,6 +188,12 @@ func Load() (s *Store, stale bool) {
 	return s, time.Since(s.Built) > maxAge
 }
 
+// OnDisk reports whether there is a store to load, without loading it.
+func OnDisk() bool {
+	_, err := os.Stat(indexFile())
+	return err == nil
+}
+
 // ── The index ───────────────────────────────────────────────────
 
 // index is what index.gob holds: everything the store keeps in memory.

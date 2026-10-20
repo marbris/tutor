@@ -25,7 +25,7 @@ func (m Model) viewSplash() string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	rows := []struct{ k, v string }{
-		{leaderHint(keymap.LeaderFind), "find cards on Scryfall"},
+		{leaderHint(keymap.LeaderFind), "find cards"},
 		{leaderHint(keymap.LeaderDecks), "your decks, and Moxfield"},
 		{leaderHint(keymap.LeaderRules), "the comprehensive rules"},
 		{leaderHint(keymap.LeaderSettings), "settings: sync, downloads, cache"},

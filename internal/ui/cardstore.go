@@ -80,16 +80,19 @@ func (m Model) handleCardStore(msg cardStoreMsg) (tea.Model, tea.Cmd) {
 		if msg.first && msg.err != nil {
 			m.notice = "card data: " + errorText(msg.err) + " — searches ask Scryfall"
 		}
-		return m, nil // none, or turned off while it was on its way
+		// None, or turned off while it was on its way: what waited for it
+		// asks Scryfall.
+		return m, m.searchesWaiting()
 	}
 	cardstore.SetCurrent(msg.store)
 	if msg.first {
 		m.notice = "card data in: " + itoa(msg.store.Len()) + " cards"
 	}
+	cmd := m.searchesWaiting()
 	if msg.stale {
-		return m, tea.Batch(refreshCardStore, cardStoreTick())
+		return m, tea.Batch(cmd, refreshCardStore, cardStoreTick())
 	}
-	return m, nil
+	return m, cmd
 }
 
 // cardStoreDownload is the store's name as a download and a cache kind.

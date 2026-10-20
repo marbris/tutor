@@ -17,7 +17,7 @@ import (
 func sortNamed(name string) (cardSort, bool) {
 	name = strings.ToLower(strings.TrimSpace(name))
 	switch name {
-	case "scryfall", "scryfall order", "arrival", "as found", "decklist":
+	case "scryfall", "scryfall order", "search order", "arrival", "as found", "decklist":
 		return sortArrival, true
 	case "colour":
 		return sortColor, true

@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/deck"
 	"ttr/internal/rules"
 	"ttr/internal/theme"
@@ -60,6 +61,9 @@ type Model struct {
 	// holding to draw.
 	images   map[string]*cardPrintings
 	pictures *pictureCache
+	// storeLoading is the cards on disk on their way in at the start, which
+	// a search from the session or the command line waits for.
+	storeLoading bool
 	// prefetch is gX, fetching every picture in a list ahead of you.
 	prefetch prefetchState
 	imageSeq int
@@ -91,12 +95,13 @@ func New() Model {
 	globalTags = &tagIndex{slugs: loadPinned()}
 	globalTags.rebuild(nil)
 	return Model{
-		ws:        newWorkspace(),
-		history:   LoadQueryHistory(),
-		stats:     statsState{memo: &statsMemo{}},
-		histories: map[string]*cardHistory{},
-		images:    map[string]*cardPrintings{},
-		pictures:  newPictureCache(),
+		ws:           newWorkspace(),
+		history:      LoadQueryHistory(),
+		stats:        statsState{memo: &statsMemo{}},
+		histories:    map[string]*cardHistory{},
+		images:       map[string]*cardPrintings{},
+		pictures:     newPictureCache(),
+		storeLoading: !downloadsOff()[cardStoreDownload] && cardstore.OnDisk(),
 	}
 }
 
@@ -106,7 +111,7 @@ func NewWithQuery(query string) (Model, tea.Cmd) {
 	p := m.ws.open(KindFind)
 	p.search.SetValue(query)
 	p.search.CursorEnd()
-	cmd := m.search(p)
+	cmd := m.search(p, false)
 	return m, cmd
 }
 

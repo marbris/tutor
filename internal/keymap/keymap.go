@@ -171,6 +171,7 @@ const (
 	SearchNextTarget  Action = "target.next"
 	SearchPrevTarget  Action = "target.prev"
 	SearchRun         Action = "run"
+	SearchScryfall    Action = "run.scryfall"
 	SearchBack        Action = "back"
 	SearchHistoryPrev Action = "history.prev"
 	SearchHistoryNext Action = "history.next"
@@ -323,6 +324,8 @@ var defaults = []binding{
 	// Not ctrl+i, which a terminal sends as the same byte as tab.
 	{Search, SearchQueryDir, k("ctrl+r")},
 	{Search, SearchRun, k("enter")},
+	// A search runs over the cards on disk; this asks Scryfall instead.
+	{Search, SearchScryfall, k("alt+enter")},
 	{Search, SearchBack, k("esc")},
 }
 
