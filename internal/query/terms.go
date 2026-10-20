@@ -4,23 +4,33 @@ import (
 	"strconv"
 	"strings"
 
-	"ttr/internal/deck"
+	"ttr/internal/cardstore"
 	"ttr/internal/tagger"
 )
 
 // termFunc is a term that matches: a card in, yes or no out.
-type termFunc func(deck.Card) bool
+type termFunc func(*cardstore.Facts) bool
 
-func (f termFunc) match(c deck.Card) bool { return f(c) }
+func (f termFunc) match(c *cardstore.Facts) bool { return f(c) }
 
 // term turns one word into what it matches. A keyword it knows, with a value
-// it can read, is that keyword; anything else is plain text.
-func term(w string) node {
+// it can read, is that keyword; anything else is plain text, and a word that
+// looked like a keyword is noted as unknown.
+func (p *parser) term(w string) node {
+	if name, ok := strings.CutPrefix(w, "!"); ok && name != "" {
+		return termFunc(func(c *cardstore.Facts) bool { return strings.EqualFold(c.Name, name) })
+	}
 	key, op, val, ok := splitTerm(w)
 	if ok {
 		if n := keyword(key, op, val); n != nil {
 			return n
 		}
+		if val != "" {
+			p.unknown = append(p.unknown, key+op+val)
+		}
+	}
+	if p.namesOnly {
+		return contains(func(c *cardstore.Facts) string { return c.Name }, w)
 	}
 	return plain(w)
 }
@@ -28,9 +38,8 @@ func term(w string) node {
 // plain is a word matched as / always has: anywhere in the name, the text,
 // the type line or the tags.
 func plain(w string) node {
-	return termFunc(func(c deck.Card) bool {
-		hay := strings.ToLower(c.Card.Name + "\n" + c.Card.CombinedOracle() + "\n" +
-			c.Card.TypeLine + "\n" + strings.Join(c.AllTags(), " "))
+	return termFunc(func(c *cardstore.Facts) bool {
+		hay := strings.ToLower(c.Name + "\n" + c.Text + "\n" + c.TypeLine + "\n" + strings.Join(c.Tags, " "))
 		return strings.Contains(hay, w)
 	})
 }
@@ -76,51 +85,57 @@ func keyword(key, op, val string) node {
 	switch key {
 	case "t", "type":
 		if text {
-			return contains(func(c deck.Card) string { return c.Card.TypeLine }, val)
+			return contains(func(c *cardstore.Facts) string { return c.TypeLine }, val)
 		}
 	case "o", "oracle":
 		if text {
-			return contains(func(c deck.Card) string { return c.Card.CombinedOracle() }, val)
+			return contains(func(c *cardstore.Facts) string { return c.Text }, val)
 		}
 	case "name":
 		if text {
-			return contains(func(c deck.Card) string { return c.Card.Name }, val)
+			return contains(func(c *cardstore.Facts) string { return c.Name }, val)
 		}
 	case "mv", "cmc", "manavalue":
-		return number(op, val, func(c deck.Card) (float64, bool) { return c.Card.CMC, true })
+		return number(op, val, func(c *cardstore.Facts) (float64, bool) { return c.CMC, true })
 	case "pow", "power":
-		return number(op, val, func(c deck.Card) (float64, bool) { return stat(c.Card.Power) })
+		return number(op, val, func(c *cardstore.Facts) (float64, bool) { return stat(c.Power) })
 	case "tou", "toughness":
-		return number(op, val, func(c deck.Card) (float64, bool) { return stat(c.Card.Toughness) })
+		return number(op, val, func(c *cardstore.Facts) (float64, bool) { return stat(c.Toughness) })
 	case "loy", "loyalty":
-		return number(op, val, func(c deck.Card) (float64, bool) { return stat(c.Card.Loyalty) })
+		return number(op, val, func(c *cardstore.Facts) (float64, bool) { return stat(c.Loyalty) })
 	case "usd":
-		return number(op, val, func(c deck.Card) (float64, bool) { return c.Card.USD() })
+		return number(op, val, func(c *cardstore.Facts) (float64, bool) { return c.USD, c.HasUSD })
 	case "c", "color":
-		return colors(op, opGe, val, func(c deck.Card) []string { return c.Card.DisplayColors() })
+		return colors(op, opGe, val, func(c *cardstore.Facts) []string { return c.Colors.List() })
 	case "id", "identity", "ci":
-		return colors(op, opLe, val, func(c deck.Card) []string { return c.Card.ColorIdentity })
+		return colors(op, opLe, val, func(c *cardstore.Facts) []string { return c.Identity.List() })
 	case "r", "rarity":
 		return rarity(op, val)
 	case "f", "format", "legal":
 		if text {
-			return termFunc(func(c deck.Card) bool {
-				l := c.Card.Legalities[val]
-				return l == "legal" || l == "restricted"
-			})
+			bit, _ := cardstore.FormatBit(val)
+			return termFunc(func(c *cardstore.Facts) bool { return c.Legal&bit != 0 })
 		}
 	case "banned":
 		if text {
-			return termFunc(func(c deck.Card) bool { return c.Card.Legalities[val] == "banned" })
+			bit, _ := cardstore.FormatBit(val)
+			return termFunc(func(c *cardstore.Facts) bool { return c.Banned&bit != 0 })
 		}
 	case "s", "set", "e", "edition":
 		if text {
-			return termFunc(func(c deck.Card) bool { return strings.EqualFold(c.Card.Set, val) })
+			return termFunc(func(c *cardstore.Facts) bool {
+				for _, s := range c.Sets {
+					if strings.EqualFold(s, val) {
+						return true
+					}
+				}
+				return false
+			})
 		}
 	case "kw", "keyword":
 		if text {
-			return termFunc(func(c deck.Card) bool {
-				for _, k := range c.Card.Keywords {
+			return termFunc(func(c *cardstore.Facts) bool {
+				for _, k := range c.Keywords {
 					if strings.EqualFold(k, val) {
 						return true
 					}
@@ -130,8 +145,8 @@ func keyword(key, op, val string) node {
 		}
 	case "tag":
 		if text {
-			return termFunc(func(c deck.Card) bool {
-				for _, t := range c.AllTags() {
+			return termFunc(func(c *cardstore.Facts) bool {
+				for _, t := range c.Tags {
 					if strings.EqualFold(t, val) {
 						return true
 					}
@@ -139,20 +154,24 @@ func keyword(key, op, val string) node {
 				return false
 			})
 		}
+	case "is":
+		if op == opColon && val == "commander" {
+			return termFunc(commander)
+		}
 	case "otag", "oracletag", "function":
 		if text {
-			return termFunc(func(c deck.Card) bool {
+			return termFunc(func(c *cardstore.Facts) bool {
 				tg := tagger.Current()
 				t, ok := tg.Find(val)
-				return ok && tg.Has(c.Card.OracleID, t)
+				return ok && tg.Has(c.OracleID, t)
 			})
 		}
 	}
 	return nil
 }
 
-func contains(field func(deck.Card) string, val string) node {
-	return termFunc(func(c deck.Card) bool { return strings.Contains(strings.ToLower(field(c)), val) })
+func contains(field func(*cardstore.Facts) string, val string) node {
+	return termFunc(func(c *cardstore.Facts) bool { return strings.Contains(strings.ToLower(field(c)), val) })
 }
 
 // stat is a power, toughness or loyalty as a number. A * counts as zero, as
@@ -171,12 +190,12 @@ func stat(s string) (float64, bool) {
 	return 0, false
 }
 
-func number(op, val string, get func(deck.Card) (float64, bool)) node {
+func number(op, val string, get func(*cardstore.Facts) (float64, bool)) node {
 	want, err := strconv.ParseFloat(val, 64)
 	if err != nil {
 		return nil
 	}
-	return termFunc(func(c deck.Card) bool {
+	return termFunc(func(c *cardstore.Facts) bool {
 		got, ok := get(c)
 		return ok && compare(op, got, want)
 	})
@@ -200,17 +219,39 @@ func compare(op string, got, want float64) bool {
 	return false
 }
 
-// rarities in order, for r>=rare.
+// rarities in order, for r>=rare: cardstore.RarityOrder, and the letters.
 var rarities = map[string]int{"common": 0, "c": 0, "uncommon": 1, "u": 1, "rare": 2, "r": 2,
 	"mythic": 3, "m": 3, "special": 4, "s": 4, "bonus": 5, "b": 5}
 
+// rarity matches a card printed at a rarity that compares: in the store,
+// any of its printings, as on Scryfall.
 func rarity(op, val string) node {
 	want, ok := rarities[val]
 	if !ok {
 		return nil
 	}
-	return termFunc(func(c deck.Card) bool {
-		got, ok := rarities[strings.ToLower(c.Card.Rarity)]
-		return ok && compare(op, float64(got), float64(want))
+	return termFunc(func(c *cardstore.Facts) bool {
+		for got := range cardstore.RarityOrder {
+			if c.Rarities.Has(got) && compare(op, float64(got), float64(want)) {
+				return true
+			}
+		}
+		return false
 	})
+}
+
+// commander is is:commander, as Scryfall has it: a card whose front is a
+// legendary creature, a Background, or a legendary Vehicle or Spacecraft
+// with power — or one that says it can be your commander.
+func commander(c *cardstore.Facts) bool {
+	front, _, _ := strings.Cut(c.TypeLine, " // ")
+	if strings.Contains(front, "Legendary") {
+		switch {
+		case strings.Contains(front, "Creature"), strings.Contains(front, "Background"):
+			return true
+		case (strings.Contains(front, "Vehicle") || strings.Contains(front, "Spacecraft")) && c.Power != "":
+			return true
+		}
+	}
+	return strings.Contains(c.Text, "can be your commander")
 }

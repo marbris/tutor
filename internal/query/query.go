@@ -1,43 +1,64 @@
-// Package query is the / filter's language: a small part of Scryfall's
-// search syntax, matched against the cards already in a list.
+// Package query is Tutor's search language: a part of Scryfall's syntax,
+// matched against the cards in a list (the / filter) and against every card
+// there is (a search, over internal/cardstore).
 //
-// Scryfall stays the search engine. This only narrows what's on screen, so
-// it takes the handful of keywords worth having there, and anything else is
-// plain text, matched as / always has: against the name, the text, the type
-// line and the tags.
-//
-//	t:creature  o:"draw a card"  mv<=3  c:rg  id:bant  pow>=4
+//	t:creature  o:"draw a card"  mv<=3  c:rg  id:bant  pow>=4  is:commander
 //	otag:ramp  tag:wincon  f:commander  r:mythic  usd<5  kw:flying  set:mh3
-//	-t:land  (t:instant or t:sorcery)
+//	-t:land  (t:instant or t:sorcery)  !"sol ring"
 //
 // Terms side by side must all match; "or" between them is either; a leading
-// - turns a term round; parentheses group.
+// - turns a term round; parentheses group. A plain word is matched as /
+// always has, against the name, the text, the type line and the tags — or,
+// in a search, against the name alone, as on Scryfall. A word that looks
+// like a keyword but isn't one Tutor knows is plain text too, and Unknown
+// names it, so a search can offer to ask Scryfall instead.
 package query
 
 import (
 	"strings"
 	"unicode"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/deck"
 )
 
 // Query is a parsed filter. The zero Query matches everything.
 type Query struct {
-	root node
+	root    node
+	unknown []string
 }
 
 // Empty reports whether the query narrows nothing.
 func (q Query) Empty() bool { return q.root == nil }
 
-// Match reports whether a card passes the filter.
+// Unknown is the words that looked like keywords Tutor doesn't know, such
+// as a:"rk post" or year>2020, which were matched as plain text.
+func (q Query) Unknown() []string { return q.unknown }
+
+// Match reports whether a card in a list passes the filter.
 func (q Query) Match(c deck.Card) bool {
-	return q.root == nil || q.root.match(c)
+	if q.root == nil {
+		return true
+	}
+	f := cardstore.Of(c.Card, c.AllTags())
+	return q.root.match(&f)
+}
+
+// MatchFacts reports whether a card passes, by its facts.
+func (q Query) MatchFacts(f *cardstore.Facts) bool {
+	return q.root == nil || q.root.match(f)
 }
 
 // Parse reads a filter. It never fails: what it can't read as a keyword is
 // plain text, and an unbalanced parenthesis closes itself.
-func Parse(s string) Query {
-	p := parser{toks: tokenize(s)}
+func Parse(s string) Query { return parse(s, false) }
+
+// ParseSearch reads a search: as Parse, but a plain word is looked for in
+// the name alone, as Scryfall does.
+func ParseSearch(s string) Query { return parse(s, true) }
+
+func parse(s string, namesOnly bool) Query {
+	p := parser{toks: tokenize(s), namesOnly: namesOnly}
 	var parts andNode
 	for p.at < len(p.toks) {
 		if n := p.or(); n != nil {
@@ -50,22 +71,22 @@ func Parse(s string) Query {
 	}
 	switch len(parts) {
 	case 0:
-		return Query{}
+		return Query{unknown: p.unknown}
 	case 1:
-		return Query{root: parts[0]}
+		return Query{root: parts[0], unknown: p.unknown}
 	}
-	return Query{root: parts}
+	return Query{root: parts, unknown: p.unknown}
 }
 
 // ── The tree ────────────────────────────────────────────────────
 
-type node interface{ match(deck.Card) bool }
+type node interface{ match(*cardstore.Facts) bool }
 
 type andNode []node
 type orNode []node
 type notNode struct{ n node }
 
-func (a andNode) match(c deck.Card) bool {
+func (a andNode) match(c *cardstore.Facts) bool {
 	for _, n := range a {
 		if !n.match(c) {
 			return false
@@ -74,7 +95,7 @@ func (a andNode) match(c deck.Card) bool {
 	return true
 }
 
-func (o orNode) match(c deck.Card) bool {
+func (o orNode) match(c *cardstore.Facts) bool {
 	for _, n := range o {
 		if n.match(c) {
 			return true
@@ -83,7 +104,7 @@ func (o orNode) match(c deck.Card) bool {
 	return false
 }
 
-func (n notNode) match(c deck.Card) bool { return !n.n.match(c) }
+func (n notNode) match(c *cardstore.Facts) bool { return !n.n.match(c) }
 
 // ── Tokens ──────────────────────────────────────────────────────
 
@@ -166,6 +187,9 @@ func tokenize(s string) []token {
 type parser struct {
 	toks []token
 	at   int
+	// namesOnly is a search's plain words: names, not text.
+	namesOnly bool
+	unknown   []string
 }
 
 func (p *parser) peek() (token, bool) {
@@ -216,7 +240,7 @@ func (p *parser) and() node {
 				continue
 			}
 		} else {
-			n = term(t.text)
+			n = p.term(t.text)
 		}
 		if t.neg {
 			n = notNode{n}

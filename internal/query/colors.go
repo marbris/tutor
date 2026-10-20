@@ -3,7 +3,7 @@ package query
 import (
 	"strings"
 
-	"ttr/internal/deck"
+	"ttr/internal/cardstore"
 )
 
 // Colors and color identity, as Scryfall reads them: letters (c:rg), color
@@ -20,20 +20,20 @@ var colorNames = map[string]string{
 }
 
 // colors is the term for c: and id:. colon is what ":" means for it.
-func colors(op, colon, val string, get func(deck.Card) []string) node {
+func colors(op, colon, val string, get func(*cardstore.Facts) []string) node {
 	if op == opColon {
 		op = colon
 	}
 	switch val {
 	case "c", "colorless":
-		return termFunc(func(c deck.Card) bool {
+		return termFunc(func(c *cardstore.Facts) bool {
 			if op == opNe {
 				return len(get(c)) > 0
 			}
 			return len(get(c)) == 0
 		})
 	case "m", "multicolor", "multicolored":
-		return termFunc(func(c deck.Card) bool {
+		return termFunc(func(c *cardstore.Facts) bool {
 			if op == opNe {
 				return len(get(c)) < 2
 			}
@@ -52,7 +52,7 @@ func colors(op, colon, val string, get func(deck.Card) []string) node {
 		}
 		want[l] = true
 	}
-	return termFunc(func(c deck.Card) bool {
+	return termFunc(func(c *cardstore.Facts) bool {
 		got := map[string]bool{}
 		for _, col := range get(c) {
 			got[strings.ToLower(col)] = true
