@@ -21,7 +21,7 @@ I search for cards on Scryfall and build decks on Moxfield. I'm grateful to the 
 But working between two web interfaces is a headache, so I made my own deck-building app. Here are my
 favorite things about it:
 
-- Keyboard only. Scryfall searches and decks sit side by side, and a card goes into the deck with `a`.
+- Keyboard only. Card searches and decks sit side by side, and a card goes into the deck with `a`.
 - Every deck is a plain text file in git. Every version is kept, and you can sync them to any git host.
 - You can see the Scryfall Tagger oracle tags of every card, and count your deck by them.
 - Tagging in bulk, and global tags that count in every deck.
@@ -98,12 +98,12 @@ Tutor is a row of panels, with an info panel on the right that describes whateve
 | Keys | Opens |
 | --- | --- |
 | `space d` | your lists: local decks, Moxfield decks, global tags |
-| `space f` | a Scryfall search |
+| `space f` | a card search |
 | `space r` | the comprehensive rules |
 | `space n` | a new panel; `tab` cycles between the three |
 
-From the lists panel you open a local list in a panel of its own. In a Scryfall search panel you
-query Scryfall and get a list of results.
+From the lists panel you open a local list in a panel of its own. In a search panel you search
+every card there is and get a list of results.
 
 One of your local lists is the **editing list**. It has its own border color, and `e` `E` choose
 which one it is. `a` adds the highlighted card to it and `x` removes it, from whichever panel you're
@@ -116,20 +116,35 @@ panels.
 
 ![A search panel beside the editing deck, with cards already in the deck marked](screenshots/add-to-deck.png)
 
-### Filtering
+### Searching
 
-`/` narrows the list in front of you as you type. Plain words match the name, the text, the type
-line and the tags. It also takes some of Scryfall's syntax, worked out on your machine over the
-cards in the list:
+Tutor downloads every card and every English printing from Scryfall once a week (about 80 MB,
+67 MB kept on disk) and searches them on your machine. A search takes a few milliseconds and needs
+no connection. It takes a part of Scryfall's syntax, the same as `/` below, and plain words match
+the card's name, as they do on Scryfall:
 
 ```
 t:creature  o:"draw a card"  mv<=3  pow>=4  c:rg  id:gruul  r>=rare  usd<5
-f:commander  kw:flying  set:mh3  otag:ramp  tag:wincon
+f:commander  kw:flying  set:mh3  otag:ramp  is:commander  !"sol ring"
 -t:land  (t:instant or t:sorcery)
 ```
 
-`tag:` is your own tags, including the global tags. Anything it doesn't know is matched as
-plain text.
+`set:` and `r:` match any printing of a card. `is:commander` is what can be your commander: a
+legendary creature, a Background, a legendary Vehicle or Spacecraft with power, or a card that
+says so. A word Tutor doesn't know, like `a:"rk post"` or `year>2020`, is named along the bottom,
+and the rest of the query still runs. `alt+enter` sends the query to Scryfall instead. `ctrl+o`
+and `ctrl+r` choose the order, and the first 1,000 cards are kept; the header says how many
+matched.
+
+Until the first download has landed, or with it turned off in the settings, searches go to
+Scryfall. A card newer than the last download is still found when a deck names it: decks look up
+what the download doesn't have on Scryfall.
+
+### Filtering
+
+`/` narrows the list in front of you as you type. Plain words match the name, the text, the type
+line and the tags. It takes the same syntax as a search, over the cards in the list, and `tag:`
+for your own tags, including the global tags. Anything it doesn't know is matched as plain text.
 
 ### Sorting
 
@@ -317,7 +332,7 @@ The tags show up in three places:
   `removal-artifact`, `sweeper` and so on), and `enter` opens a tag to show the ones under it.
   What a tag means shows under the highlighted one, where Tagger describes it (about a third of the
   tags have a description).
-- In a Scryfall search, `tab` after `otag:` completes the tag name.
+- In a search, `tab` after `otag:` completes the tag name.
 
 There are two ways to turn Tagger tags into tags of your own on a local list.
 
@@ -389,18 +404,21 @@ Measured on my laptop (Intel i7-1355U, Linux):
 
 - One 14 MB binary.
 - It opens in about 30 ms, with the panels you left back on screen. Pinned tag lists add to that:
-  with twelve of them, 21,000 cards in all, it's about 90 ms. A Scryfall search among the panels
-  arrives a quarter of a second later.
+  with twelve of them, 21,000 cards in all, it's about 90 ms. Every card is loaded from disk behind
+  that in about 60 ms, and a search among the panels runs as soon as they're in.
+- A search over all 35,000 cards takes 1 to 15 ms, and loading the first 1,000 of them about 20 ms.
 - A key press is drawn in about 13 ms.
-- It uses 80 to 130 MB of memory with those twelve tag lists pinned. Every card it has looked up
-  is kept in memory, about 3 KB each, so a list of thousands of cards adds tens of megabytes once
-  it's been opened.
-- What it downloads is kept on disk: about 75 MB, mostly every card's printings and rulings so they
-  show without asking Scryfall, plus about 100 KB for each card picture you've looked at. `ttr cache`
-  shows what's there.
+- It uses about 100 MB of memory on start and about 130 MB with the decks panel open and those
+  twelve tag lists pinned, and it stays there: every card's search data is about 30 MB, at most
+  48 MB of card pictures are kept in memory (the rest are read from disk again when shown), and
+  above 128 MB Go is told to hand back what it no longer uses. The weekly download peaks at 250 to
+  300 MB for the few seconds it takes to sort.
+- What it downloads is kept on disk: about 150 MB, mostly every card and printing (67 MB), rulings
+  and printing lists, plus about 100 KB for each card picture you've looked at. `ttr cache` shows
+  what's there.
 
-Anything that waits, waits on Scryfall, which asks apps to send no more than ten requests and two
-searches a second. Tutor keeps to that.
+Only pictures, cards newer than the last download, and `alt+enter` searches still wait on Scryfall,
+which asks apps to send no more than ten requests and two searches a second. Tutor keeps to that.
 
 ## Install
 
@@ -463,12 +481,13 @@ ln -s "$(pwd)/ttr" ~/.local/bin/ttr
 without the interface:
 
 ```bash
-ttr 't:creature c:rw cmc<=3'          # open a Scryfall search
+ttr 't:creature c:rw cmc<=3'          # open a search
 ttr Isshin                            # one exact match prints the card in the terminal
 ttr https://moxfield.com/decks/...    # open a Moxfield deck
 ```
 
-Searches use [Scryfall's syntax](https://scryfall.com/docs/syntax).
+Searches use the syntax under [Searching](#searching), a part of
+[Scryfall's](https://scryfall.com/docs/syntax).
 
 ![ttr printing a card in the terminal](screenshots/quick-lookup.png)
 
@@ -583,13 +602,14 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 - **appearance**: the theme. `enter` drops down every theme, and each one goes on as you move to it.
   `enter` keeps it, `esc` puts the old one back.
 - **sync**: the git remote your lists mirror to. `enter` sets it, `d` disconnects.
-- **downloads**: the files Tutor keeps from Scryfall: the Tagger tags, every card's rulings, and its
-  lists of keywords, types and card names. Each has its size, and `enter` turns it off or on. Off,
-  Tutor does without it: rulings are fetched a card at a time, for instance.
+- **downloads**: the files Tutor keeps from Scryfall: every card and printing, the Tagger tags, every
+  card's rulings, and its lists of keywords, types and card names. Each has its size, and `enter`
+  turns it off or on. Off, Tutor does without it: searches go to Scryfall, and rulings are fetched a
+  card at a time, for instance.
 - **cache**: what's downloaded, by kind, and how much room each takes. `d` clears one. Everything
   there can be downloaded again.
 
-`r` on a download or a kind in the cache fetches it again. The Tagger tags, rulings, catalogs,
+`r` on a download or a kind in the cache fetches it again. Every card, the Tagger tags, rulings, catalogs,
 comprehensive rules and the decks of people you follow download again at once. Pictures, printings
 and printed texts are fetched again one by one, the next time each is shown. Card data is fetched
 again for the open lists now and for the others when they open.
