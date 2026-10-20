@@ -80,7 +80,7 @@ func TestACardIsItsMostNormalPrintingAndKeepsEveryPaperOne(t *testing.T) {
 		c.ImageURIs.PNG != "https://cards.scryfall.io/png/front/s/o/sol-cmm.png?2" {
 		t.Errorf("the picture links weren't made from the border crop: %+v", c.ImageURIs)
 	}
-	if c.Legalities["vintage"] != "restricted" || c.Legalities["modern"] != "" || c.OracleText != "{T}: Add {C}{C}." {
+	if c.Legalities["vintage"] != "restricted" || c.Legalities["modern"] != "not_legal" || c.OracleText != "{T}: Add {C}{C}." {
 		t.Errorf("the card's own fields are wrong: %+v", c)
 	}
 	if !c.PricedAt.Equal(s.Built) {

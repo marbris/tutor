@@ -141,6 +141,10 @@ func Build(r io.Reader, dir string, built time.Time) (*Store, error) {
 	// build's peak down, for the few seconds it runs.
 	defer debug.SetGCPercent(debug.SetGCPercent(20))
 	groups := map[string]*line{}
+	// reversible are the cards known so far only from a reversible
+	// printing — the same card on both sides, named "A // A" — whose own
+	// fields give way to the first ordinary printing.
+	reversible := map[string]bool{}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 1<<20), 16<<20)
 	for sc.Scan() {
@@ -164,9 +168,15 @@ func Build(r io.Reader, dir string, built time.Time) (*Store, error) {
 			continue
 		}
 		g := groups[id]
-		if g == nil {
+		rev := c.Layout == "reversible_card"
+		switch {
+		case g == nil:
 			g = &line{C: oracleOf(id, c)}
 			groups[id] = g
+			reversible[id] = rev
+		case reversible[id] && !rev:
+			g.C = oracleOf(id, c)
+			reversible[id] = false
 		}
 		g.P = append(g.P, printingOf(c))
 	}
@@ -206,17 +216,31 @@ func Build(r io.Reader, dir string, built time.Time) (*Store, error) {
 	today := built.Format("2006-01-02")
 	var off int64
 	for _, l := range lines {
-		body, err := json.Marshal(l)
+		def := defaultPrinting(*l, today)
+		sp := span{Off: off, Default: int16(def)}
+		own, err := json.Marshal(l.C)
 		if err != nil {
 			tmp.Close()
 			return nil, err
 		}
-		def := defaultPrinting(*l, today)
-		ix.At = append(ix.At, span{Off: off, N: int32(len(body)), Default: int16(def)})
+		block := append(own, '\n')
+		sp.Oracle = int32(len(block))
+		for p, pr := range l.P {
+			row, err := json.Marshal(pr)
+			if err != nil {
+				tmp.Close()
+				return nil, err
+			}
+			if p == def {
+				sp.DefOff, sp.DefN = int32(len(block)), int32(len(row))
+			}
+			block = append(append(block, row...), '\n')
+		}
+		sp.N = int32(len(block))
+		ix.At = append(ix.At, sp)
 		ix.Facts = append(ix.Facts, factsOf(*l, def, built))
-		w.Write(body)
-		w.WriteByte('\n')
-		off += int64(len(body)) + 1
+		w.Write(block)
+		off += int64(len(block))
 	}
 	lines = nil
 	if err := w.Flush(); err != nil {
@@ -265,6 +289,17 @@ func writeAtomic(path string, body []byte) error {
 }
 
 func oracleOf(id string, c raw) oracle {
+	// A reversible printing is one card on both sides: the card is its
+	// front.
+	if c.Layout == "reversible_card" && len(c.CardFaces) > 0 {
+		f := c.CardFaces[0]
+		c.Name, c.ManaCost, c.TypeLine, c.OracleText = f.Name, f.ManaCost, f.TypeLine, f.OracleText
+		c.Power, c.Toughness, c.Loyalty = f.Power, f.Toughness, f.Loyalty
+		if len(f.Colors) > 0 {
+			c.Colors = f.Colors
+		}
+		c.CardFaces = nil
+	}
 	o := oracle{ID: id, Name: c.Name, ManaCost: c.ManaCost, TypeLine: c.TypeLine, Text: c.OracleText,
 		Colors: c.Colors, Identity: c.ColorIdentity, Power: c.Power, Toughness: c.Toughness,
 		Loyalty: c.Loyalty, CMC: c.CMC, EDHREC: c.EDHRECRank, Keywords: c.Keywords}

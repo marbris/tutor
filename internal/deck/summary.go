@@ -68,7 +68,7 @@ func CheckCached(slug string) (Legality, []string) {
 	if err != nil {
 		return Legality{}, nil
 	}
-	cards, complete := ResolveCached(d.MainEntries())
+	cards, complete := resolveForCheck(d.MainEntries(), d.Format)
 	return Check(d.Format, cards, complete), Colours(cards)
 }
 

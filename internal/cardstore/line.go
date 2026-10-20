@@ -7,12 +7,13 @@ import (
 	"ttr/internal/mtg"
 )
 
-// A card's line in the cards file: what is the same in every printing
-// once, then each printing's own fields, newest first. The keys are short
-// and empty fields left out: there are a hundred thousand printings.
+// A card in the cards file: a line with what is the same in every
+// printing, then a line with each printing's own fields, newest first. The
+// keys are short and empty fields left out: there are a hundred thousand
+// printings.
 type line struct {
-	C oracle     `json:"c"`
-	P []printing `json:"p"`
+	C oracle
+	P []printing
 }
 
 type oracle struct {
@@ -102,8 +103,15 @@ func (l line) card(p int, built time.Time) mtg.Card {
 		PrintsSearchURI: "https://api.scryfall.com/cards/search?order=released&q=oracleid%3A" +
 			o.ID + "&unique=prints",
 	}
+	// Kept without the formats a card isn't legal in; Scryfall lists them
+	// all, and a deck's legality reads "not_legal" as an answer.
 	if c.Legalities == nil {
-		c.Legalities = map[string]string{}
+		c.Legalities = make(map[string]string, len(Formats))
+	}
+	for _, f := range Formats {
+		if _, ok := c.Legalities[f]; !ok {
+			c.Legalities[f] = "not_legal"
+		}
 	}
 	for _, f := range o.Faces {
 		c.CardFaces = append(c.CardFaces, mtg.Face{Name: f.Name, ManaCost: f.ManaCost,

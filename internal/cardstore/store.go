@@ -3,8 +3,8 @@
 //
 // Scryfall's default_cards bulk file is downloaded once a week: about 80 MB,
 // some 120,000 printings, 650 MB of JSON once unpacked. It is read as it
-// arrives and written back one card a line, the card's rules text once and
-// each printing's own few fields after it — about 80 MB. Only the Facts
+// arrives and written back a card at a time: a line with the card's rules
+// text, then a line with each printing's own few fields — about 55 MB. Only the Facts
 // a search needs are held in memory, one per card, with where its line is;
 // a card is read from disk in full when a list needs it.
 //
@@ -40,7 +40,7 @@ func indexFile() string { return filepath.Join(Dir(), "index.gob") }
 
 // format is the version of the files: a store written in another is made
 // again from a fresh download.
-const format = 1
+const format = 2
 
 // Store is the cards on disk, and their Facts in memory.
 type Store struct {
@@ -55,12 +55,18 @@ type Store struct {
 	byName map[string]int
 }
 
-// span is where a card's line is in the cards file.
+// span is where a card's lines are in the cards file: the card's own,
+// then a line for each printing.
 type span struct {
 	Off int64
 	N   int32
-	// Default is which of its printings a search shows.
-	Default int16
+	// Oracle is the length of the card's own line.
+	Oracle int32
+	// Default is which of its printings a search shows, and DefOff and DefN
+	// where its line is, from Off: a card as its default printing is a read
+	// of two short lines, not all of them.
+	Default      int16
+	DefOff, DefN int32
 }
 
 // Len is how many cards there are.
@@ -101,11 +107,65 @@ func oracleKey(id string) string { return "\x00" + id }
 
 // Card is card i as its most normal printing, read from disk.
 func (s *Store) Card(i int) (mtg.Card, error) {
-	l, err := s.read(i)
+	if s == nil || i < 0 || i >= len(s.at) {
+		return mtg.Card{}, fmt.Errorf("no such card")
+	}
+	sp := s.at[i]
+	f, err := os.Open(s.path)
 	if err != nil {
 		return mtg.Card{}, err
 	}
-	return l.card(int(s.at[i].Default), s.Built), nil
+	defer f.Close()
+	own := make([]byte, sp.Oracle)
+	def := make([]byte, sp.DefN)
+	if _, err := f.ReadAt(own, sp.Off); err != nil {
+		return mtg.Card{}, err
+	}
+	if _, err := f.ReadAt(def, sp.Off+int64(sp.DefOff)); err != nil {
+		return mtg.Card{}, err
+	}
+	l := line{P: make([]printing, 1)}
+	if err := json.Unmarshal(own, &l.C); err != nil {
+		return mtg.Card{}, err
+	}
+	if err := json.Unmarshal(def, &l.P[0]); err != nil {
+		return mtg.Card{}, err
+	}
+	return l.card(0, s.Built), nil
+}
+
+// Light is card i from its facts alone, without reading the disk: its
+// name, type, text and color identity, and whether it's legal in one
+// format. Enough to check a deck, for many decks at once.
+func (s *Store) Light(i int, format string) mtg.Card {
+	f := &s.facts[i]
+	c := mtg.Card{OracleID: f.OracleID, Name: f.Name, ManaCost: f.ManaCost, TypeLine: f.TypeLine,
+		OracleText: f.Text, CMC: f.CMC, ColorIdentity: f.Identity.List(), Colors: f.Colors.List(),
+		Keywords: f.Keywords}
+	if bit, ok := FormatBit(format); ok {
+		l := "not_legal"
+		switch {
+		case f.Legal&bit != 0:
+			l = "legal"
+		case f.Banned&bit != 0:
+			l = "banned"
+		}
+		c.Legalities = legality(format, l)
+	}
+	return c
+}
+
+// legalities are the one-format maps Light hands out, shared: a light card
+// is read, never changed, and there are thousands of them at once.
+var legalities sync.Map
+
+func legality(format, l string) map[string]string {
+	key := format + "\x00" + l
+	if m, ok := legalities.Load(key); ok {
+		return m.(map[string]string)
+	}
+	m, _ := legalities.LoadOrStore(key, map[string]string{format: l})
+	return m.(map[string]string)
 }
 
 // Printings is every printing of card i, newest first, and which of them a
@@ -150,8 +210,17 @@ func (s *Store) read(i int) (line, error) {
 	if _, err := f.ReadAt(buf, s.at[i].Off); err != nil {
 		return l, err
 	}
-	err = json.Unmarshal(buf, &l)
-	return l, err
+	rows := bytes.Split(bytes.TrimSuffix(buf, []byte("\n")), []byte("\n"))
+	if err := json.Unmarshal(rows[0], &l.C); err != nil {
+		return l, err
+	}
+	l.P = make([]printing, len(rows)-1)
+	for p, row := range rows[1:] {
+		if err := json.Unmarshal(row, &l.P[p]); err != nil {
+			return l, err
+		}
+	}
+	return l, nil
 }
 
 // ── In use ──────────────────────────────────────────────────────
@@ -159,6 +228,9 @@ func (s *Store) read(i int) (line, error) {
 var (
 	mu      sync.RWMutex
 	current *Store
+	// pending is closed when a load from disk said to be on its way
+	// (Expect) has put a store in use, or failed to (Settle).
+	pending chan struct{}
 )
 
 // Current is the store in use: nil until one is loaded, or with the
@@ -169,11 +241,48 @@ func Current() *Store {
 	return current
 }
 
-// SetCurrent puts a store in use.
+// SetCurrent puts a store in use, and settles a load that was expected.
 func SetCurrent(s *Store) {
 	mu.Lock()
 	current = s
 	mu.Unlock()
+	Settle()
+}
+
+// Expect says a store is being loaded from disk, so Ready waits for it:
+// at the start, a deck opened from the session shouldn't miss the store
+// by the 60 ms it takes to load.
+func Expect() {
+	mu.Lock()
+	if pending == nil {
+		pending = make(chan struct{})
+	}
+	mu.Unlock()
+}
+
+// Settle says the expected load is over, however it went.
+func Settle() {
+	mu.Lock()
+	if pending != nil {
+		close(pending)
+		pending = nil
+	}
+	mu.Unlock()
+}
+
+// Ready is Current, once a load from disk that was expected is over. Off
+// the main loop only: it waits.
+func Ready() *Store {
+	mu.RLock()
+	p := pending
+	mu.RUnlock()
+	if p != nil {
+		select {
+		case <-p:
+		case <-time.After(5 * time.Second):
+		}
+	}
+	return Current()
 }
 
 // Load is the store on disk, of any age, so it's in use from the start;

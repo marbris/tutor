@@ -55,29 +55,36 @@ type searchDoneMsg struct {
 // runLocalSearch searches the cards on disk, off the main thread.
 func runLocalSearch(s *cardstore.Store, panelID int, q, order, dir string) tea.Cmd {
 	return func() tea.Msg {
-		parsed := query.ParseSearch(q)
-		var found []int
-		// Nothing left once the words it couldn't read are out is no
-		// question at all, not one every card answers.
-		if !parsed.Empty() {
-			found = query.Search(s, parsed, order, dir)
-		}
-		msg := searchDoneMsg{panel: panelID, query: q, total: len(found), local: true, unknown: parsed.Unknown()}
-		if len(found) == 0 {
+		cards, total, unknown, err := searchStore(s, q, order, dir, maxLocal)
+		msg := searchDoneMsg{panel: panelID, query: q, cards: cards, total: total, local: true, unknown: unknown, err: err}
+		if err == nil && total == 0 {
 			msg.err = fetch.NotFound{}
-			return msg
-		}
-		found = found[:min(len(found), maxLocal)]
-		msg.cards = make([]deck.Card, 0, len(found))
-		for _, i := range found {
-			c, err := s.Card(i)
-			if err != nil {
-				return searchDoneMsg{panel: panelID, query: q, err: err}
-			}
-			msg.cards = append(msg.cards, deck.Card{Card: c})
 		}
 		return msg
 	}
+}
+
+// searchStore is a search of the cards on disk: the first limit cards in
+// the order asked for, how many matched, and the words it couldn't read.
+func searchStore(s *cardstore.Store, q, order, dir string, limit int) ([]deck.Card, int, []string, error) {
+	parsed := query.ParseSearch(q)
+	var found []int
+	// Nothing left once the words it couldn't read are out is no question
+	// at all, not one every card answers.
+	if !parsed.Empty() {
+		found = query.Search(s, parsed, order, dir)
+	}
+	total := len(found)
+	found = found[:min(total, limit)]
+	cards := make([]deck.Card, 0, len(found))
+	for _, i := range found {
+		c, err := s.Card(i)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+		cards = append(cards, deck.Card{Card: c})
+	}
+	return cards, total, parsed.Unknown(), nil
 }
 
 // runSearch asks Scryfall, off the main thread.

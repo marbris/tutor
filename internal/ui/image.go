@@ -17,6 +17,7 @@ import (
 
 	"ttr/internal/browser"
 	"ttr/internal/cache"
+	"ttr/internal/cardstore"
 	"ttr/internal/fetch"
 	"ttr/internal/mtg"
 	"ttr/internal/paths"
@@ -227,7 +228,7 @@ func keepPrintings(c mtg.Card) (imageMsg, int) {
 // picture (and its back's) as load gets them.
 func printingsAndPictures(c mtg.Card, load func(mtg.Card, int) (picture, int)) (imageMsg, int) {
 	key := imageKey(c)
-	list, size, stale, err := prints.All(c)
+	list, size, stale, err := printingsOf(c)
 	if err != nil {
 		return imageMsg{key: key, err: err}, size
 	}
@@ -271,8 +272,40 @@ func (m *Model) fetchImage(c mtg.Card) tea.Cmd {
 // refreshPrintings is prints.Refresh, as a variable for the tests.
 var refreshPrintings = prints.Refresh
 
-// keptOnDisk is prints.Kept, as a variable for the tests.
-var keptOnDisk = prints.Kept
+// keptOnDisk is printingsKept, as a variable for the tests.
+var keptOnDisk = printingsKept
+
+// printingsOf is every paper printing of a card, newest first, and what
+// finding out downloaded: from the cards on disk when they're in, and
+// otherwise as prints.All has it, kept or asked of Scryfall.
+func printingsOf(c mtg.Card) ([]mtg.Card, int, bool, error) {
+	if s, i, ok := inStore(c); ok {
+		if list, _, err := s.Printings(i); err == nil && len(list) > 0 {
+			return list, 0, false, nil
+		}
+	}
+	return prints.All(c)
+}
+
+// printingsKept reports whether a card's printings are to hand without
+// asking Scryfall.
+func printingsKept(c mtg.Card) bool {
+	if _, _, ok := inStore(c); ok {
+		return true
+	}
+	return prints.Kept(c)
+}
+
+// inStore is where a card is among the cards on disk, if they're in and it's
+// there.
+func inStore(c mtg.Card) (*cardstore.Store, int, bool) {
+	s := cardstore.Current()
+	i, ok := s.FindOracle(c.OracleID)
+	if !ok {
+		i, ok = s.Find(c.Name)
+	}
+	return s, i, ok
+}
 
 // fetchShown asks for the picture on show, if it isn't in hand or on its
 // way.

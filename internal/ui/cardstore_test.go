@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ttr/internal/cardstore"
+	"ttr/internal/mtg"
 )
 
 // storeCards are a few cards as Scryfall's bulk file has them.
@@ -57,5 +58,31 @@ func TestACardStoreTurnedOffWhileOnItsWayIsNotUsed(t *testing.T) {
 	m.handleCardStore(cardStoreMsg{store: s})
 	if cardstore.Current() != nil {
 		t.Error("a store turned off was put in use")
+	}
+}
+
+func TestGxsPrintingsAndAddByNameComeFromTheCardsOnDisk(t *testing.T) {
+	withStore(t)
+	asked := scryfallAsked(t)
+	sol := mtg.Card{Name: "Sol Ring", OracleID: "sol"}
+	if !keptOnDisk(sol) {
+		t.Error("a card on disk is taken for one to fetch")
+	}
+	list, size, stale, err := printingsOf(sol)
+	if err != nil || len(list) != 1 || list[0].ID != "sol-cmm" || size != 0 || stale {
+		t.Errorf("printings %v, %d, %v, %v", list, size, stale, err)
+	}
+
+	msg := msgOf(runAddCard(1, "llanowar elves")).(addCardMsg)
+	if msg.err != nil || msg.total != 1 || msg.cards[0].Card.Name != "Llanowar Elves" {
+		t.Errorf("add by name found %+v", msg)
+	}
+	if len(*asked) > 0 {
+		t.Errorf("Scryfall was asked %v", *asked)
+	}
+	// A word the cards on disk can't answer goes to Scryfall.
+	msgOf(runAddCard(1, "a:post elves"))
+	if len(*asked) != 1 {
+		t.Errorf("an unknown word didn't go to Scryfall: %v", *asked)
 	}
 }

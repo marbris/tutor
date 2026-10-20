@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -29,7 +30,17 @@ var version = "dev"
 
 // ── Entry point ─────────────────────────────────────────────────
 
+// memoryLimit is a soft limit on what ttr holds: what it keeps is some 60
+// MB, and the rest is garbage Go would otherwise hold on to for minutes
+// after a burst of work, such as the decks panel checking every list. Near
+// the limit Go collects sooner and hands the room back. GOMEMLIMIT, if set,
+// wins.
+const memoryLimit = 128 << 20
+
 func main() {
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(memoryLimit)
+	}
 	// Files used to live in one directory; put any left there where they
 	// now belong, before anything goes looking for them.
 	paths.Migrate()

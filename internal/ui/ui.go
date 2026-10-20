@@ -11,7 +11,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"ttr/internal/cardstore"
 	"ttr/internal/deck"
 	"ttr/internal/rules"
 	"ttr/internal/theme"
@@ -101,7 +100,7 @@ func New() Model {
 		histories:    map[string]*cardHistory{},
 		images:       map[string]*cardPrintings{},
 		pictures:     newPictureCache(),
-		storeLoading: !downloadsOff()[cardStoreDownload] && cardstore.OnDisk(),
+		storeLoading: expectCardStore(),
 	}
 }
 

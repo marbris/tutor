@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/catalog"
 	"ttr/internal/mtg"
 	"ttr/internal/rules"
@@ -102,8 +103,8 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 // says whether it did. Anything else — no answer, several answers, a failure
 // — is the interface's business.
 func PrintCardIfSingle(query string) bool {
-	cards, total, err := scryfall.Search(query, "edhrec", "auto", 2)
-	if err != nil || total != 1 || len(cards) != 1 {
+	c, ok := singleCard(query)
+	if !ok {
 		return false
 	}
 
@@ -112,8 +113,30 @@ func PrintCardIfSingle(query string) bool {
 		rd, _ = rules.Load()
 		rd.AddCatalog(catalog.Kept())
 	}
-	PrintCard(cards[0], rd)
+	PrintCard(c, rd)
 	return true
+}
+
+// singleCard is the card a query matches, when it matches one: among the
+// cards on disk if they're kept and can answer it, and otherwise on
+// Scryfall.
+func singleCard(query string) (mtg.Card, bool) {
+	if !downloadsOff()[cardStoreDownload] {
+		if s, _ := cardstore.Load(); s != nil {
+			cards, total, unknown, err := searchStore(s, query, "edhrec", "auto", 2)
+			if err == nil && len(unknown) == 0 {
+				if total != 1 {
+					return mtg.Card{}, false
+				}
+				return cards[0].Card, true
+			}
+		}
+	}
+	cards, total, err := scryfall.Search(query, "edhrec", "auto", 2)
+	if err != nil || total != 1 || len(cards) != 1 {
+		return mtg.Card{}, false
+	}
+	return cards[0], true
 }
 
 // stdoutWidth is how wide to wrap for. Long lines are hard to read however

@@ -647,14 +647,23 @@ type legalityMsg struct {
 	colours  []string
 }
 
+// legalityTurns is how many decks checkLegality works on at once.
+var legalityTurns = make(chan struct{}, 2)
+
 // checkLegality works out whether each local deck is legal, from the card
 // cache alone. One command per deck rather than one for all of them, so the
 // first answers appear while the rest are still being worked out.
+//
+// Two at a time: each reads its cards from disk, and a few dozen lists at
+// once — tag lists of thousands of cards among them — would hold all of
+// those at the same moment.
 func checkLegality(slugs []string) tea.Cmd {
 	cmds := make([]tea.Cmd, 0, len(slugs))
 	for _, slug := range slugs {
 		s := slug
 		cmds = append(cmds, func() tea.Msg {
+			legalityTurns <- struct{}{}
+			defer func() { <-legalityTurns }()
 			verdict, colours := deck.CheckCached(s)
 			return legalityMsg{slug: s, legality: verdict, colours: colours}
 		})

@@ -26,9 +26,16 @@ type cardStoreMsg struct {
 // cardStoreTickMsg counts the download along in the notice.
 type cardStoreTickMsg struct{}
 
-// loadCardStore reads the store, or downloads it when there's none.
+// loadCardStore reads the store, or downloads it when there's none. One
+// read from disk is put in use at once, for whatever is waiting on it
+// (cardstore.Ready); handleCardStore does the rest.
 func loadCardStore() tea.Msg {
 	s, stale := cardstore.Load()
+	if s != nil && !downloadsOff()[cardStoreDownload] {
+		cardstore.SetCurrent(s)
+		return cardStoreMsg{store: s, stale: stale}
+	}
+	cardstore.Settle()
 	if s != nil {
 		return cardStoreMsg{store: s, stale: stale}
 	}
@@ -93,6 +100,17 @@ func (m Model) handleCardStore(msg cardStoreMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmd, refreshCardStore, cardStoreTick())
 	}
 	return m, cmd
+}
+
+// expectCardStore says whether the cards on disk are about to be loaded,
+// and tells the store, so the decks a session opens wait the moment it
+// takes rather than asking Scryfall.
+func expectCardStore() bool {
+	if downloadsOff()[cardStoreDownload] || !cardstore.OnDisk() {
+		return false
+	}
+	cardstore.Expect()
+	return true
 }
 
 // cardStoreDownload is the store's name as a download and a cache kind.

@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/deck"
 	"ttr/internal/fetch"
 	"ttr/internal/scryfall"
@@ -29,9 +30,17 @@ type addCardMsg struct {
 	err   error
 }
 
-// runAddCard asks Scryfall, off the main thread.
+// runAddCard looks the card up off the main thread: among the cards on
+// disk when they're in and the query is one they can answer, and otherwise
+// on Scryfall.
 func runAddCard(panelID int, query string) tea.Cmd {
 	return func() tea.Msg {
+		if s := cardstore.Current(); s != nil {
+			cards, total, unknown, err := searchStore(s, query, "edhrec", "auto", maxResults)
+			if err == nil && len(unknown) == 0 {
+				return addCardMsg{panel: panelID, query: query, cards: cards, total: total}
+			}
+		}
 		cards, total, err := scryfall.Search(query, "edhrec", "auto", maxResults)
 		msg := addCardMsg{panel: panelID, query: query, total: total, err: err}
 		for _, c := range cards {

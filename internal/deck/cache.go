@@ -1,6 +1,7 @@
 package deck
 
 import (
+	"ttr/internal/cardstore"
 	"ttr/internal/scryfall"
 
 	"ttr/internal/paths"
@@ -197,6 +198,24 @@ func (c *cardCache) save() error {
 
 // ── Resolving ───────────────────────────────────────────────────
 
+// fromStore is a deck line's card from every card on disk
+// (internal/cardstore), when they're in: by its pinned printing if it has
+// one, otherwise as its most normal printing. A line the store can't answer
+// — a printing only MTGO has, a card newer than the last download — goes
+// to the kept cards and Scryfall, as before.
+func fromStore(e Entry) (mtg.Card, bool) {
+	s := cardstore.Ready()
+	i, ok := s.Find(e.Name)
+	if !ok {
+		return mtg.Card{}, false
+	}
+	if e.Set != "" && e.Collector != "" {
+		return s.Printing(i, e.Set, e.Collector)
+	}
+	c, err := s.Card(i)
+	return c, err == nil
+}
+
 // UnresolvedError lists the deck lines Scryfall didn't recognise. The deck
 // still opens — the cards it did resolve are worth showing — so this is
 // reported alongside the result rather than instead of it.
@@ -218,9 +237,35 @@ func Resolve(entries []Entry) ([]Card, error) {
 	// distinct key is asked for once however many lines want it.
 	var idents []map[string]string
 	askedFor := map[string]bool{}
-	withCards(func(cache *cardCache) {
+	local := map[string]mtg.Card{}
+	for _, e := range entries {
+		key := entryKey(e)
+		if _, done := local[key]; done {
+			continue
+		}
+		if c, ok := fromStore(e); ok {
+			local[key] = c
+		}
+	}
+	allLocal := true
+	for _, e := range entries {
+		if _, ok := local[entryKey(e)]; !ok {
+			allLocal = false
+			break
+		}
+	}
+	// The kept cards are only read when the store can't answer everything:
+	// they're 17 MB in memory once loaded.
+	cached := withCards
+	if allLocal {
+		cached = func(func(*cardCache)) {}
+	}
+	cached(func(cache *cardCache) {
 		for _, e := range entries {
 			key := entryKey(e)
+			if _, ok := local[key]; ok {
+				continue
+			}
 			if _, ok := cache.get(e); ok || askedFor[key] {
 				continue
 			}
@@ -259,9 +304,18 @@ func Resolve(entries []Entry) ([]Card, error) {
 
 	cards := make([]Card, 0, len(entries))
 	var missing []string
+	if allLocal {
+		for _, e := range entries {
+			cards = append(cards, Card{Card: local[entryKey(e)], Qty: e.Qty, Commander: e.commander(), Tags: e.Tags})
+		}
+		return cards, nil
+	}
 	withCards(func(cache *cardCache) {
 		for _, e := range entries {
-			card, ok := cache.get(e)
+			card, ok := local[entryKey(e)]
+			if !ok {
+				card, ok = cache.get(e)
+			}
 			if !ok {
 				missing = append(missing, e.Name)
 				continue
@@ -312,8 +366,24 @@ func RefreshStale(slug string) (map[string]mtg.Card, error) {
 	var stale []Entry
 	var idents []map[string]string
 	asked := map[string]bool{}
+	// The cards the store answers age with it, a week at most; only the
+	// rest are kept here and asked for again.
+	var kept []Entry
+	store := cardstore.Ready()
+	for _, e := range d.MainEntries() {
+		if store == nil {
+			kept = d.MainEntries()
+			break
+		}
+		if _, ok := store.Find(e.Name); !ok {
+			kept = append(kept, e)
+		}
+	}
+	if len(kept) == 0 {
+		return nil, nil
+	}
 	withCards(func(cache *cardCache) {
-		for _, e := range d.MainEntries() {
+		for _, e := range kept {
 			key := entryKey(e)
 			if _, ok := cache.get(e); !ok || !cache.stale(e) || asked[key] {
 				continue
@@ -404,9 +474,25 @@ func (idx cardIndex) lookup(e Entry) (mtg.Card, bool) {
 func ResolveCached(entries []Entry) ([]Card, bool) {
 	out := make([]Card, 0, len(entries))
 	complete := true
-	withCards(func(cache *cardCache) {
-		for _, e := range entries {
-			card, ok := cache.get(e)
+	// The store is read outside the lock: every deck in the decks panel
+	// does this at once.
+	local := make([]mtg.Card, len(entries))
+	inStore := make([]bool, len(entries))
+	allLocal := true
+	for i, e := range entries {
+		local[i], inStore[i] = fromStore(e)
+		allLocal = allLocal && inStore[i]
+	}
+	cached := withCards
+	if allLocal {
+		cached = func(f func(*cardCache)) { f(nil) }
+	}
+	cached(func(cache *cardCache) {
+		for i, e := range entries {
+			card, ok := local[i], inStore[i]
+			if !ok {
+				card, ok = cache.get(e)
+			}
 			if !ok {
 				complete = false
 				continue
@@ -422,14 +508,43 @@ func ResolveCached(entries []Entry) ([]Card, bool) {
 	return out, complete
 }
 
+// resolveForCheck is ResolveCached for a legality check: the cards the
+// store has come from their facts in memory (cardstore.Light), with no read
+// of the disk, which matters when the decks panel checks every list at
+// once.
+func resolveForCheck(entries []Entry, format string) ([]Card, bool) {
+	s := cardstore.Ready()
+	out := make([]Card, 0, len(entries))
+	var rest []Entry
+	for _, e := range entries {
+		if i, ok := s.Find(e.Name); ok {
+			out = append(out, Card{Card: s.Light(i, format), Qty: e.Qty, Commander: e.commander(), Tags: e.Tags})
+			continue
+		}
+		rest = append(rest, e)
+	}
+	if len(rest) == 0 {
+		return out, true
+	}
+	more, complete := ResolveCached(rest)
+	return append(out, more...), complete
+}
+
 // CachedByOracle is the cards the cache holds among oracle ids, by oracle
 // id: a card already fetched for any deck needn't be asked for again.
 func CachedByOracle(ids []string) map[string]mtg.Card {
 	want := make(map[string]bool, len(ids))
+	out := map[string]mtg.Card{}
+	s := cardstore.Ready()
 	for _, id := range ids {
+		if i, ok := s.FindOracle(id); ok {
+			if c, err := s.Card(i); err == nil {
+				out[id] = c
+				continue
+			}
+		}
 		want[id] = true
 	}
-	out := map[string]mtg.Card{}
 	withCards(func(cache *cardCache) {
 		for _, c := range cache.cards {
 			if want[c.OracleID] {
