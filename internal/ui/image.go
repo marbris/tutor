@@ -122,6 +122,9 @@ func (cp *cardPrintings) shownFace(p mtg.Card) int {
 // picture is one printing's picture, and how far along getting it is.
 type picture struct {
 	state imgState
+	// local is a picture on its way from disk, which is "loading", not
+	// "fetching".
+	local bool
 	png   []byte
 	w, h  int // in pixels
 	err   error
@@ -149,6 +152,9 @@ type imageMsg struct {
 	// for it again; card is what to ask about.
 	stale bool
 	card  mtg.Card
+	// onDisk is gX past what memory keeps: the pictures are on disk, not
+	// in hand.
+	onDisk bool
 }
 
 // printingsRefreshedMsg is a stale list of printings asked for again: the
@@ -199,6 +205,27 @@ func (m *Model) gxCard(c mtg.Card) tea.Cmd {
 // the one to show, and its picture — and how many bytes that took, which
 // gX adds up.
 func loadPrintings(c mtg.Card) (imageMsg, int) {
+	return printingsAndPictures(c, loadPicture)
+}
+
+// keepPrintings is loadPrintings for gX past what memory keeps: the
+// printings and the pictures are put on disk but not converted, so showing
+// one later is a load from disk, not a download.
+func keepPrintings(c mtg.Card) (imageMsg, int) {
+	msg, got := printingsAndPictures(c, func(p mtg.Card, face int) (picture, int) {
+		_, got, err := printingJPEG(p, face)
+		if err != nil {
+			return picture{state: imgFailed, err: err}, got
+		}
+		return picture{state: imgFetching, local: true}, got
+	})
+	msg.onDisk = msg.err == nil && msg.picture.state != imgFailed
+	return msg, got
+}
+
+// printingsAndPictures is a card's printings, the one to show, and its
+// picture (and its back's) as load gets them.
+func printingsAndPictures(c mtg.Card, load func(mtg.Card, int) (picture, int)) (imageMsg, int) {
 	key := imageKey(c)
 	list, size, stale, err := prints.All(c)
 	if err != nil {
@@ -208,10 +235,10 @@ func loadPrintings(c mtg.Card) (imageMsg, int) {
 	if !ok {
 		return imageMsg{key: key, err: fmt.Errorf("no picture of %s", c.Name)}, size
 	}
-	pic, got := loadPicture(list[at], 0)
+	pic, got := load(list[at], 0)
 	msg := imageMsg{key: key, list: list, at: at, picture: pic, stale: stale, card: c}
 	if list[at].PictureFaces() > 1 {
-		back, more := loadPicture(list[at], 1)
+		back, more := load(list[at], 1)
 		msg.back = &back
 		got += more
 	}
@@ -256,10 +283,10 @@ func (m *Model) fetchShown(cp *cardPrintings) tea.Cmd {
 	}
 	face := cp.shownFace(p)
 	key := pictureKey(p.ID, face)
-	if pic, ok := m.pictures[key]; ok && pic.state != imgFailed {
+	if pic, ok := m.pictures.get(key); ok && pic.state != imgFailed {
 		return nil
 	}
-	m.pictures[key] = &picture{state: imgFetching}
+	m.pictures.put(key, &picture{state: imgFetching, local: pictureKept(p, face)}, m.kitty.key)
 	return func() tea.Msg {
 		pic, _ := loadPicture(p, face)
 		return pictureMsg{key: key, picture: pic}
@@ -277,8 +304,10 @@ func (m *Model) imageHover() tea.Cmd {
 		return nil
 	}
 	key := imageKey((*c))
-	if _, ok := m.images[key]; ok {
-		return nil
+	if cp, ok := m.images[key]; ok {
+		// The printings are in hand; the picture may have been let go to
+		// keep memory down, and is read from disk again.
+		return m.fetchShown(cp)
 	}
 	// The pause is there to spare Scryfall a request for every card the
 	// cursor passes. A card whose printings are already on disk costs it
@@ -356,17 +385,20 @@ func (m *Model) storeImage(msg imageMsg) {
 		return
 	}
 	m.images[msg.key] = &cardPrintings{state: imgReady, list: msg.list, at: msg.at}
+	if msg.onDisk {
+		return
+	}
 	pic := msg.picture
 	id := msg.list[msg.at].ID
-	m.pictures[id] = &pic
+	m.pictures.put(id, &pic, m.kitty.key)
 	if msg.back != nil {
-		m.pictures[pictureKey(id, 1)] = msg.back
+		m.pictures.put(pictureKey(id, 1), msg.back, m.kitty.key)
 	}
 }
 
 func (m Model) handlePicture(msg pictureMsg) (tea.Model, tea.Cmd) {
 	pic := msg.picture
-	m.pictures[msg.key] = &pic
+	m.pictures.put(msg.key, &pic, m.kitty.key)
 	return m, nil
 }
 
@@ -382,7 +414,8 @@ func (m Model) shown() (*cardPrintings, mtg.Card, *picture) {
 	if !ok {
 		return cp, mtg.Card{}, nil
 	}
-	return cp, p, m.pictures[pictureKey(p.ID, cp.shownFace(p))]
+	pic, _ := m.pictures.peek(pictureKey(p.ID, cp.shownFace(p)))
+	return cp, p, pic
 }
 
 // shownKey is what the picture on show is filed under.
@@ -445,8 +478,23 @@ func (m *Model) stepPrinting(older bool) tea.Cmd {
 // of the size, and turning one into the other takes about 50ms, off the
 // main loop and once a run per picture.
 var printingPNG = func(p mtg.Card, face int) ([]byte, int, int, int, error) {
-	dir := filepath.Join(paths.Cache(), "images")
-	jpg := filepath.Join(dir, pictureKey(p.ID, face)+".crop.jpg")
+	raw, got, err := printingJPEG(p, face)
+	if err != nil {
+		return nil, 0, 0, got, err
+	}
+	data, w, h, err := toPNG(raw)
+	if err != nil {
+		os.Remove(pictureFile(p, face)) // a broken copy would only fail again next time
+		return nil, 0, 0, got, err
+	}
+	return data, w, h, got, nil
+}
+
+// printingJPEG is a printing's picture as Scryfall sends it, from disk or
+// downloaded and kept, and how many bytes were downloaded for it.
+func printingJPEG(p mtg.Card, face int) ([]byte, int, error) {
+	jpg := pictureFile(p, face)
+	dir := filepath.Dir(jpg)
 	raw, err := os.ReadFile(jpg)
 	got := 0
 	// One refreshed from the settings since it was kept is downloaded
@@ -461,15 +509,22 @@ var printingPNG = func(p mtg.Card, face int) ([]byte, int, int, int, error) {
 				os.WriteFile(jpg, raw, 0644)
 			}
 		case err != nil:
-			return nil, 0, 0, 0, ferr
+			return nil, 0, ferr
 		}
 	}
-	data, w, h, err := toPNG(raw)
-	if err != nil {
-		os.Remove(jpg) // a broken copy would only fail again next time
-		return nil, 0, 0, got, err
-	}
-	return data, w, h, got, nil
+	return raw, got, nil
+}
+
+// pictureFile is where a printing's picture is kept on disk.
+func pictureFile(p mtg.Card, face int) string {
+	return filepath.Join(paths.Cache(), "images", pictureKey(p.ID, face)+".crop.jpg")
+}
+
+// pictureKept reports whether a printing's picture is on disk, so showing
+// it is a load, not a download.
+func pictureKept(p mtg.Card, face int) bool {
+	_, err := os.Stat(pictureFile(p, face))
+	return err == nil
 }
 
 // toPNG turns a picture in any format the image package reads into a PNG,
@@ -634,6 +689,8 @@ func (m Model) infoImageLines(width int) []string {
 
 	var lines []string
 	switch {
+	case pic != nil && pic.state == imgFetching && pic.local:
+		lines = wrapStyled("loading the "+p.SetName+" printing…", width, muted)
 	case pic == nil || pic.state == imgFetching:
 		lines = wrapStyled("fetching the "+p.SetName+" printing…", width, muted)
 	case pic.state == imgFailed:

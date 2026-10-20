@@ -87,7 +87,7 @@ func TestGxShowsThePrintingAndSendsItOnce(t *testing.T) {
 	m.images[imageKey(card)] = &cardPrintings{state: imgReady, list: []mtg.Card{
 		{ID: "cmm1", Set: "cmm", SetName: "Commander Masters", ReleasedAt: "2023-08-04"},
 	}}
-	m.pictures["cmm1"] = &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}
+	m.pictures.put("cmm1", &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}, "")
 
 	m = drive(m, "g", "x")
 	if m.info.mode != infoImage {
@@ -158,7 +158,7 @@ func printingView(t *testing.T, width int) Model {
 		{ID: "old", Set: "lea", SetName: "Limited Edition Alpha", ReleasedAt: "1993-08-05", Rarity: "uncommon", Prices: mtg.Prices{USD: "4000"}},
 	}}
 	for _, id := range []string{"new", "mid", "old"} {
-		m.pictures[id] = &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}
+		m.pictures.put(id, &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}, "")
 	}
 	return drive(m, "g", "x")
 }
@@ -375,7 +375,7 @@ func TestFTurnsADoubleFacedCardOver(t *testing.T) {
 		{Name: "Delver of Secrets", ImageURIs: mtg.ImageURIs{Normal: "f.jpg"}},
 		{Name: "Insectile Aberration", ImageURIs: mtg.ImageURIs{Normal: "b.jpg"}},
 	}
-	m.pictures["mid.1"] = &picture{state: imgReady, png: []byte("back"), w: 488, h: 680}
+	m.pictures.put("mid.1", &picture{state: imgReady, png: []byte("back"), w: 488, h: 680}, "")
 	if !m.canFlip() {
 		t.Fatal("f not offered on a double-faced card")
 	}

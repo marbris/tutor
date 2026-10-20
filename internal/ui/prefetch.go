@@ -17,8 +17,10 @@ import (
 // up front: the picture gx would show for each card, one card at a time from
 // the one under the cursor to the end and round to the top — so the cards
 // nearest you arrive first — with the notice counting what has come down.
-// A picture already on disk is read and converted to the PNG the terminal
-// takes, so walking the list afterwards is instant either way.
+// The first stretch of cards is converted to the PNG the terminal takes and
+// kept in memory, so walking onto them is instant. The rest are only put on
+// disk, since memory keeps no more than pictureBudget: each is loaded from
+// there, without a download, when you reach it.
 
 // prefetchState is the gX in progress. seq rises with every gX, so a
 // second one supersedes the first rather than racing it.
@@ -41,6 +43,15 @@ type prefetchMsg struct {
 // loadPrintingsFor is loadPrintings, as a variable so the tests needn't go
 // to Scryfall.
 var loadPrintingsFor = loadPrintings
+
+// keepPrintingsFor is keepPrintings, likewise.
+var keepPrintingsFor = keepPrintings
+
+// prefetchInHand is how many of gX's cards, from the cursor on, have their
+// pictures converted and kept in memory: the ones you'll walk to first,
+// well inside pictureBudget. The rest are put on disk, and each is loaded
+// from there (~50 ms) when you reach it.
+const prefetchInHand = 24
 
 // gxAll is gX on a card list.
 func (m *Model) gxAll(p *panel) tea.Cmd {
@@ -86,16 +97,20 @@ func (m *Model) prefetchNext() tea.Cmd {
 		m.images[key] = &cardPrintings{state: imgFetching, local: keptOnDisk(c)}
 		m.notice = m.prefetchProgress()
 		panel, seq := pf.panel, pf.seq
+		load := loadPrintingsFor
+		if pf.next > prefetchInHand {
+			load = keepPrintingsFor
+		}
 		// No pause here: fetch keeps Scryfall's pace, and a card already on
 		// disk needs none — gX over a cached deck just reads and converts.
 		return func() tea.Msg {
-			img, n := loadPrintingsFor(c)
+			img, n := load(c)
 			return prefetchMsg{panel: panel, seq: seq, img: img, bytes: n}
 		}
 	}
 	if len(pf.cards) > 0 {
 		m.notice = itoa(len(pf.cards)) + " " + plural("picture", len(pf.cards)) +
-			" in hand · " + byteText(pf.bytes) + " downloaded"
+			" ready · " + byteText(pf.bytes) + " downloaded"
 		if pf.failed > 0 {
 			m.notice += " · " + itoa(pf.failed) + " with no picture"
 		}

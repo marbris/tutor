@@ -24,7 +24,7 @@ func printingUp(t *testing.T) Model {
 	m.images[imageKey(card)] = &cardPrintings{state: imgReady, list: []mtg.Card{
 		{ID: "cmm1", Set: "cmm", SetName: "Commander Masters", ReleasedAt: "2023-08-04"},
 	}}
-	m.pictures["cmm1"] = &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}
+	m.pictures.put("cmm1", &picture{state: imgReady, png: []byte("png"), w: 488, h: 680}, "")
 	m = drive(m, "g", "x")
 	if m.info.mode != infoImage {
 		t.Fatalf("gx left the panel in %v", m.info.mode)

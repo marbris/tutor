@@ -59,7 +59,7 @@ type Model struct {
 	// them what hoverSeq does for rulings; kitty is what the terminal is
 	// holding to draw.
 	images   map[string]*cardPrintings
-	pictures map[string]*picture
+	pictures *pictureCache
 	// prefetch is gX, fetching every picture in a list ahead of you.
 	prefetch prefetchState
 	imageSeq int
@@ -96,7 +96,7 @@ func New() Model {
 		stats:     statsState{memo: &statsMemo{}},
 		histories: map[string]*cardHistory{},
 		images:    map[string]*cardPrintings{},
-		pictures:  map[string]*picture{},
+		pictures:  newPictureCache(),
 	}
 }
 
