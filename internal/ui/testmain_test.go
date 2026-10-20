@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"ttr/internal/cardstore"
 )
 
 // TestMain redirects every directory the program writes to, the same as
@@ -27,6 +29,8 @@ func TestMain(m *testing.M) {
 	// Nothing goes to the real terminal: a theme switch would set its
 	// background. Tests that want the bytes catch them themselves.
 	writeTerminal = func([]byte) {}
+	// Nor does a test download every card: the store comes from fixtures.
+	cardstore.BulkURL = "http://127.0.0.1:1/no-downloads-in-tests"
 
 	code := m.Run()
 	os.RemoveAll(root)

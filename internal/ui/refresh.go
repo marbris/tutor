@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"ttr/internal/cache"
+	"ttr/internal/cardstore"
 	"ttr/internal/catalog"
 	"ttr/internal/deck"
 	"ttr/internal/rulings"
@@ -66,6 +67,12 @@ func (m *Model) refreshKind(panelID int, kind string) tea.Cmd {
 	}
 
 	switch kind {
+	case cardStoreDownload:
+		m.notice = "downloading " + what + " again…"
+		return tea.Batch(done(func() (tea.Msg, error) {
+			s, err := cardstore.Refresh()
+			return cardStoreMsg{store: s}, err
+		}), cardStoreTick())
 	case "tagger":
 		m.notice = "downloading " + what + " again…"
 		return done(func() (tea.Msg, error) {

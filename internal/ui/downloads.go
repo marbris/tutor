@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/catalog"
 	"ttr/internal/paths"
 	"ttr/internal/rulings"
@@ -35,6 +36,11 @@ type download struct {
 }
 
 var downloads = []download{
+	{
+		name: cardStoreDownload, what: "every card and printing, for local search", size: "about 80 MB a week, 67 MB kept",
+		load:  tea.Batch(loadCardStore, cardStoreTick()),
+		unuse: func(*Model) { cardstore.SetCurrent(nil) },
+	},
 	{
 		name: "tagger", what: "Scryfall Tagger's tags", size: "about 6 MB a week",
 		load:  loadTagger,

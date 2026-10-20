@@ -319,6 +319,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleCatalog(msg)
 	case rulingsLoadedMsg:
 		return m.handleRulingsLoaded(msg)
+	case cardStoreMsg:
+		return m.handleCardStore(msg)
+	case cardStoreTickMsg:
+		return m.handleCardStoreTick()
 	case settingsDoneMsg:
 		return m.handleSettingsDone(msg)
 	case refreshedMsg:

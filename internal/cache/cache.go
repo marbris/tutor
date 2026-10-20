@@ -25,6 +25,8 @@ type Kind struct {
 }
 
 var Kinds = []Kind{
+	{"allcards", "every card and printing (search, decks)", func(r string) bool { return strings.HasPrefix(r, "cardstore"+string(filepath.Separator)) },
+		"the card data downloads again, about 80 MB"},
 	{"cards", "card data for your decks", func(r string) bool { return r == "cards.json" || r == "cards.fetched.json" },
 		"decks look their cards up again on opening"},
 	{"pictures", "card pictures (gx)", func(r string) bool { return strings.HasPrefix(r, "images"+string(filepath.Separator)) },

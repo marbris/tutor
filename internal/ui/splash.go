@@ -50,6 +50,11 @@ func (m Model) viewSplash() string {
 		}
 	}
 	lines = append(lines, "", dim.Render(strings.Join(how, " · ")))
+	// With no panels there's no bottom line, and the notice goes here: on a
+	// first run, the card data counting in.
+	if m.notice != "" {
+		lines = append(lines, "", dim.Render(m.notice))
+	}
 
 	block := lipgloss.JoinVertical(lipgloss.Left, lines...)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, block)

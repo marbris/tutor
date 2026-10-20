@@ -71,6 +71,30 @@ func GetFile(u string) ([]byte, error) {
 	return do(client, req, u)
 }
 
+// Open is a download too big to hold at once — a bulk file — as a stream,
+// for the caller to read and close, and its length (-1 when unknown). It is
+// for hosts with no rate limit, such as data.scryfall.io: it takes no turn.
+func Open(u string) (io.ReadCloser, int64, error) {
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	if limiterFor(req.URL.Host) != nil {
+		return nil, 0, fmt.Errorf("%s is rate limited; Open is for bulk files", Host(u))
+	}
+	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("Accept", "*/*")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	if resp.StatusCode != 200 {
+		resp.Body.Close()
+		return nil, 0, fmt.Errorf("%s (%d)", Host(u), resp.StatusCode)
+	}
+	return resp.Body, resp.ContentLength, nil
+}
+
 func do(client *http.Client, req *http.Request, u string) ([]byte, error) {
 	lim := limiterFor(req.URL.Host)
 	if lim != nil {
