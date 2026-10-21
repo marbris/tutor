@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"ttr/internal/diskcache"
@@ -48,6 +49,10 @@ type Data struct {
 	Cards map[string][]int `json:"cards"`
 
 	byLabel map[string]int
+	// mu guards above and has, which fill in as they are asked: a search
+	// runs off the main loop while the statistics ask on it, and two
+	// unguarded writes at once stop the program.
+	mu sync.Mutex
 	// above is each tag with all its ancestors, worked out when first asked.
 	above map[int][]int
 	// has is each card's tags with all their ancestors, likewise.
@@ -235,11 +240,14 @@ func (d *Data) Has(oracleID string, tag int) bool {
 	return d.Closure(oracleID)[tag]
 }
 
-// Closure is every tag a card has: its own, and every tag above them.
+// Closure is every tag a card has: its own, and every tag above them. The
+// set is shared, never changed once made, so the caller must not change it.
 func (d *Data) Closure(oracleID string) map[int]bool {
 	if d == nil {
 		return nil
 	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	set, ok := d.has[oracleID]
 	if !ok {
 		set = map[int]bool{}
@@ -253,7 +261,7 @@ func (d *Data) Closure(oracleID string) map[int]bool {
 	return set
 }
 
-// ancestry is a tag and every tag above it. The tree is a tree by intent;
+// ancestry is a tag and every tag above it. The caller holds mu. The tree is a tree by intent;
 // a loop in it is skipped rather than followed.
 func (d *Data) ancestry(tag int) []int {
 	if got, ok := d.above[tag]; ok {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -159,4 +160,24 @@ func TestWithIsEveryCardUnderATag(t *testing.T) {
 	if d.With(-1) != nil || (*Data)(nil).With(0) != nil {
 		t.Error("no tag is on no cards")
 	}
+}
+
+func TestTagsCanBeAskedFromSeveralGoroutinesAtOnce(t *testing.T) {
+	// A search off the main loop and the statistics on it ask at the same
+	// time; filling the cache from both used to stop the program. The race
+	// detector (go test -race) is what catches it.
+	d := read(t)
+	removal, _ := d.Find("removal")
+	var wg sync.WaitGroup
+	for g := 0; g < 8; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, card := range []string{"shatter", "sol", "naturalize", "unknown"} {
+				d.Has(card, removal)
+				d.Closure(card)
+			}
+		}()
+	}
+	wg.Wait()
 }

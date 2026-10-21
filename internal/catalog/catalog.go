@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"ttr/internal/diskcache"
@@ -65,6 +66,9 @@ type Data struct {
 
 	// subtypeOf is each subtype's card types, lowercased subtype first.
 	subtypeOf map[string][]string
+	// subtypeOnce builds subtypeOf on first use, from whichever goroutine
+	// asks first.
+	subtypeOnce sync.Once
 }
 
 // List is one catalog: nil when it isn't in.
@@ -81,7 +85,7 @@ func (d *Data) SubtypeOf(subtype string) ([]string, bool) {
 	if d == nil {
 		return nil, false
 	}
-	if d.subtypeOf == nil {
+	d.subtypeOnce.Do(func() {
 		d.subtypeOf = map[string][]string{}
 		for t, c := range SubtypeCatalogs {
 			for _, s := range d.Lists[c] {
@@ -89,7 +93,7 @@ func (d *Data) SubtypeOf(subtype string) ([]string, bool) {
 				d.subtypeOf[k] = append(d.subtypeOf[k], t)
 			}
 		}
-	}
+	})
 	ts, ok := d.subtypeOf[strings.ToLower(subtype)]
 	return ts, ok
 }
