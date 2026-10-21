@@ -788,20 +788,32 @@ func wrapStyled(s string, width int, style lipgloss.Style) []string {
 // A background on the outer box alone shows only in the gaps: every styled
 // word ends in a reset, and a reset goes back to the terminal's background,
 // not the theme's. So a theme whose background isn't the terminal's came out
-// as boxes of one colour behind words of the other. Setting the background
-// again after every reset is what makes it one even colour. Resets that only
-// touch the foreground (the picture's placeholders) leave it alone anyway.
+// as boxes of one colour behind words of the other. Every cell has to carry
+// the theme's background — see paintLine for how without saying it again
+// after every word.
 func paintBackground(frame string, bg lipgloss.Color) string {
 	seq := lipgloss.ColorProfile().Color(string(bg)).Sequence(true)
 	if seq == "" {
 		return frame
 	}
-	set := "\x1b[" + seq + "m"
 	lines := strings.Split(frame, "\n")
 	for i, line := range lines {
-		line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+set)
-		line = strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+set)
-		lines[i] = set + line + "\x1b[0m"
+		if painted, ok := paintLine(line, seq); ok {
+			lines[i] = painted
+		} else {
+			lines[i] = paintAfterResets(line, seq)
+		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// paintAfterResets sets the background again after every reset. It is what
+// paintBackground did for every line before paintLine, and still does for a
+// line holding an escape paintLine doesn't know. It sends the background
+// some 1,500 times a frame, half of what each key press writes.
+func paintAfterResets(line, seq string) string {
+	set := "\x1b[" + seq + "m"
+	line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+set)
+	line = strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+set)
+	return set + line + "\x1b[0m"
 }

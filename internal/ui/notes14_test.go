@@ -161,27 +161,18 @@ func TestRuleExamplesAreSetApartInTheInfoPanel(t *testing.T) {
 	}
 }
 
-func TestTheThemesBackgroundIsSetAgainAfterEveryReset(t *testing.T) {
+func TestTheThemesBackgroundIsUnderEveryCharacter(t *testing.T) {
 	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(prev)
 
+	// Every styled word ends in a reset, which drops to the terminal's
+	// background; nothing may be drawn on it.
 	m := withCards(sized(100, 20), "f", sample(), sortArrival)
-	set := "\x1b[48;2;" // what the theme's background starts with
-	view := m.View()
-	for i, line := range strings.Split(view, "\n") {
-		if !strings.HasPrefix(line, set) {
-			t.Fatalf("line %d doesn't start on the background: %q", i, line)
-		}
-		rest := line
-		for {
-			at := strings.Index(rest, "\x1b[0m")
-			if at < 0 {
-				break
-			}
-			rest = rest[at+len("\x1b[0m"):]
-			if rest != "" && !strings.HasPrefix(rest, set) {
-				t.Fatalf("line %d drops to the terminal's background after a reset: %q", i, line)
+	for i, line := range strings.Split(m.View(), "\n") {
+		for _, c := range cells(t, line) {
+			if !strings.HasPrefix(c.s.bg, "48;2;") {
+				t.Fatalf("line %d draws %q on the terminal's background: %q", i, c.r, line)
 			}
 		}
 	}
