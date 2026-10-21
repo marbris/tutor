@@ -536,6 +536,9 @@ type Options struct {
 	Open map[string]bool
 	// Otags is the Scryfall Tagger tags shown among the tags (alt+t).
 	Otags []string
+	// Keep is the Scryfall Tagger paths in the filter, shown even when they
+	// count nothing, so the filter can still be taken off them.
+	Keep map[string]bool
 }
 
 // ordered are the groups whose rows have an order of their own — the curve
@@ -561,6 +564,10 @@ var GroupOrder = []string{
 // exist, their order and their positions all come from the whole result set
 // and so hold still, while the numbers beside them describe just the cards
 // on screen — a category with nothing left in it stays put and reads zero.
+//
+// The Scryfall Tagger group is the exception. It is long, so a row the
+// narrowing has emptied goes and the rest sort by what they count now — but
+// a row in the filter stays, at zero if need be, so it can be taken off.
 func GroupsBy(rowSource, counted []deck.Card, o Options) []Group {
 	tagsByName, openTags := o.TagsByName, o.Open
 	built := map[string][]Row{
@@ -570,7 +577,7 @@ func GroupsBy(rowSource, counted []deck.Card, o Options) []Group {
 		"Mana Value (excl. lands)": cmcRows(),
 		"Rarity":                   rarityRows(rowSource),
 		"Price (USD)":              priceRows(),
-		TaggerGroup:                taggerRows(rowSource, openTags),
+		TaggerGroup:                taggerRows(rowSource, counted, openTags, o.Keep),
 	}
 
 	out := make([]Group, 0, len(GroupOrder))

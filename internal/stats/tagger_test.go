@@ -141,3 +141,21 @@ func TestAnOtagSitsAmongTheTagsInTaggerColour(t *testing.T) {
 		t.Errorf("a restored otag row doesn't match by its tag: %+v", r)
 	}
 }
+
+func TestTheTaggerGroupSortsByWhatItCountsNowAndHidesTheEmpty(t *testing.T) {
+	withTags(t)
+	all := []deck.Card{oracle("shatter"), oracle("disenchant"), oracle("sol"), oracle("island")}
+	sol := []deck.Card{oracle("sol")}
+	g, _ := taggerGroup(GroupsBy(all, sol, Options{}))
+	if got := rowsText(g); got != "ramp=1" {
+		t.Errorf("narrowed to Sol Ring, rows %s", got)
+	}
+	// A row in the filter stays, at zero, and the tree leads to it.
+	g, _ = taggerGroup(GroupsBy(all, sol, Options{
+		Open: map[string]bool{"removal": true},
+		Keep: map[string]bool{"removal/removal-enchantment": true},
+	}))
+	if got := rowsText(g); got != "ramp=1 removal=0 >removal-enchantment=0" {
+		t.Errorf("with a kept row, rows %s", got)
+	}
+}

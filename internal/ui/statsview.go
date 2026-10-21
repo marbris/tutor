@@ -135,11 +135,30 @@ func (m Model) countedGroups() []stats.Group {
 		return memo.groups
 	}
 	counted, source := m.statCards()
-	groups := stats.GroupsBy(source, counted, stats.Options{TagsByName: m.stats.tagsByName, Open: m.stats.openTags, Otags: globalTags.otags})
+	groups := stats.GroupsBy(source, counted, stats.Options{TagsByName: m.stats.tagsByName,
+		Open: m.stats.openTags, Otags: globalTags.otags, Keep: taggerKept(l)})
 	if memo != nil && l != nil {
 		memo.key, memo.groups, memo.ok = key, groups, true
 	}
 	return groups
+}
+
+// taggerKept is the Scryfall Tagger paths in a list's filter, which the
+// group shows even once they count nothing.
+func taggerKept(l *cardList) map[string]bool {
+	if l == nil {
+		return nil
+	}
+	var keep map[string]bool
+	for _, cl := range l.statFilter {
+		if cl.Row.Group == stats.TaggerGroup {
+			if keep == nil {
+				keep = map[string]bool{}
+			}
+			keep[cl.Row.Path] = true
+		}
+	}
+	return keep
 }
 
 // rotateGroups turns the groups over so top comes first, the rest following

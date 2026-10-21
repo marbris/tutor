@@ -27,9 +27,12 @@ const TaggerGroup = "Scryfall Tagger"
 const pathSep = "/"
 
 // taggerRows is the tree of tags the cards in rowSource have, the roots and
-// whatever open has opened, each level commonest first, and the untagged
-// remainder last.
-func taggerRows(rowSource []deck.Card, open map[string]bool) []Row {
+// whatever open has opened, each level by how many of the counted cards it
+// holds, and the untagged remainder last. A tag none of the counted cards
+// has is left out — the tree is long, and the narrowing would leave it full
+// of zeros — unless keep has it or a tag under it: a row in the filter has
+// to stay, or the filter couldn't be taken off it.
+func taggerRows(rowSource, counted []deck.Card, open, keep map[string]bool) []Row {
 	tg := tagger.Current()
 	if tg == nil {
 		return nil
@@ -45,16 +48,41 @@ func taggerRows(rowSource []deck.Card, open map[string]bool) []Row {
 	if !tagged {
 		return nil
 	}
+	count := map[int]int{}
+	untagged := 0
+	for _, e := range counted {
+		closure := tg.Closure(e.Card.OracleID)
+		for t := range closure {
+			count[t] += copies(e)
+		}
+		if len(closure) == 0 {
+			untagged += copies(e)
+		}
+	}
 
-	// present is the tags among is that the cards have, commonest first.
-	present := func(is []int) []int {
+	// kept reports whether path is in keep, or leads to a path that is.
+	kept := func(path string) bool {
+		for k := range keep {
+			if k == path || strings.HasPrefix(k, path+pathSep) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// present is the tags among is that the counted cards have, or that keep
+	// holds on to, the most counted first.
+	present := func(is []int, parent string) []int {
 		var out []int
 		for _, i := range is {
-			if base[i] > 0 {
+			if base[i] > 0 && (count[i] > 0 || kept(join(parent, tg.Tags[i].Label))) {
 				out = append(out, i)
 			}
 		}
 		sort.SliceStable(out, func(a, b int) bool {
+			if count[out[a]] != count[out[b]] {
+				return count[out[a]] > count[out[b]]
+			}
 			if base[out[a]] != base[out[b]] {
 				return base[out[a]] > base[out[b]]
 			}
@@ -66,12 +94,9 @@ func taggerRows(rowSource []deck.Card, open map[string]bool) []Row {
 	var rows []Row
 	var walk func(tags []int, parent string, depth int)
 	walk = func(tags []int, parent string, depth int) {
-		for _, t := range present(tags) {
-			path := tg.Tags[t].Label
-			if parent != "" {
-				path = parent + pathSep + path
-			}
-			children := present(tg.Tags[t].Children)
+		for _, t := range present(tags, parent) {
+			path := join(parent, tg.Tags[t].Label)
+			children := present(tg.Tags[t].Children, path)
 			r := taggerRow(path)
 			r.Depth, r.Expandable = depth, len(children) > 0
 			rows = append(rows, r)
@@ -82,7 +107,18 @@ func taggerRows(rowSource []deck.Card, open map[string]bool) []Row {
 	}
 	walk(tg.Roots(), "", 0)
 
-	return append(rows, TaggerRow(untaggedLabel))
+	if untagged > 0 || keep[untaggedLabel] {
+		rows = append(rows, TaggerRow(untaggedLabel))
+	}
+	return rows
+}
+
+// join is a tag's path under its parent's.
+func join(parent, label string) string {
+	if parent == "" {
+		return label
+	}
+	return parent + pathSep + label
 }
 
 // TaggerRow is the row for a path of tags, whether or not it's on show: a

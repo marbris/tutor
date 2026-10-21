@@ -253,3 +253,26 @@ func TestAltTShowsATaggerTagWithTheTagsAndKeepsIt(t *testing.T) {
 		t.Errorf("globalotags.json still holds %v", got)
 	}
 }
+
+func TestAltNOnATaggerRowCanBeTakenBackThoughItCountsNothing(t *testing.T) {
+	withTagger(t)
+	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
+	l := m.ws.current().cardsView()
+	m = drive(m, "s")
+	m = pointStat(t, m, stats.TaggerGroup, "ramp")
+	m = drive(m, "alt+n")
+	if l.count() != 3 {
+		t.Fatalf("not ramp left %d cards, want 3", l.count())
+	}
+	r, ok := findRow(m.statGroups(), stats.TaggerGroup, "ramp")
+	if !ok || r.Count != 0 {
+		t.Fatalf("ramp, in the filter, should still show at 0: %+v %v", r, ok)
+	}
+	if u, _ := m.statUnder(); u.Label != "ramp" {
+		t.Errorf("the highlight moved to %s", u.Label)
+	}
+	m = drive(m, "alt+n")
+	if len(l.statFilter) != 0 || l.count() != 4 {
+		t.Errorf("alt+n again left the filter %v and %d cards", l.statFilter, l.count())
+	}
+}
