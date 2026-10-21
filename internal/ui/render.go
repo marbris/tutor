@@ -177,7 +177,8 @@ const (
 
 // membersFor is what a list should flag as living somewhere else too, and
 // where. A list never marks itself: the editing deck marks what the focused
-// list has, and the focused list marks what the editing deck has.
+// list has, and the focused list marks what the editing deck has. The map
+// holds only cards the list itself has.
 func (m Model) membersFor(l *cardList) map[string]membership {
 	editing := m.ws.editingList()
 	var focused *cardList
@@ -198,8 +199,14 @@ func (m Model) membersFor(l *cardList) map[string]membership {
 		case focused:
 			level = inFocused
 		}
-		for name := range o.names() {
-			if level > out[name] {
+		// Only the list's own cards are ever looked up, so only they are
+		// kept: walk the shorter of the two lists and look in the longer.
+		small, big := l.names(), o.names()
+		if len(big) < len(small) {
+			small, big = big, small
+		}
+		for name := range small {
+			if big[name] && level > out[name] {
 				out[name] = level
 			}
 		}

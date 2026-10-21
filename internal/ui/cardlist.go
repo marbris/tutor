@@ -39,6 +39,16 @@ type cardList struct {
 	// order. The workspace keeps it current; see Model.resortInclusion.
 	members map[string]membership
 
+	// nameSet is names(), kept for the gen it was built at. Every frame asks
+	// each list what it holds, and building 20,000 names afresh each time
+	// is what made a held key outrun the screen.
+	nameSet    map[string]bool
+	nameSetGen int
+	// nameColWidth is the shared name column render worked out, for the
+	// rows, order and width in nameColKey; measuring every row is as slow.
+	nameColKey   [3]int
+	nameColWidth int
+
 	// rows is what's on screen: all, narrowed and sorted.
 	rows []deck.Card
 
@@ -424,7 +434,11 @@ func (l *cardList) render(width, height int, members map[string]membership, focu
 	// abbreviates on that boundary — no ragged overlap between the two.
 	nameCol := 0
 	if l.order.abbreviates() {
-		nameCol = nameColumnFor(l.rows, l.order, width)
+		key := [3]int{l.gen, int(l.order), width}
+		if key != l.nameColKey || l.nameColWidth == 0 {
+			l.nameColKey, l.nameColWidth = key, nameColumnFor(l.rows, l.order, width)
+		}
+		nameCol = l.nameColWidth
 	}
 
 	lines := make([]string, 0, height)
@@ -444,12 +458,17 @@ func (l *cardList) render(width, height int, members map[string]membership, focu
 }
 
 // names is every card in the list by lowercased name, for the panel beside
-// it to flag what they have in common.
+// it to flag what they have in common. It is kept until the next refresh,
+// so callers must not change it.
 func (l *cardList) names() map[string]bool {
+	if l.nameSet != nil && l.nameSetGen == l.gen {
+		return l.nameSet
+	}
 	out := make(map[string]bool, len(l.all))
 	for _, c := range l.all {
 		out[markKey(c)] = true
 	}
+	l.nameSet, l.nameSetGen = out, l.gen
 	return out
 }
 
