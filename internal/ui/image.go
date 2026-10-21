@@ -232,7 +232,7 @@ func printingsAndPictures(c mtg.Card, load func(mtg.Card, int) (picture, int)) (
 	if err != nil {
 		return imageMsg{key: key, err: err}, size
 	}
-	list, at, ok := prints.Start(list, c, time.Now().Format("2006-01-02"))
+	list, at, ok := prints.Start(list, withChosen(c, list), time.Now().Format("2006-01-02"))
 	if !ok {
 		return imageMsg{key: key, err: fmt.Errorf("no picture of %s", c.Name)}, size
 	}
@@ -380,7 +380,7 @@ func (m Model) handleImage(msg imageMsg) (tea.Model, tea.Cmd) {
 		if err != nil {
 			return nil // the stale list stays, and is asked for next time
 		}
-		list, _, ok := prints.Start(list, c, time.Now().Format("2006-01-02"))
+		list, _, ok := prints.Start(list, withChosen(c, list), time.Now().Format("2006-01-02"))
 		if !ok {
 			return nil
 		}
@@ -496,6 +496,10 @@ func (m *Model) stepPrinting(older bool) tea.Cmd {
 		cp.at++
 	default:
 		cp.at--
+	}
+	// Where you leave it is the printing the card is shown in from now on.
+	if c := m.focusedCard(); c != nil {
+		choose(imageKey(*c), cp.list[cp.at].ID)
 	}
 	return m.fetchShown(cp)
 }

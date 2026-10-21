@@ -363,8 +363,9 @@ The info panel shows the highlighted card's oracle text, with keywords highlight
 its legalities.
 
 `gx` shows the card as printed, in the printing your list holds. `H` and `L` step through older and
-newer artworks, `f` turns a double-faced card over, and `K` `J` scroll down to the price, tags and
-rulings. The picture follows the cursor, and `gx` again puts the card back. `gX` downloads the
+newer artworks, and the one you leave it on is remembered: that card opens on it from then on, in
+every list and session, without changing any deck file. `f` turns a double-faced card over, and `K`
+`J` scroll down to the price, tags and rulings. The picture follows the cursor, and `gx` again puts the card back. `gX` downloads the
 pictures of every card in the list, so walking through it is instant. Pictures are drawn in the
 terminal in kitty, Ghostty and WezTerm. In other terminals `gx` opens the card in your browser.
 
