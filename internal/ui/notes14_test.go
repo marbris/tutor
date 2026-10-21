@@ -166,6 +166,9 @@ func TestTheThemesBackgroundIsUnderEveryCharacter(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(prev)
 
+	// A theme that paints its background, whatever an earlier test left.
+	theme.Use(theme.Theme{})
+
 	// Every styled word ends in a reset, which drops to the terminal's
 	// background; nothing may be drawn on it.
 	m := withCards(sized(100, 20), "f", sample(), sortArrival)
