@@ -30,12 +30,17 @@ var version = "dev"
 
 // ── Entry point ─────────────────────────────────────────────────
 
-// memoryLimit is a soft limit on what ttr holds: what it keeps is some 60
-// MB, and the rest is garbage Go would otherwise hold on to for minutes
-// after a burst of work, such as the decks panel checking every list. Near
-// the limit Go collects sooner and hands the room back. GOMEMLIMIT, if set,
-// wins.
-const memoryLimit = 128 << 20
+// memoryLimit is a soft limit on what ttr holds: what it keeps is some 75
+// MB, plus up to 48 MB of pictures once gx has been used, and the rest is
+// garbage Go would otherwise hold on to for minutes after a burst of work,
+// such as the decks panel checking every list. Near the limit Go collects
+// sooner and hands the room back.
+//
+// It needs room above what is kept. At 128 MB, a few pictures put ttr
+// within a few MB of it, Go collected all the time, and drawing a frame
+// went from 11 ms to 29 ms: slower than key repeat, so a held arrow kept
+// moving after it was let go. GOMEMLIMIT, if set, wins.
+const memoryLimit = 192 << 20
 
 func main() {
 	if os.Getenv("GOMEMLIMIT") == "" {
