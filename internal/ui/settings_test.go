@@ -311,3 +311,28 @@ func TestSwitchingThemeSetsTheTerminalsBackgroundAndTerminalPutsItBack(t *testin
 		t.Errorf("terminal sent %q, want the background put back", sent)
 	}
 }
+
+func TestALongSettingStaysInsideANarrowPanel(t *testing.T) {
+	// The git remote is longer than a narrow panel is wide. It used to run
+	// past the edge, wrap, and push the panel's bottom off the screen.
+	remote := "git@github.com:marbris/mtg_decks.git (main)"
+	m := sized(150, 30)
+	for i := 0; i < 6; i++ {
+		m.ws.open(KindSettings).show(&settingsView{rows: []settingsRow{
+			{kind: srowHeading, label: "sync"},
+			{kind: srowRemote, label: "git remote", value: remote},
+		}})
+	}
+
+	frame := splitLines(stripANSI(m.View()))
+	if len(frame) != 30 {
+		t.Fatalf("the frame is %d lines, want 30", len(frame))
+	}
+	top, bottom := frame[2], frame[len(frame)-1]
+	if strings.Count(bottom, "╰") != strings.Count(top, "╭") {
+		t.Errorf("a panel's bottom is off the screen:\n%s\n%s", top, bottom)
+	}
+	if !strings.Contains(strings.Join(frame, "\n"), "git rem") {
+		t.Error("the remote's label was squeezed out")
+	}
+}

@@ -103,10 +103,13 @@ func (m Model) viewPanel(p *panel, index, width, height, headHeight int) string 
 	lines = append(lines, m.viewPanelBody(p, inner, maxInt(height-2-len(lines)-len(hints), 1))...)
 	lines = append(lines, hints...)
 
+	// MaxHeight too: a line too wide for the panel wraps, and without it the
+	// panel grows past its neighbours and loses its bottom off the screen.
 	body := lipgloss.NewStyle().
 		Width(inner).
 		Height(maxInt(height-2, 1)).
 		MaxWidth(inner).
+		MaxHeight(maxInt(height-2, 1)).
 		Render(strings.Join(lines, "\n"))
 
 	return lipgloss.NewStyle().

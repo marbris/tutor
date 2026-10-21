@@ -151,15 +151,22 @@ func (v *settingsView) lines(width, height int, focused bool, m *Model) []string
 			out = append(out, head.Render(fit(r.label, width)))
 			continue
 		}
-		valueW := textWidth(r.value)
-		label := fit("  "+r.label, maxInt(width-valueW-1, 0))
+		// A value too long for a narrow panel — the git remote — is cut,
+		// keeping enough of the label to say what it is. Left whole, it ran
+		// past the edge, wrapped, and pushed the panel's bottom off screen.
+		value := r.value
+		keep := minInt(textWidth("  "+r.label), 10)
+		if textWidth(value) > width-1-keep {
+			value = truncate(value, maxInt(width-1-keep, 1))
+		}
+		label := fit("  "+r.label, maxInt(width-textWidth(value)-1, 0))
 		if focused && i == v.cursor.at {
 			line := lipgloss.NewStyle().Foreground(theme.SelectionFg).Bold(true).Render(label) + " " +
-				lipgloss.NewStyle().Foreground(theme.SelectionFg).Render(r.value)
+				lipgloss.NewStyle().Foreground(theme.SelectionFg).Render(value)
 			out = append(out, highlightLine(line, width, theme.SelectionBg))
 			continue
 		}
-		out = append(out, text.Render(label)+" "+dim.Render(r.value))
+		out = append(out, text.Render(label)+" "+dim.Render(value))
 	}
 	return fillTo(out, width, height)
 }
