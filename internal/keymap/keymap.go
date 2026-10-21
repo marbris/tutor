@@ -142,6 +142,7 @@ const (
 
 	StatsTagOrder Action = "tag.order"
 	StatsExpand   Action = "expand"
+	StatsOtag     Action = "otag"
 
 	LeaderFind      Action = "find"
 	LeaderDecks     Action = "decks"
@@ -286,6 +287,7 @@ var defaults = []binding{
 	{Stats, StatsClose, k("s")},
 	{Stats, StatsTagOrder, k("tab")},
 	{Stats, StatsExpand, k("enter")},
+	{Stats, StatsOtag, k("alt+t")},
 
 	{Leader, LeaderFind, k("f")},
 	{Leader, LeaderDecks, k("d")},

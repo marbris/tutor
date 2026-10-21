@@ -91,7 +91,7 @@ type Model struct {
 const defaultQuerySort = 9
 
 func New() Model {
-	globalTags = &tagIndex{slugs: loadPinned()}
+	globalTags = &tagIndex{slugs: loadPinned(), otags: loadOtags()}
 	globalTags.rebuild(nil)
 	return Model{
 		ws:           newWorkspace(),

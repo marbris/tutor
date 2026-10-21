@@ -10,6 +10,7 @@ import (
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
 	"ttr/internal/tagger"
+	"ttr/internal/theme"
 )
 
 // withTags puts a small Tagger tree in use: removal over removal-artifact
@@ -59,7 +60,7 @@ func rowsText(g Group) string {
 func TestTaggerCountsAParentByItsChildren(t *testing.T) {
 	withTags(t)
 	cards := []deck.Card{oracle("shatter"), oracle("disenchant"), oracle("sol"), oracle("island")}
-	g, ok := taggerGroup(GroupsBy(cards, cards, false, nil))
+	g, ok := taggerGroup(GroupsBy(cards, cards, Options{}))
 	if !ok {
 		t.Fatal("no Scryfall Tagger group")
 	}
@@ -74,7 +75,7 @@ func TestTaggerCountsAParentByItsChildren(t *testing.T) {
 func TestAnOpenTagShowsItsChildrenUnderIt(t *testing.T) {
 	withTags(t)
 	cards := []deck.Card{oracle("shatter"), oracle("disenchant"), oracle("sol")}
-	g, _ := taggerGroup(GroupsBy(cards, cards, false, map[string]bool{"removal": true}))
+	g, _ := taggerGroup(GroupsBy(cards, cards, Options{Open: map[string]bool{"removal": true}}))
 	if got := rowsText(g); got != "removal=2 >removal-artifact=2 >removal-enchantment=1 ramp=1" {
 		t.Errorf("rows %s", got)
 	}
@@ -99,7 +100,7 @@ func TestNoTaggerGroupWithoutTheTags(t *testing.T) {
 	tagger.SetCurrent(nil)
 	defer tagger.SetCurrent(old)
 	cards := []deck.Card{oracle("shatter")}
-	if _, ok := taggerGroup(GroupsBy(cards, cards, false, nil)); ok {
+	if _, ok := taggerGroup(GroupsBy(cards, cards, Options{})); ok {
 		t.Error("a Tagger group with no tags loaded")
 	}
 }
@@ -110,5 +111,33 @@ func TestTheTaggerGroupIsLast(t *testing.T) {
 	groups := Groups(cards, cards)
 	if len(groups) == 0 || groups[len(groups)-1].Title != TaggerGroup {
 		t.Errorf("the groups end with %q, want the Tagger group", groups[len(groups)-1].Title)
+	}
+}
+
+func TestAnOtagSitsAmongTheTagsInTaggerColour(t *testing.T) {
+	withTags(t)
+	mine := oracle("sol")
+	mine.Tags = []string{"ramp"}
+	cards := []deck.Card{oracle("shatter"), oracle("disenchant"), mine, oracle("island")}
+	var tags []Row
+	for _, g := range GroupsBy(cards, cards, Options{Otags: []string{"removal", "ramp"}}) {
+		if g.Title == "Tags" {
+			tags = g.Rows
+		}
+	}
+	var got []string
+	for _, r := range tags {
+		got = append(got, r.Path+"="+strconv.Itoa(r.Count))
+	}
+	// removal counts its children's cards; ramp the otag and ramp the tag
+	// are two rows.
+	if s := strings.Join(got, " "); s != "otag:removal=2 tag:ramp=1 otag:ramp=1 tag:untagged=3" {
+		t.Errorf("tags %s", s)
+	}
+	if tags[0].Color != theme.Info || tags[1].Color == theme.Info {
+		t.Error("the otag isn't in Tagger's colour, or the tag is")
+	}
+	if r := TagRow("otag:removal"); r.FilterName() != "otag:removal" || !r.Match(oracle("shatter")) {
+		t.Errorf("a restored otag row doesn't match by its tag: %+v", r)
 	}
 }

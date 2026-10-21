@@ -11,6 +11,7 @@ import (
 
 	"ttr/internal/deck"
 	"ttr/internal/paths"
+	"ttr/internal/stats"
 )
 
 // Global tags: tags that hold across every list on screen.
@@ -33,6 +34,7 @@ import (
 const (
 	pinnedFile    = "globaltags.json"
 	oldPinnedFile = "taglists.json"
+	otagsFile     = "globalotags.json"
 )
 
 // tagIndex is the lists lending the global tags, and what they say.
@@ -55,6 +57,10 @@ type tagIndex struct {
 	// read, by slug. Pinned lists run to thousands of lines and rebuild runs
 	// after every edit, so a file is read again only once it has changed.
 	read map[string]readList
+	// otags is the Scryfall Tagger tags alt+t has put among the tags in the
+	// statistics, by label. They aren't lent to the cards: they're rows of
+	// the Tags group, counting what Tagger says, in Tagger's colour.
+	otags []string
 }
 
 type readList struct {
@@ -109,6 +115,64 @@ func savePinned(slugs []string) {
 	if os.WriteFile(pinnedPath(), body, 0644) == nil {
 		os.Remove(filepath.Join(paths.State(), oldPinnedFile))
 	}
+}
+
+func otagsPath() string { return filepath.Join(paths.State(), otagsFile) }
+
+// loadOtags reads which otags were shown with the tags.
+func loadOtags() []string {
+	body, err := os.ReadFile(otagsPath())
+	if err != nil {
+		return nil
+	}
+	var labels []string
+	if json.Unmarshal(body, &labels) != nil {
+		return nil
+	}
+	return labels
+}
+
+func saveOtags(labels []string) {
+	body, err := json.Marshal(labels)
+	if err != nil {
+		return
+	}
+	os.MkdirAll(filepath.Dir(otagsPath()), 0755)
+	os.WriteFile(otagsPath(), body, 0644)
+}
+
+func (x *tagIndex) hasOtag(label string) bool {
+	for _, o := range x.otags {
+		if o == label {
+			return true
+		}
+	}
+	return false
+}
+
+// toggleOtag shows an otag with the tags or stops showing it, and says which.
+func (x *tagIndex) toggleOtag(label string) bool {
+	x.gen++
+	for i, o := range x.otags {
+		if o == label {
+			x.otags = append(x.otags[:i:i], x.otags[i+1:]...)
+			return false
+		}
+	}
+	x.otags = append(x.otags, label)
+	return true
+}
+
+// cardOtags is the otags shown with the tags that Tagger gives a card,
+// counting the tags under each, as their rows in the statistics do.
+func cardOtags(c deck.Card) []string {
+	var out []string
+	for _, label := range globalTags.otags {
+		if stats.OtagRow(label).Match(c) {
+			out = append(out, label)
+		}
+	}
+	return out
 }
 
 func (x *tagIndex) active(slug string) bool {

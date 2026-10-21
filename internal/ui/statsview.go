@@ -135,7 +135,7 @@ func (m Model) countedGroups() []stats.Group {
 		return memo.groups
 	}
 	counted, source := m.statCards()
-	groups := stats.GroupsBy(source, counted, m.stats.tagsByName, m.stats.openTags)
+	groups := stats.GroupsBy(source, counted, stats.Options{TagsByName: m.stats.tagsByName, Open: m.stats.openTags, Otags: globalTags.otags})
 	if memo != nil && l != nil {
 		memo.key, memo.groups, memo.ok = key, groups, true
 	}
@@ -252,6 +252,43 @@ func (m *Model) toggleBranch() bool {
 		m.stats.openTags[r.Path] = true
 	}
 	m.stats.openGen++
+	return true
+}
+
+// otagUnder is the Scryfall Tagger tag alt+t would put among the tags, or
+// take out: the highlighted Tagger row's, or an otag row's in the Tags group.
+func (m Model) otagUnder() (string, bool) {
+	r, ok := m.statUnder()
+	if !ok {
+		return "", false
+	}
+	if r.Group == stats.TaggerGroup && r.Label != "untagged" {
+		return r.Label, true
+	}
+	return stats.OtagLabel(r)
+}
+
+// toggleGlobalOtag is alt+t: the highlighted Tagger tag shown with the
+// tags, kept across sessions, or no longer. Taken out, it leaves any filter
+// it was in too, since its row is gone from under it.
+func (m *Model) toggleGlobalOtag() bool {
+	label, ok := m.otagUnder()
+	if !ok {
+		return false
+	}
+	if globalTags.toggleOtag(label) {
+		m.notice = label + " shows with the tags — " + keymap.Hint(keymap.Stats, keymap.StatsOtag) + " on it again takes it out"
+	} else {
+		m.notice = label + " no longer shows with the tags"
+		gone := stats.OtagRow("otag:" + label)
+		for _, p := range m.ws.panels {
+			if l := p.cardsView(); l != nil && l.statFilter.Has(gone) {
+				l.statFilter = l.statFilter.Without(gone)
+				l.refresh()
+			}
+		}
+	}
+	saveOtags(globalTags.otags)
 	return true
 }
 
@@ -425,6 +462,11 @@ func (m *Model) statsKey(key string) bool {
 	case keymap.StatsExpand:
 		// Only on a tag with tags under it.
 		if !m.toggleBranch() {
+			return false
+		}
+	case keymap.StatsOtag:
+		// Only on a Tagger tag, or an otag among the tags.
+		if !m.toggleGlobalOtag() {
 			return false
 		}
 	case keymap.StatsTagOrder:

@@ -505,6 +505,13 @@ func (m Model) statsHints() [][2]string {
 		}
 		keys = append(keys, hint(what, keymap.Stats, keymap.StatsExpand))
 	}
+	if label, ok := m.otagUnder(); ok {
+		what := "show with the tags"
+		if globalTags.hasOtag(label) {
+			what = "take out of the tags"
+		}
+		keys = append(keys, hint(what, keymap.Stats, keymap.StatsOtag))
+	}
 	return keys
 }
 

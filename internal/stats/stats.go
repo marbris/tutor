@@ -15,6 +15,7 @@ import (
 
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
+	"ttr/internal/tagger"
 	"ttr/internal/theme"
 )
 
@@ -336,6 +337,33 @@ func priceRows() []Row {
 // one set of opened rows.
 const tagPathPrefix = "tag:"
 
+// The otags chosen with alt+t sit among the tags too, in Tagger's colour:
+// a row a Scryfall Tagger tag, counting the cards under it as the Tagger
+// group does. They aren't tags on the cards, so tag: in / doesn't find them
+// — otag: does already. Their paths start otag:, apart from your tags'.
+const otagPathPrefix = "otag:"
+
+// OtagRow is the row in the Tags group for an otag, by its path.
+func OtagRow(path string) Row {
+	label := strings.TrimPrefix(path, otagPathPrefix)
+	return Row{
+		Group: "Tags", Label: label, Path: otagPathPrefix + label, Name: otagPathPrefix + label, Color: theme.Info,
+		Match: func(ci deck.Card) bool {
+			tg := tagger.Current()
+			t, ok := tg.Find(label)
+			return ok && tg.Has(ci.Card.OracleID, t)
+		},
+	}
+}
+
+// OtagLabel is the Tagger tag an otag row in the Tags group stands for.
+func OtagLabel(r Row) (string, bool) {
+	if r.Group != "Tags" {
+		return "", false
+	}
+	return strings.CutPrefix(r.Path, otagPathPrefix)
+}
+
 // The two rows under a tag both give.
 const (
 	OwnTagLabel      = "this list"
@@ -343,9 +371,9 @@ const (
 )
 
 // tagRows is the tags the cards in rowSource have, of their own or borrowed,
-// commonest first or by name, each opened one followed by its two halves, and
-// the untagged at the bottom.
-func tagRows(rowSource []deck.Card, byName bool, open map[string]bool) []Row {
+// and the chosen otags they have, commonest first or by name, each opened one
+// followed by its two halves, and the untagged at the bottom.
+func tagRows(rowSource []deck.Card, byName bool, open map[string]bool, otags []string) []Row {
 	own := map[string]bool{}
 	borrowed := map[string]bool{}
 	base := map[string]int{}
@@ -370,29 +398,54 @@ func tagRows(rowSource []deck.Card, byName bool, open map[string]bool) []Row {
 			note(t, borrowed)
 		}
 	}
-	sort.Slice(labels, func(i, j int) bool {
-		if !byName && base[labels[i]] != base[labels[j]] {
-			return base[labels[i]] > base[labels[j]]
-		}
-		return strings.ToLower(labels[i]) < strings.ToLower(labels[j])
-	})
 
-	rows := make([]Row, 0, len(labels)+1)
+	// Your tags and the otags sort together, each with its own count: a tag
+	// and an otag of the same name are two rows, told apart by colour.
+	type entry struct {
+		row  Row
+		base int
+	}
+	var entries []entry
 	for _, tag := range labels {
 		r := TagRow(tagPathPrefix + tag)
 		if !own[tag] {
 			r.Color = theme.MemberOther
 		}
 		r.Expandable = own[tag] && borrowed[tag]
-		rows = append(rows, r)
-		if r.Expandable && open[r.Path] {
-			rows = append(rows, TagRow(r.Path+pathSep+OwnTagLabel), TagRow(r.Path+pathSep+BorrowedTagLabel))
+		entries = append(entries, entry{r, base[tag]})
+	}
+	for _, label := range otags {
+		r := OtagRow(otagPathPrefix + label)
+		n := 0
+		for _, e := range rowSource {
+			if r.Match(e) {
+				n += copies(e)
+			}
+		}
+		if n > 0 {
+			entries = append(entries, entry{r, n})
+		}
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		if !byName && a.base != b.base {
+			return a.base > b.base
+		}
+		return strings.ToLower(a.row.Label) < strings.ToLower(b.row.Label)
+	})
+
+	rows := make([]Row, 0, len(entries)+1)
+	for _, e := range entries {
+		rows = append(rows, e.row)
+		if e.row.Expandable && open[e.row.Path] {
+			rows = append(rows, TagRow(e.row.Path+pathSep+OwnTagLabel), TagRow(e.row.Path+pathSep+BorrowedTagLabel))
 		}
 	}
 	// An untagged line, but only once something is tagged: a histogram whose
 	// one bar is "untagged" says nothing, so a deck with no tags has no tag
 	// group at all. When some cards are tagged, the untagged remainder is worth
 	// seeing — and it sits at the bottom, as the leftover rather than a tag.
+	// The otags aren't tags on the cards, so they don't count here.
 	if len(labels) > 0 {
 		rows = append(rows, TagRow(tagPathPrefix+untaggedLabel))
 	}
@@ -400,11 +453,17 @@ func tagRows(rowSource []deck.Card, byName bool, open map[string]bool) []Row {
 }
 
 // IsTagPath reports whether a path names a row of the Tags group.
-func IsTagPath(path string) bool { return strings.HasPrefix(path, tagPathPrefix) }
+func IsTagPath(path string) bool {
+	return strings.HasPrefix(path, tagPathPrefix) || strings.HasPrefix(path, otagPathPrefix)
+}
 
-// TagRow is the row for a tag, or for one half of it, by its path — whether
-// or not it is on show, so a filter on it can be put back after a restart.
+// TagRow is the row for a tag, or for one half of it, or for an otag, by its
+// path — whether or not it is on show, so a filter on it can be put back
+// after a restart.
 func TagRow(path string) Row {
+	if strings.HasPrefix(path, otagPathPrefix) {
+		return OtagRow(path)
+	}
 	rest := strings.TrimPrefix(path, tagPathPrefix)
 	if rest == untaggedLabel {
 		return Row{
@@ -464,7 +523,19 @@ func copies(e deck.Card) int {
 // Groups builds the category list from rowSource and counts it over
 // counted, the tags commonest first and Tagger's closed. See GroupsBy.
 func Groups(rowSource, counted []deck.Card) []Group {
-	return GroupsBy(rowSource, counted, false, nil)
+	return GroupsBy(rowSource, counted, Options{})
+}
+
+// Options is how GroupsBy lays the groups out, beyond the cards.
+type Options struct {
+	// TagsByName puts the tags in alphabetical order rather than commonest
+	// first: tags tend to come in families — otag-removal, otag-ramp — which
+	// read better side by side.
+	TagsByName bool
+	// Open is the tree rows opened to show their children, by path.
+	Open map[string]bool
+	// Otags is the Scryfall Tagger tags shown among the tags (alt+t).
+	Otags []string
 }
 
 // ordered are the groups whose rows have an order of their own — the curve
@@ -490,16 +561,10 @@ var GroupOrder = []string{
 // exist, their order and their positions all come from the whole result set
 // and so hold still, while the numbers beside them describe just the cards
 // on screen — a category with nothing left in it stays put and reads zero.
-//
-// tagsByName puts the tags in alphabetical order rather than commonest
-// first: tags tend to come in families — otag-removal, otag-ramp — which
-// read better side by side.
-//
-// openTags is the Scryfall Tagger rows opened to show their children, by
-// path.
-func GroupsBy(rowSource, counted []deck.Card, tagsByName bool, openTags map[string]bool) []Group {
+func GroupsBy(rowSource, counted []deck.Card, o Options) []Group {
+	tagsByName, openTags := o.TagsByName, o.Open
 	built := map[string][]Row{
-		"Tags":                     tagRows(rowSource, tagsByName, openTags),
+		"Tags":                     tagRows(rowSource, tagsByName, openTags, o.Otags),
 		TypeGroup:                  typeRows(rowSource, openTags),
 		"Color (excl. lands)":      colorRows(),
 		"Mana Value (excl. lands)": cmcRows(),

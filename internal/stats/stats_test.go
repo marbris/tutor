@@ -197,7 +197,7 @@ func TestNamedGroupsLeadWithTheCommonestAndOrderedOnesKeepTheirOrder(t *testing.
 			t.Errorf("%s = %q, want %q", title, got, want)
 		}
 	}
-	byName := GroupsBy(entries, entries, true, nil)
+	byName := GroupsBy(entries, entries, Options{TagsByName: true})
 	if got := strings.Join(labels(byName, "Tags"), " "); got != "a-wincon b-tribe otag-ramp untagged" {
 		t.Errorf("tags by name = %q", got)
 	}
@@ -258,7 +258,7 @@ func TestBorrowedTagsAreColouredApartAndATagBothGiveOpensIntoItsHalves(t *testin
 		return Row{}, false
 	}
 
-	groups := GroupsBy(entries, entries, false, nil)
+	groups := GroupsBy(entries, entries, Options{})
 	ramp, _ := find(groups, "tag:ramp")
 	aura, _ := find(groups, "tag:aura")
 	land, _ := find(groups, "tag:land")
@@ -272,7 +272,7 @@ func TestBorrowedTagsAreColouredApartAndATagBothGiveOpensIntoItsHalves(t *testin
 		t.Error("the halves show before ramp is opened")
 	}
 
-	groups = GroupsBy(entries, entries, false, map[string]bool{"tag:ramp": true})
+	groups = GroupsBy(entries, entries, Options{Open: map[string]bool{"tag:ramp": true}})
 	own, ok1 := find(groups, "tag:ramp/this list")
 	other, ok2 := find(groups, "tag:ramp/other lists")
 	if !ok1 || !ok2 || own.Base != 1 || other.Base != 1 {

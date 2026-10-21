@@ -218,3 +218,38 @@ func TestATaggerTagsMeaningShowsUnderItInTheStatistics(t *testing.T) {
 		t.Error("the meaning stayed with the row the highlight left")
 	}
 }
+
+func TestAltTShowsATaggerTagWithTheTagsAndKeepsIt(t *testing.T) {
+	isolate(t)
+	freshGlobalTags(t)
+	withTagger(t)
+	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
+	m = drive(m, "s", "ctrl+k")
+	if r, _ := m.statUnder(); r.Label != "removal" {
+		t.Fatalf("on %s/%s, want the Tagger group's removal", r.Group, r.Label)
+	}
+	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "show with the tags") {
+		t.Error("alt+t isn't offered on removal")
+	}
+	m = drive(m, "alt+t")
+	r, ok := findRow(m.statGroups(), "Tags", "removal")
+	if !ok || r.Count != 2 || r.Path != "otag:removal" {
+		t.Fatalf("removal isn't among the tags counting 2: %+v", r)
+	}
+	if got := loadOtags(); len(got) != 1 || got[0] != "removal" {
+		t.Errorf("globalotags.json holds %v", got)
+	}
+
+	// Taken out again from its row among the tags.
+	m.pointAt(r)
+	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "take out of the tags") {
+		t.Error("alt+t isn't offered on the otag row")
+	}
+	m = drive(m, "alt+t")
+	if _, ok := findRow(m.statGroups(), "Tags", "removal"); ok {
+		t.Error("removal is still among the tags")
+	}
+	if got := loadOtags(); len(got) != 0 {
+		t.Errorf("globalotags.json still holds %v", got)
+	}
+}
