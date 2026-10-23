@@ -161,6 +161,8 @@ const (
 	GotoVersions Action = "versions"
 	GotoImage    Action = "image"
 	GotoImageAll Action = "image.all"
+	// GotoMoxfield is gm: the deck copied as text for Moxfield's import.
+	GotoMoxfield Action = "copy-moxfield"
 
 	TagMoveJoin    Action = "join"
 	TagMoveUpsert  Action = "upsert"
@@ -307,6 +309,7 @@ var defaults = []binding{
 	{Goto, GotoVersions, k("v")},
 	{Goto, GotoImage, k("x")},
 	{Goto, GotoImageAll, k("X")},
+	{Goto, GotoMoxfield, k("m")},
 
 	// After T, the second key is where the tags come from: t and a this
 	// list (echoing t, which tags only what's there, and a, which adds what

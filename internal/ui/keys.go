@@ -563,6 +563,10 @@ func (m Model) handleGoto(key string) (tea.Model, tea.Cmd) {
 	case keymap.GotoImageAll:
 		cmd := m.gxAll(p)
 		return m, cmd
+
+	case keymap.GotoMoxfield:
+		cmd := m.copyForMoxfield(p)
+		return m, cmd
 	}
 	return m, nil
 }

@@ -714,7 +714,8 @@ func (l *cardList) keys() []hintGroup {
 		sel = append(sel, hint("put", keymap.Cards, keymap.CardsPut))
 	}
 	if local {
-		sel = append(sel, hint("commit", keymap.Cards, keymap.CardsWrite))
+		sel = append(sel, hint("commit", keymap.Cards, keymap.CardsWrite),
+			[2]string{gotoHint(keymap.GotoMoxfield), "copy for moxfield"})
 	} else {
 		// Not yours, so writing it asks for a name and makes it yours.
 		sel = append(sel, hint("save as new deck", keymap.Cards, keymap.CardsWrite, keymap.CardsWriteNew))

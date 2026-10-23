@@ -1053,6 +1053,7 @@ func (l *deckList) keys() []hintGroup {
 			hint("pin to global tags", keymap.Decks, keymap.DecksGlobalTags),
 			{gotoHint(keymap.GotoVersions), "versions"},
 			{gotoHint(keymap.GotoImage), "open on moxfield"},
+			{gotoHint(keymap.GotoMoxfield), "copy for moxfield"},
 		}},
 	}
 }

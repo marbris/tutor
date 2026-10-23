@@ -576,6 +576,7 @@ ttr cache clear [kind]          # delete it, all of it or one kind
 | `t` | pin to the global tags, or unpin |
 | `gv` | git history |
 | `gx` | open a Moxfield deck on moxfield.com |
+| `gm` | copy a list of yours to the clipboard, tags and all, to paste into Moxfield's import (also in an open list) |
 
 Lists are grouped into folders by their path: renaming a list to `aggro/mono-red` moves it into
 `aggro`.
