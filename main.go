@@ -78,7 +78,7 @@ func main() {
 
 	// The first run puts Tutor in the desktop's application launcher. Not
 	// on the way to removing it, nor for a question about ttr itself.
-	if len(args) == 0 || !map[string]bool{"uninstall": true, "launcher": true,
+	if len(args) == 0 || !map[string]bool{"uninstall": true, "launcher": true, "upgrade": true, "update": true,
 		"-h": true, "--help": true, "help": true, "-v": true, "--version": true, "version": true}[args[0]] {
 		if said := launcher.FirstRun(); said != "" {
 			fmt.Fprintln(os.Stderr, said)
@@ -134,6 +134,10 @@ func main() {
 
 	case "uninstall":
 		runUninstall(args[1:])
+		return
+
+	case "upgrade", "update":
+		runUpgrade(args[1:])
 		return
 	}
 

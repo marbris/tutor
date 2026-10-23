@@ -456,6 +456,10 @@ mv ttr-darwin-arm64 /usr/local/bin/ttr
 
 Windows: rename `ttr-windows-amd64.exe` to `ttr.exe` and put it somewhere on your `PATH`.
 
+After that, `ttr upgrade` fetches the newest release, checks it against the release's
+`SHA256SUMS`, and puts it in place of the `ttr` you ran. Use `sudo ttr upgrade` if that's in a
+directory like `/usr/local/bin`. On macOS the `xattr` step is only needed the first time.
+
 ### In the application launcher
 
 The first time it runs, `ttr` puts Tutor in your desktop's application launcher, so you can start it
@@ -511,6 +515,7 @@ ttr sync off                    # disconnect (your lists are untouched)
 ttr rules <query>               # search the comprehensive rules
 ttr theme [name]                # list themes, or switch
 ttr keys [--defaults]           # list the key bindings, or print them as a keys.json
+ttr upgrade [-f]                # install the newest release from GitHub over this ttr
 ttr uninstall                   # remove Tutor; asks about your settings and lists
 ttr launcher [remove]           # put Tutor in the application launcher, or take it out
 ttr init                        # write commented-out templates of every settings file

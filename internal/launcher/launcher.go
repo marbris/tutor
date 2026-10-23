@@ -145,6 +145,18 @@ func Executable() (string, bool) {
 	return exe, true
 }
 
+// MoveAside renames a program to <exe>.old and deletes that once ttr has
+// exited. Windows won't delete or overwrite a program that is running, but
+// will rename it, which frees its name for a new one or for nothing.
+func MoveAside(exe string) error {
+	aside := exe + ".old"
+	os.Remove(aside)
+	if err := os.Rename(exe, aside); err != nil {
+		return err
+	}
+	return exec.Command("cmd", "/c", "ping -n 3 127.0.0.1 >nul & del /f /q \""+aside+"\"").Start()
+}
+
 // graphical reports whether there's a desktop to launch from. On Linux a
 // session over ssh has none; one is made the first time there is.
 func graphical() bool {

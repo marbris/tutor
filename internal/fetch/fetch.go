@@ -1,9 +1,9 @@
 // Package fetch is the one place ttr talks to the network.
 //
-// Four services are involved — Scryfall for cards, Moxfield for decks,
-// MTGJSON for printed text, and Wizards for the rules — and they all want the
-// same courtesy: a User-Agent that says who is calling. Keeping that in one
-// place is the only way it stays true of all four.
+// Five services are involved — Scryfall for cards, Moxfield for decks,
+// MTGJSON for printed text, Wizards for the rules, and GitHub for ttr
+// upgrade — and they all want the same courtesy: a User-Agent that says who
+// is calling. Keeping that in one place is the only way it stays true of all.
 package fetch
 
 import (

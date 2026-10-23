@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -165,12 +164,7 @@ func RemoveProgram(exe string) error {
 		}
 		return nil
 	}
-	aside := exe + ".old"
-	os.Remove(aside)
-	if err := os.Rename(exe, aside); err != nil {
-		return err
-	}
-	return exec.Command("cmd", "/c", "ping -n 3 127.0.0.1 >nul & del /f /q \""+aside+"\"").Start()
+	return launcher.MoveAside(exe)
 }
 
 // Size is how much room the paths take, walking directories.
