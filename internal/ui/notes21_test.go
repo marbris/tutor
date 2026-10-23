@@ -57,3 +57,18 @@ func TestInclusionOrderFollowsAFilterElsewhere(t *testing.T) {
 		t.Errorf("typing a filter that hides Sol Ring left it %v beside", a.members["sol ring"])
 	}
 }
+
+// t takes several tags at once, a space between them.
+func TestTTakesSeveralTags(t *testing.T) {
+	m := editingDeckModel()
+	m = drive(m, "t", "r", "a", "m", "p", "space", "d", "r", "a", "w", "enter")
+	l := m.ws.current().cardsView()
+	c, _ := l.current()
+	got := l.all[l.indexOfCard(c.Card.Name)].Tags
+	if !sameTags(got, []string{"draw", "ramp"}) && !sameTags(got, []string{"ramp", "draw"}) {
+		t.Errorf("t ramp draw left the tags %v", got)
+	}
+	if m.notice != "1 tagged ramp draw" {
+		t.Errorf("the notice reads %q", m.notice)
+	}
+}

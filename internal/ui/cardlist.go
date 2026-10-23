@@ -633,6 +633,7 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		m.put(l)
 	case keymap.CardsTag:
 		p.ask(askTag, "tag", "")
+		p.askInput.Placeholder = "ramp draw … · -tag takes one off · tab completes"
 	case keymap.CardsAddTagged:
 		// Add and tag, the last tag filled in. It lives on A, beside a for
 		// add, because it is an add that also tags — not a second kind of tag.

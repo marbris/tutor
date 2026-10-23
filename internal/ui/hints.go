@@ -132,7 +132,7 @@ func (m Model) hintGroups() []hintGroup {
 	case askAddCard, askOtag:
 		return []hintGroup{{"", addBarKeys(p)}}
 	case askTag:
-		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"}, {"enter", "tag them"}, {"esc", "leave"}}}}
+		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"}, {"enter", "tag them (a space between tags)"}, {"esc", "leave"}}}}
 	case askTagMove, askGlobalTags:
 		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"},
 			{"enter", "bring them over (empty: every tag)"}, {"esc", "leave"}}}}

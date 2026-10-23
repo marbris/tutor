@@ -376,10 +376,22 @@ func (m *Model) tag(cards []deck.Card, input string) {
 	case r.present == 0:
 		m.notice = "none of those are in the deck"
 	case r.absent > 0:
-		m.notice = itoa(r.present) + " tagged, " + itoa(r.absent) + " not in the deck"
+		m.notice = itoa(r.present) + " tagged" + tagEditText(add, remove) + ", " + itoa(r.absent) + " not in the deck"
 	default:
-		m.notice = itoa(r.present) + " tagged"
+		m.notice = itoa(r.present) + " tagged" + tagEditText(add, remove)
 	}
+}
+
+// tagEditText is what t did, for the notice: " ramp draw -wincon".
+func tagEditText(add, remove []string) string {
+	out := ""
+	for _, t := range add {
+		out += " " + t
+	}
+	for _, t := range remove {
+		out += " -" + t
+	}
+	return out
 }
 
 // addTagged is A: a, and the typed tags put on as well. The prompt opens
