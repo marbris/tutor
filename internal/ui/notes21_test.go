@@ -216,3 +216,68 @@ func TestGMCopiesTheOpenDeck(t *testing.T) {
 		t.Errorf("the clipboard holds %q, want %q", *got, want)
 	}
 }
+
+// space n copies the panel you're in: beside it, focused, laid out the same.
+func TestSpaceNCopiesThePanel(t *testing.T) {
+	m := withCards(sized(240, 30), "f", sample(), sortArrival)
+	m = withCards(m, "f", sample(), sortArrival)
+	m = focusOn(m, 0)
+	l := m.ws.current().cardsView()
+	l.setFilter("elf")
+	l.cycleSort(1)
+	l.marks["sol ring"] = true
+
+	m = drive(m, "space", "n")
+	if m.ws.count() != 3 || m.ws.focused != 1 {
+		t.Fatalf("%d panels, focus on %d: want the copy at 1 of 3", m.ws.count(), m.ws.focused)
+	}
+	c := m.ws.current().cardsView()
+	if c == nil || c == l {
+		t.Fatalf("the copy shows %v", c)
+	}
+	if c.filter != "elf" || c.order != l.order || len(c.rows) != len(l.rows) {
+		t.Errorf("the copy is filtered %q, ordered %v with %d rows; the original %q, %v, %d",
+			c.filter, c.order, len(c.rows), l.filter, l.order, len(l.rows))
+	}
+	if c.markCount() != 0 {
+		t.Error("the v picks came along")
+	}
+	if m.ws.current().id == m.ws.panels[0].id {
+		t.Error("the copy has the original's id")
+	}
+
+	// Each goes its own way from here.
+	c.setFilter("")
+	if l.filter != "elf" {
+		t.Error("clearing the copy's filter cleared the original's")
+	}
+}
+
+// Two panels on one deck stay the same deck: an edit in one shows in both.
+func TestACopiedDeckFollowsItsEdits(t *testing.T) {
+	m := editingDeckModel()
+	m = drive(m, "space", "n")
+	orig, cp := m.ws.panels[0].cardsView(), m.ws.panels[1].cardsView()
+	if m.ws.editing != 0 {
+		t.Fatalf("the editing deck moved to %d", m.ws.editing)
+	}
+
+	m = focusOn(m, 0)
+	m = drive(m, "x") // the first card out of the editing deck
+	if len(cp.all) != len(orig.all) {
+		t.Fatalf("the copy has %d cards, the deck %d", len(cp.all), len(orig.all))
+	}
+	m = drive(m, "u")
+	if len(cp.all) != len(sample()) {
+		t.Errorf("after u the copy has %d cards, want %d", len(cp.all), len(sample()))
+	}
+}
+
+// The settings panel is one of a kind.
+func TestSpaceNLeavesTheSettingsAlone(t *testing.T) {
+	m := drive(sized(140, 30), "space", "c")
+	m = drive(m, "space", "n")
+	if m.ws.count() != 1 || !strings.Contains(m.notice, "isn't copied") {
+		t.Errorf("%d panels, notice %q", m.ws.count(), m.notice)
+	}
+}

@@ -68,7 +68,6 @@ func TestTheLeaderOpensEachKindOfPanel(t *testing.T) {
 		"f": KindFind,
 		"d": KindDecks,
 		"r": KindRules,
-		"n": KindNew,
 	} {
 		m := drive(sized(120, 40), "space", key)
 		if m.ws.count() != 1 {
@@ -162,17 +161,14 @@ func TestAPanelCanBeMovedAlongTheRow(t *testing.T) {
 }
 
 func TestTabCyclesWhatANewPanelSearches(t *testing.T) {
-	m := drive(sized(120, 40), "space", "n")
-	if m.ws.current().kind != KindNew {
-		t.Fatal("space n did not open an untyped panel")
-	}
+	m := drive(sized(120, 40), "space", "f")
 	m = drive(m, "tab")
-	if got := m.ws.current().kind; got != KindFind {
-		t.Errorf("first tab landed on %v, want find", got)
+	if got := m.ws.current().kind; got != KindDecks {
+		t.Errorf("first tab landed on %v, want decks", got)
 	}
 	m = drive(m, "tab", "tab")
-	if got := m.ws.current().kind; got != KindRules {
-		t.Errorf("three tabs landed on %v, want rules", got)
+	if got := m.ws.current().kind; got != KindFind {
+		t.Errorf("three tabs landed on %v, want find again", got)
 	}
 }
 

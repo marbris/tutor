@@ -23,10 +23,7 @@ import (
 type Kind int
 
 const (
-	// KindNew is a panel that hasn't been told what it is yet. Tab in its
-	// search bar cycles through the others.
-	KindNew Kind = iota
-	KindFind
+	KindFind Kind = iota
 	KindDecks
 	KindRules
 	KindCards
@@ -34,9 +31,8 @@ const (
 	KindSettings
 )
 
-// kinds is the cycle tab walks, leaving out the two that aren't a search
-// target: an untyped panel, and a card list, which is something a search
-// produces rather than something you ask for.
+// kinds is the cycle tab walks, leaving out a card list, which is something
+// a search produces rather than something you ask for, and the settings.
 var kinds = []Kind{KindFind, KindDecks, KindRules}
 
 func (k Kind) String() string {
@@ -102,8 +98,7 @@ func (k Kind) placeholder() string {
 	return "tab: scryfall · decks · rules"
 }
 
-// next moves a panel to the following search target, wrapping. An untyped
-// panel lands on the first rather than the second.
+// next moves a panel to the following search target, wrapping.
 func (k Kind) next(delta int) Kind {
 	at := 0
 	for i, c := range kinds {

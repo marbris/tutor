@@ -40,7 +40,7 @@ var leaderMenu = []leaderCmd{
 	{keymap.LeaderFind, "find", func(m *Model) { m.ws.open(KindFind) }},
 	{keymap.LeaderDecks, "decks", nil}, // opens the list and checks it, so it needs a command
 	{keymap.LeaderRules, "rules", nil}, // needs a command, so it is run below
-	{keymap.LeaderNew, "new", func(m *Model) { m.ws.open(KindNew) }},
+	{keymap.LeaderCopy, "copy panel", func(m *Model) { m.copyPanel() }},
 	{keymap.LeaderSync, "git push", nil},              // hands back a command, so it is run below
 	{keymap.LeaderCommitAll, "commit all lists", nil}, // so does this
 	{keymap.LeaderSettings, "settings", func(m *Model) { m.openSettings() }},

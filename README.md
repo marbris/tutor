@@ -100,7 +100,7 @@ Tutor is a row of panels, with an info panel on the right that describes whateve
 | `space d` | your lists: local decks, Moxfield decks, global tags |
 | `space f` | a card search |
 | `space r` | the comprehensive rules |
-| `space n` | a new panel; `tab` cycles between the three |
+| `space n` | a copy of the panel you're in, to sort or filter another way. Two panels on one list stay the same list |
 
 From the lists panel you open a local list in a panel of its own. In a search panel you search
 every card there is and get a list of results.
@@ -588,7 +588,7 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 | `e` `E` | choose the editing list |
 | `gd` | jump to the editing list |
 | `space f` `space d` `space r` | new search / lists / rules panel |
-| `space n` | new panel |
+| `space n` | copy this panel |
 | `space x` `space o` | close this panel / close the others |
 | `space c` | the settings |
 | `space u` | bring back the last closed panel |

@@ -147,7 +147,7 @@ const (
 	LeaderFind      Action = "find"
 	LeaderDecks     Action = "decks"
 	LeaderRules     Action = "rules"
-	LeaderNew       Action = "new"
+	LeaderCopy      Action = "copy"
 	LeaderSync      Action = "sync"
 	LeaderCommitAll Action = "commit-all"
 	LeaderClose     Action = "close"
@@ -295,7 +295,7 @@ var defaults = []binding{
 	{Leader, LeaderFind, k("f")},
 	{Leader, LeaderDecks, k("d")},
 	{Leader, LeaderRules, k("r")},
-	{Leader, LeaderNew, k("n")},
+	{Leader, LeaderCopy, k("n")},
 	{Leader, LeaderSync, k("s")},
 	{Leader, LeaderCommitAll, k("w")},
 	{Leader, LeaderClose, k("x")},
@@ -342,7 +342,8 @@ func k(keys ...string) []string { return keys }
 // renamed is actions known by an older name, so a keys.json written before
 // the rename still moves them.
 var renamed = map[Scope]map[string]Action{
-	Decks: {"tag-list": DecksGlobalTags},
+	Decks:  {"tag-list": DecksGlobalTags},
+	Leader: {"new": LeaderCopy}, // space n opened an empty panel before 10.5.0
 }
 
 // retired is actions that are gone, so a keys.json that still moves one is

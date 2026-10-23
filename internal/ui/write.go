@@ -102,6 +102,7 @@ func (m Model) autosave() tea.Cmd {
 		}
 		cmds = append(cmds, autosaveDeck(*l.deck, l.all, l.wasClean))
 		l.wasClean = false
+		m.mirrorDeck(l)
 	}
 	// An edit to a list lending global tags changes what every other list
 	// counts — at once, so the key that made it sees the new counts.

@@ -64,8 +64,8 @@ func TestTabToTheDecksTargetShowsTheDecksAtOnce(t *testing.T) {
 	// A blank panel, tabbed round to the decks target, lists the decks
 	// straight away rather than waiting for enter — with the bar still open
 	// over them.
-	m := drive(sized(140, 40), "space", "n")
-	m = drive(m, "tab", "tab") // new → find → decks
+	m := drive(sized(140, 40), "space", "f")
+	m = drive(m, "tab") // find → decks
 	p := m.ws.current()
 	if p.kind != KindDecks {
 		t.Fatalf("two tabs landed on %v, want decks", p.kind)
