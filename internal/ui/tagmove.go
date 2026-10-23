@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -24,6 +25,7 @@ import (
 //	T O  the same, and every other card that carries it added
 //	T g  the global tags made the editing deck's own
 //	T X  the editing deck's copies of this list's cards lose every tag
+//	T r  a tag renamed across the whole editing deck: old/new
 //
 // All but T o, T O and T X ask which tags first, completing with tab; left empty,
 // every tag moves. "This list's cards" are the ones picked out with v, or
@@ -43,6 +45,7 @@ var tagMoveMenu = []tagMoveCmd{
 	{keymap.TagMoveOtagAdd, "otag + cards → editing deck"},
 	{keymap.TagMoveGlobal, "global tags → editing deck"},
 	{keymap.TagMoveClear, "clear tags in editing deck"},
+	{keymap.TagMoveRename, "rename a tag in editing deck"},
 }
 
 // tagMoveParts is the menu, an entry each, led by T so it reads as what was
@@ -114,6 +117,9 @@ func (m Model) handleTagMove(key string) (tea.Model, tea.Cmd) {
 		p.askInput.Placeholder = "ramp removal … · tab completes · empty: every tag"
 	case keymap.TagMoveClear:
 		m.clearTags(l.shownOrPicked())
+	case keymap.TagMoveRename:
+		p.ask(askRenameTag, "rename tag in "+target.name, "")
+		p.askInput.Placeholder = "old/new · tab completes"
 	}
 	return m, nil
 }
@@ -234,10 +240,13 @@ func onlyTags(cards []deck.Card, tags []string) []deck.Card {
 
 // sourceTags is the tags T t and T a would move from a list, for tab to
 // complete from.
-func sourceTags(l *cardList) []string {
+func sourceTags(l *cardList) []string { return tagsOf(l.shownOrPicked()) }
+
+// tagsOf is every tag the cards carry, lower case, in order.
+func tagsOf(cards []deck.Card) []string {
 	seen := map[string]bool{}
 	var out []string
-	for _, c := range l.shownOrPicked() {
+	for _, c := range cards {
 		for _, t := range c.Tags {
 			if k := strings.ToLower(t); !seen[k] {
 				seen[k] = true
@@ -247,4 +256,46 @@ func sourceTags(l *cardList) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// renameTag is T r: old/new, the tag renamed on every card of the editing
+// deck that has it, whatever is showing — a rename is of the tag, not of
+// some of its cards. A card that already has the new tag just loses the old.
+func (m *Model) renameTag(input string) {
+	target, why := m.editTarget()
+	if target == nil {
+		m.notice = why
+		return
+	}
+	before, after, ok := strings.Cut(input, "/")
+	from, to := filterTerms(before), filterTerms(after)
+	if !ok || len(from) != 1 || len(to) != 1 {
+		m.notice = "old/new — one tag on each side of the slash"
+		return
+	}
+	old, renamed := from[0], to[0]
+	if old == renamed {
+		return
+	}
+	// A tag that came from Moxfield can be "Ramp"; what's typed is lower
+	// case, so the old one is matched either way and taken off as written.
+	has := func(t string) bool { return strings.EqualFold(t, old) }
+	var at []int
+	for i, c := range target.all {
+		if slices.ContainsFunc(c.Tags, has) {
+			at = append(at, i)
+		}
+	}
+	if len(at) == 0 {
+		m.notice = "no card in " + target.name + " has the tag " + old
+		return
+	}
+	target.pushUndo("rename tag " + old + " → " + renamed)
+	for _, i := range at {
+		c := target.all[i]
+		c.Tags = deck.ApplyTagEdits(slices.DeleteFunc(slices.Clone(c.Tags), has), []string{renamed}, nil)
+		target.all[i] = c
+	}
+	target.refresh()
+	m.notice = "renamed " + old + " → " + renamed + " on " + itoa(len(at)) + " " + plural("card", len(at))
 }

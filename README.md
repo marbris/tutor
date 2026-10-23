@@ -272,7 +272,7 @@ list: the cards selected with `v`, or every card showing, so filter first to bri
 
 | Keys | Does |
 | --- | --- |
-| `t` | tag the cards in the editing list (`ramp -draw` adds one and takes one off; `tab` completes) |
+| `t` | tag the cards in the editing list (`ramp draw` adds two, `-draw` takes one off; `tab` completes) |
 | `a` | add the cards, with their tags. A card the editing list has only takes the tags |
 | `A` | the same, and tag them too (the last tag is filled in, so `A enter` repeats it) |
 | `T t` | this list's tags onto the editing list, for the cards it has |
@@ -281,6 +281,7 @@ list: the cards selected with `v`, or every card showing, so filter first to bri
 | `T O` | the same, and every other card with that tag is added |
 | `T g` | the global tags, written into the editing list |
 | `T X` | clear every tag from the editing list's copies of this list's cards (or the `v` picks) |
+| `T r` | rename a tag on every card of the editing list: type `old/new` (`tab` completes) |
 
 `T t`, `T a` and `T g` ask which tags to bring: type one or a few (`tab` completes), or leave it
 empty for all of them. Each of these is one step for `u` to undo.

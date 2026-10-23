@@ -72,3 +72,80 @@ func TestTTakesSeveralTags(t *testing.T) {
 		t.Errorf("the notice reads %q", m.notice)
 	}
 }
+
+func keysOf(s string) []string {
+	var keys []string
+	for _, r := range s {
+		if r == ' ' {
+			keys = append(keys, "space")
+		} else {
+			keys = append(keys, string(r))
+		}
+	}
+	return keys
+}
+
+// T r renames a tag on every card of the editing deck, filtered or not.
+func TestTRRenamesATagAcrossTheDeck(t *testing.T) {
+	m := editingDeckModel()
+	l := m.ws.current().cardsView()
+	l.all[0].Tags = []string{"Ramp"} // as Moxfield writes it
+	l.all[1].Tags = []string{"mana", "ramp"}
+	l.all[2].Tags = []string{"wincon"}
+	l.setFilter("sol") // the rename reaches past what's showing
+
+	m = drive(m, "T", "r")
+	m = drive(m, keysOf("ramp/mana")...)
+	m = drive(m, "enter")
+	for i, want := range [][]string{{"mana"}, {"mana"}, {"wincon"}} {
+		if !sameTags(l.all[i].Tags, want) {
+			t.Errorf("%s has %v, want %v", l.all[i].Card.Name, l.all[i].Tags, want)
+		}
+	}
+	if m.notice != "renamed ramp → mana on 2 cards" {
+		t.Errorf("the notice reads %q", m.notice)
+	}
+
+	l.setFilter("")
+	m = drive(m, "u")
+	if !sameTags(l.all[0].Tags, []string{"Ramp"}) || !sameTags(l.all[1].Tags, []string{"mana", "ramp"}) {
+		t.Errorf("u left %v and %v", l.all[0].Tags, l.all[1].Tags)
+	}
+}
+
+func TestTRSaysWhatItCantRename(t *testing.T) {
+	m := editingDeckModel()
+	l := m.ws.current().cardsView()
+	undos := len(l.undo)
+
+	m = drive(m, "T", "r")
+	m = drive(m, keysOf("nothing/else")...)
+	m = drive(m, "enter")
+	if m.notice != "no card in query has the tag nothing" || len(l.undo) != undos {
+		t.Errorf("an unknown tag: notice %q, %d undo steps", m.notice, len(l.undo)-undos)
+	}
+
+	m = drive(m, "T", "r")
+	m = drive(m, keysOf("ramp")...)
+	m = drive(m, "enter")
+	if m.notice != "old/new — one tag on each side of the slash" {
+		t.Errorf("no slash: notice %q", m.notice)
+	}
+}
+
+// tab completes the old name, and the new one after the slash.
+func TestTRCompletesBothSides(t *testing.T) {
+	m := editingDeckModel()
+	l := m.ws.current().cardsView()
+	l.all[0].Tags = []string{"removal"}
+	m = drive(m, "T", "r", "r", "e", "tab")
+	if got := m.ws.current().askInput.Value(); got != "removal " {
+		t.Fatalf("tab before the slash gave %q", got)
+	}
+	m = drive(m, "backspace")
+	m = drive(m, keysOf("/rem")...)
+	m = drive(m, "tab")
+	if got := m.ws.current().askInput.Value(); got != "removal/removal " {
+		t.Errorf("tab after the slash gave %q", got)
+	}
+}

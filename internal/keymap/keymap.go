@@ -168,6 +168,7 @@ const (
 	TagMoveOtagAdd Action = "otag.add"
 	TagMoveGlobal  Action = "global"
 	TagMoveClear   Action = "clear"
+	TagMoveRename  Action = "rename"
 
 	SearchNextTarget  Action = "target.next"
 	SearchPrevTarget  Action = "target.prev"
@@ -310,13 +311,15 @@ var defaults = []binding{
 	// After T, the second key is where the tags come from: t and a this
 	// list (echoing t, which tags only what's there, and a, which adds what
 	// isn't), o Scryfall Tagger (O adds too), g the global tags,
-	// X clears them.
+	// X clears them. r is the odd one out: it renames a tag in the editing
+	// deck, which comes from nowhere.
 	{TagMove, TagMoveJoin, k("t")},
 	{TagMove, TagMoveUpsert, k("a")},
 	{TagMove, TagMoveOtag, k("o")},
 	{TagMove, TagMoveOtagAdd, k("O")},
 	{TagMove, TagMoveGlobal, k("g")},
 	{TagMove, TagMoveClear, k("X")},
+	{TagMove, TagMoveRename, k("r")},
 
 	{Search, SearchNextTarget, k("tab")},
 	{Search, SearchPrevTarget, k("shift+tab")},

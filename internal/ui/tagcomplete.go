@@ -93,7 +93,8 @@ func (m Model) knownTags() []string {
 func (m *Model) completeTag(p *panel, delta int) {
 	value := p.askInput.Value()
 	// The word being completed is the last one; tags are single words.
-	start := strings.LastIndex(value, " ") + 1
+	// T r's old/new has two, on either side of the slash.
+	start := strings.LastIndexAny(value, " /") + 1
 	before, word := value[:start], value[start:]
 	if strings.HasPrefix(word, "-") {
 		before, word = before+"-", word[1:]
@@ -108,6 +109,10 @@ func (m *Model) completeTag(p *panel, delta int) {
 	if p.asking == askGlobalTags {
 		known = globalTags.all()
 		sort.Strings(known)
+	}
+	// Which tag to rename: the editing deck's.
+	if target, _ := m.editTarget(); p.asking == askRenameTag && target != nil {
+		known = tagsOf(target.all)
 	}
 	m.complete(&p.tagComp, value, set, delta, before, strings.ToLower(word), known)
 }

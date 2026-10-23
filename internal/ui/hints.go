@@ -136,6 +136,9 @@ func (m Model) hintGroups() []hintGroup {
 	case askTagMove, askGlobalTags:
 		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"},
 			{"enter", "bring them over (empty: every tag)"}, {"esc", "leave"}}}}
+	case askRenameTag:
+		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"},
+			{"enter", "rename it"}, {"esc", "leave"}}}}
 	case askAddTag:
 		return []hintGroup{{"", [][2]string{{"tab shift+tab", "complete the tag"},
 			{"enter", "add and tag (empty: just add)"}, {"esc", "leave"}}}}

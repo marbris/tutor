@@ -44,6 +44,8 @@ const (
 	// askGlobalTags is T g: which of the global tags to make the editing
 	// deck's own, every one when left empty.
 	askGlobalTags
+	// askRenameTag is T r: old/new, a tag renamed across the editing deck.
+	askRenameTag
 )
 
 // addCardLabel is the i bar's label.
@@ -80,7 +82,7 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.ws.current()
 
 	key := msg.String()
-	if (p.asking == askTag || p.asking == askTagMove || p.asking == askAddTag || p.asking == askGlobalTags) && (key == "tab" || key == "shift+tab") {
+	if (p.asking == askTag || p.asking == askTagMove || p.asking == askAddTag || p.asking == askGlobalTags || p.asking == askRenameTag) && (key == "tab" || key == "shift+tab") {
 		delta := 1
 		if key == "shift+tab" {
 			delta = -1
@@ -163,6 +165,9 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		case askGlobalTags:
 			m.bakeGlobalTags(strings.Fields(strings.ToLower(answer)))
+
+		case askRenameTag:
+			m.renameTag(answer)
 
 		case askWrite:
 			if l := p.cardsView(); l != nil {
