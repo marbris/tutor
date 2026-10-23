@@ -44,6 +44,9 @@ type cardList struct {
 	// is what made a held key outrun the screen.
 	nameSet    map[string]bool
 	nameSetGen int
+	// shownSet is shownNames(), kept the same way.
+	shownSet    map[string]bool
+	shownSetGen int
 	// nameColWidth is the shared name column render worked out, for the
 	// rows, order and width in nameColKey; measuring every row is as slow.
 	nameColKey   [3]int
@@ -469,6 +472,21 @@ func (l *cardList) names() map[string]bool {
 		out[markKey(c)] = true
 	}
 	l.nameSet, l.nameSetGen = out, l.gen
+	return out
+}
+
+// shownNames is names() for the cards the list shows, after / and the
+// statistics: what another list marks as being here. A card filtered out
+// of view isn't one you'd find by looking. The same rule about changing it.
+func (l *cardList) shownNames() map[string]bool {
+	if l.shownSet != nil && l.shownSetGen == l.gen {
+		return l.shownSet
+	}
+	out := make(map[string]bool, len(l.rows))
+	for _, c := range l.rows {
+		out[markKey(c)] = true
+	}
+	l.shownSet, l.shownSetGen = out, l.gen
 	return out
 }
 
