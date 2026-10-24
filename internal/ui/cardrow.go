@@ -272,14 +272,14 @@ func layoutRow(name, col string, colAbbreviates bool, width int) (string, string
 
 	// 2. Shorten the column, if it's the kind that can be.
 	if colAbbreviates {
-		if short := initialism(col, false); fits(name, short) {
+		if short := initialism(col); fits(name, short) {
 			return padBetween(name, short, width)
 		}
-		col = initialism(col, false)
+		col = initialism(col)
 	}
 
 	// 3. Shorten the name.
-	short := initialism(name, true)
+	short := initialism(name)
 	if fits(short, col) {
 		return padBetween(short, col, width)
 	}
@@ -305,7 +305,7 @@ func layoutColumns(name, col string, nameCol, body int) (string, string) {
 	// this row's name, so a short name can't buy a longer column than its
 	// neighbours show.
 	if textWidth(col) > typeCol {
-		col = initialism(col, false)
+		col = initialism(col)
 	}
 	if textWidth(col) > typeCol {
 		col = truncate(col, typeCol)
@@ -314,7 +314,7 @@ func layoutColumns(name, col string, nameCol, body int) (string, string) {
 	// The name keeps its column; only a name that overruns even that is given
 	// up, and to an initialism before a cut, the way the ladder does it.
 	if textWidth(name) > nameCol {
-		if short := initialism(name, true); textWidth(short) <= nameCol {
+		if short := initialism(name); textWidth(short) <= nameCol {
 			name = short
 		} else {
 			name = truncate(name, nameCol)
@@ -337,7 +337,7 @@ func nameColumnFor(cards []deck.Card, order cardSort, width int) int {
 		if w := textWidth(cardName(c)); w > fullName {
 			fullName = w
 		}
-		if w := textWidth(initialism(order.column(c.Card), false)); w > abbrCol {
+		if w := textWidth(initialism(order.column(c.Card))); w > abbrCol {
 			abbrCol = w
 		}
 	}
@@ -367,20 +367,21 @@ func padBetween(left, right string, width int) (string, string) {
 // punctuation to stay recognisable.
 //
 //	Legendary Creature — Elf Faerie Noble  →  LC-EFN
-//	Dwynen, Gilt-Leaf Daen                 →  D,GLD.
-//	Miara, Thorn of the Glade              →  M,TotG.
+//	Dwynen, Gilt-Leaf Daen                 →  D,GLD
+//	Miara, Thorn of the Glade              →  M,TotG
 //
 // Case is preserved, which is what keeps the little words little: "of the"
 // contributes "ot", not "OT". A dash between clauses survives as a dash,
-// because a type line without it reads as one long word. The full stop marks
-// a shortened *name* — a type line is obviously not a name either way.
-func initialism(s string, trailingDot bool) string {
+// because a type line without it reads as one long word. A shortened name
+// had a full stop after it until 11.0.0; it went with the other trailing
+// dots, and the info panel beside the list names the card in full.
+func initialism(s string) string {
 	var b strings.Builder
 
 	for _, word := range strings.Fields(s) {
 		// The slash between the halves of a split card — a name or a type
 		// line — survives whole: "Invasion of Tarkir // Defiant Thundermaw"
-		// shortens to "IoT//DT.", not "IoT-DT.", so the two halves stay
+		// shortens to "IoT//DT", not "IoT-DT", so the two halves stay
 		// legibly two.
 		if word == "//" {
 			b.WriteString("//")
@@ -410,14 +411,7 @@ func initialism(s string, trailingDot bool) string {
 		}
 	}
 
-	out := b.String()
-	if out == "" {
-		return out
-	}
-	if trailingDot {
-		out += "."
-	}
-	return out
+	return b.String()
 }
 
 func isDash(w string) bool {

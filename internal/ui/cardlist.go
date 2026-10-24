@@ -589,7 +589,7 @@ func (l *cardList) lines(width, height int, focused bool, m *Model) []string {
 		if l.total() == 0 {
 			what = "no results"
 		}
-		return fillTo([]string{mutedLine(what, width)}, width, height)
+		return fillTo(mutedLines(what, width), width, height)
 	}
 	return l.render(width, height, m.membersFor(l), focused)
 }

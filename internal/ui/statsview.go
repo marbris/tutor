@@ -616,7 +616,7 @@ func (m Model) statPop() int {
 func (m Model) renderStats(width int) []string {
 	groups := m.statGroups()
 	if len(groups) == 0 {
-		return []string{mutedLine("nothing to count", width)}
+		return mutedLines("nothing to count", width)
 	}
 
 	var expr stats.Expr
@@ -750,7 +750,7 @@ func (m *statsMemo) highlight(row int, under []string) []string {
 }
 
 // tagMeaning is what Scryfall Tagger says the highlighted tag means, to
-// show under it: a few lines, indented with the row. Most tags have no
+// show under it: the whole of it, wrapped and indented with the row. Most tags have no
 // description, and then it says so.
 func (m Model) tagMeaning(width int) []string {
 	r, ok := m.statUnder()
@@ -764,9 +764,6 @@ func (m Model) tagMeaning(width int) []string {
 	}
 	indent := strings.Repeat("  ", r.Depth+2)
 	lines := wrapStyled(text, maxInt(width-len(indent), 10), lipgloss.NewStyle().Foreground(theme.TextMuted).Italic(true))
-	if len(lines) > 3 {
-		lines = append(lines[:2], mutedLine("…", width))
-	}
 	for i := range lines {
 		lines[i] = indent + lines[i]
 	}
@@ -835,9 +832,21 @@ func (b statBar) render() string {
 		if b.open {
 			fold = "▾ "
 		}
-		text := fold + b.row.Label
+		// Shortened a step at a time while it's too wide, each step dropping
+		// what reads least: "in filter" (the number still says it), then
+		// the "(excl. lands)" the bars under it make plain.
+		label, note := b.row.Label, ""
 		if b.value != "" {
-			text += " · " + b.value
+			note = " · " + b.value
+		}
+		text := fold + label + note
+		if textWidth(text) > b.labelWidth {
+			note = strings.TrimSuffix(note, " in filter")
+			text = fold + label + note
+		}
+		if textWidth(text) > b.labelWidth {
+			label = strings.TrimSuffix(label, " (excl. lands)")
+			text = fold + label + note
 		}
 		style := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 		if b.under {

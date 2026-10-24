@@ -270,7 +270,7 @@ func (v *settingsView) info(width int) []string {
 	case srowCacheTotal:
 		body = []string{"Everything in the cache can be downloaded again, so clearing any of it loses nothing but time."}
 	}
-	out := []string{head.Render(fit(r.label, width)), ""}
+	out := append(wrapStyled(r.label, width, head), "")
 	for _, para := range body {
 		out = append(out, wrapStyled(para, width, lipgloss.NewStyle().Foreground(theme.Text))...)
 		out = append(out, "")

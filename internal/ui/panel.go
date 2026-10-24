@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 
@@ -449,22 +451,50 @@ func (p *panel) subLines(width int) []string {
 	return out
 }
 
-// hardWrap wraps on spaces, and breaks a word that is wider than the width on
-// its own rather than letting it overrun.
+// hardWrap wraps on spaces, and breaks a word that is wider than the width
+// rather than letting it overrun. The rest of a broken word starts a line the
+// words after it carry on, so "Asmoranomardicadaistinaculdacar, the Heir"
+// doesn't leave "r," on a line of its own.
 func hardWrap(s string, width int) []string {
+	if width < 1 {
+		return nil
+	}
 	var out []string
-	for _, line := range wrap(s, width) {
-		r := []rune(line)
-		for textWidth(string(r)) > width {
-			n := 0
-			for n < len(r) && textWidth(string(r[:n+1])) <= width {
-				n++
-			}
-			n = maxInt(n, 1)
-			out = append(out, string(r[:n]))
-			r = r[n:]
+	for _, para := range strings.Split(s, "\n") {
+		if strings.TrimSpace(para) == "" {
+			out = append(out, "")
+			continue
 		}
-		out = append(out, string(r))
+		line := ""
+		for _, word := range strings.Fields(para) {
+			for textWidth(word) > width {
+				if line != "" {
+					out = append(out, line)
+					line = ""
+				}
+				r := []rune(word)
+				n := 0
+				for n < len(r) && textWidth(string(r[:n+1])) <= width {
+					n++
+				}
+				n = maxInt(n, 1)
+				out = append(out, string(r[:n]))
+				word = string(r[n:])
+			}
+			switch {
+			case word == "":
+			case line == "":
+				line = word
+			case textWidth(line)+1+textWidth(word) <= width:
+				line += " " + word
+			default:
+				out = append(out, line)
+				line = word
+			}
+		}
+		if line != "" {
+			out = append(out, line)
+		}
 	}
 	return out
 }

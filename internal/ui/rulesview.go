@@ -346,7 +346,7 @@ func (v *rulesView) lines(width, height int, focused bool, m *Model) []string {
 		if v.filter != "" {
 			what = "nothing matches"
 		}
-		return fillTo([]string{mutedLine(what, width)}, width, height)
+		return fillTo(mutedLines(what, width), width, height)
 	}
 
 	v.cursor.scrollInto(height, len(v.rows))
@@ -481,7 +481,7 @@ func (v *rulesView) info(width int) []string {
 	sub := lipgloss.NewStyle().Foreground(theme.TextDim)
 
 	if r.kind == rowGlossary {
-		out := []string{head.Render(fit(r.entry.Term, width)), ""}
+		out := append(wrapStyled(r.entry.Term, width, head), "")
 		return append(out, wrapStyled(r.entry.Definition, width, body)...)
 	}
 
@@ -490,7 +490,8 @@ func (v *rulesView) info(width int) []string {
 	if r.term != "" {
 		title += "  " + r.term
 	}
-	out = append(out, head.Render(fit(title, width)), "")
+	out = append(out, wrapStyled(title, width, head)...)
+	out = append(out, "")
 
 	// The rule as the book has it, not the stand-in the list borrowed from
 	// a sub-rule to have something to show — that sub-rule is listed below
@@ -503,7 +504,7 @@ func (v *rulesView) info(width int) []string {
 
 	for _, s := range v.data.Subrules(r.number) {
 		out = append(out, "")
-		out = append(out, sub.Render(fit(s.Number, width)))
+		out = append(out, wrapStyled(s.Number, width, sub)...)
 		out = append(out, ruleText(s.Text, width, body)...)
 	}
 	return out
@@ -525,7 +526,7 @@ func ruleText(text string, width int, style lipgloss.Style) []string {
 			out = append(out, "")
 		}
 		out = append(out, indent+label.Render(fit("Example", maxInt(width-len(indent), 1))))
-		for _, line := range wrap(ex, maxInt(width-len(indent), 1)) {
+		for _, line := range hardWrap(ex, maxInt(width-len(indent), 1)) {
 			out = append(out, indent+dim.Render(line))
 		}
 	}

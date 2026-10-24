@@ -20,15 +20,15 @@ func TestInitialismsFromTheDesign(t *testing.T) {
 	for in, want := range map[string]string{
 		"Legendary Creature — Elf Faerie Noble": "LC-EFN",
 	} {
-		if got := initialism(in, false); got != want {
+		if got := initialism(in); got != want {
 			t.Errorf("initialism(%q) = %q, want %q", in, got, want)
 		}
 	}
 	for in, want := range map[string]string{
-		"Dwynen, Gilt-Leaf Daen":    "D,GLD.",
-		"Miara, Thorn of the Glade": "M,TotG.",
+		"Dwynen, Gilt-Leaf Daen":    "D,GLD",
+		"Miara, Thorn of the Glade": "M,TotG",
 	} {
-		if got := initialism(in, true); got != want {
+		if got := initialism(in); got != want {
 			t.Errorf("initialism(%q) = %q, want %q", in, got, want)
 		}
 	}
@@ -36,8 +36,8 @@ func TestInitialismsFromTheDesign(t *testing.T) {
 
 func TestInitialismKeepsCaseSoLittleWordsStayLittle(t *testing.T) {
 	// "of the" becoming "OT" would read as two more nouns.
-	if got := initialism("Sword of Feast and Famine", true); got != "SoFaF." {
-		t.Errorf("got %q, want SoFaF.", got)
+	if got := initialism("Sword of Feast and Famine"); got != "SoFaF" {
+		t.Errorf("got %q, want SoFaF", got)
 	}
 }
 
@@ -45,10 +45,10 @@ func TestInitialismHandlesDoubleFacedNames(t *testing.T) {
 	// The "//" between the halves of a split or double-faced name survives as
 	// "//", so the two halves stay legibly two rather than joining across a
 	// dash.
-	if got := initialism("Brutal Cathar // Moonrage Brute", true); got != "BC//MB." {
-		t.Errorf("got %q, want BC//MB.", got)
+	if got := initialism("Brutal Cathar // Moonrage Brute"); got != "BC//MB" {
+		t.Errorf("got %q, want BC//MB", got)
 	}
-	if got := initialism("Battle - Siege // Creature - Dragon", false); got != "B-S//C-D" {
+	if got := initialism("Battle - Siege // Creature - Dragon"); got != "B-S//C-D" {
 		t.Errorf("got %q, want B-S//C-D", got)
 	}
 }
@@ -168,7 +168,7 @@ func TestTheLadderGivesUpTheTypeLineBeforeTheName(t *testing.T) {
 
 	// Narrower still: now the name goes too.
 	narrow := row(c, sortType, 18)
-	if !strings.Contains(narrow, "D,GLD.") {
+	if !strings.Contains(narrow, "D,GLD") {
 		t.Errorf("the name was not abbreviated:\n%q", narrow)
 	}
 }

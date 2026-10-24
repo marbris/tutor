@@ -133,9 +133,7 @@ func (m Model) viewPanelBody(p *panel, width, height int) []string {
 		return fillTo([]string{dim.Render(fit("searching…", width))}, width, height)
 	}
 	if p.err != nil {
-		return fillTo([]string{
-			lipgloss.NewStyle().Foreground(theme.Error).Render(fit(errorText(p.err), width)),
-		}, width, height)
+		return fillTo(wrapStyled(errorText(p.err), width, lipgloss.NewStyle().Foreground(theme.Error)), width, height)
 	}
 
 	if v := p.top(); v != nil {
@@ -150,11 +148,8 @@ func (m Model) viewPanelBody(p *panel, width, height int) []string {
 		how = keymap.Hint(keymap.Global, keymap.GlobalBar) + " to search · " +
 			leaderHint(keymap.LeaderClose) + " to close"
 	}
-	return fillTo([]string{
-		dim.Render(fit("nothing here yet", width)),
-		"",
-		dim.Render(fit(how, width)),
-	}, width, height)
+	lines := append(wrapStyled("nothing here yet", width, dim), "")
+	return fillTo(append(lines, wrapStyled(how, width, dim)...), width, height)
 }
 
 // fillTo pads a block out to the height it has to occupy, so the panel below
@@ -284,13 +279,21 @@ func sameMembers(a, b map[string]membership) bool {
 // viewInfo draws the information panel.
 func (m Model) viewInfo(width, height int) string {
 	inner, hints, room := m.infoFrame(width, height)
-	title, border := m.infoTitle(), theme.Border
+	border := theme.Border
 	// F's picker has the keys, so the card column wears the focus, the way
 	// the panel with the keys always does.
 	if m.picking() != nil {
-		title, border = "pick a tag to filter by", theme.BorderFocus
+		border = theme.BorderFocus
 	}
-	return viewColumn(title, m.infoContent(inner), m.info.offset, hints, inner, room, height, border)
+	return viewColumn(m.infoHeading(), m.infoContent(inner), m.info.offset, hints, inner, room, height, border)
+}
+
+// infoHeading is the card column's title: what it describes, or the picker.
+func (m Model) infoHeading() string {
+	if m.picking() != nil {
+		return "pick a tag to filter by"
+	}
+	return m.infoTitle()
 }
 
 // viewStats draws the statistics column, left of the information panel.
@@ -308,10 +311,10 @@ func (m Model) viewStats(width, height int) string {
 // the body scrolled to offset in the room the keys leave it, and the keys.
 func viewColumn(title string, body []string, offset int, hints []string, inner, room, height int, border lipgloss.Color) string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
-	lines := []string{
-		lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render(fit(title, inner)),
-		lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)),
-	}
+	// The title wraps rather than losing its end: the statistics' says what
+	// is counted and how, and the how comes last.
+	lines := wrapStyled(title, inner, lipgloss.NewStyle().Foreground(theme.Accent).Bold(true))
+	lines = append(lines, lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)))
 	// Scrolled with K and J from wherever you are — the panel is read, never
 	// focused.
 	if offset > maxInt(len(body)-room, 0) {
@@ -391,17 +394,17 @@ func (m Model) infoContent(inner int) []string {
 func (m Model) infoFrame(width, height int) (inner int, hints []string, room int) {
 	// The picker's keys show whether or not ? is on: it is a mode, and a
 	// mode has to say how to get out of it.
-	return columnFrame(m.infoHintGroups(), m.hintsExpanded || m.picking() != nil, width, height)
+	return columnFrame(m.infoHeading(), m.infoHintGroups(), m.hintsExpanded || m.picking() != nil, width, height)
 }
 
 // statsFrame is the same for the statistics column.
 func (m Model) statsFrame(width, height int) (inner int, hints []string, room int) {
-	return columnFrame(m.statsHintGroups(), m.hintsExpanded, width, height)
+	return columnFrame(m.statTitle(), m.statsHintGroups(), m.hintsExpanded, width, height)
 }
 
-func columnFrame(groups []hintGroup, expanded bool, width, height int) (inner int, hints []string, room int) {
+func columnFrame(heading string, groups []hintGroup, expanded bool, width, height int) (inner int, hints []string, room int) {
 	inner = maxInt(width-2, 1)
-	const title = 2 // the title and the rule under it
+	title := maxInt(len(hardWrap(heading, inner)), 1) + 1 // the title, wrapped as drawn, and the rule under it
 	if expanded {
 		hints = hintFooter([][]hintGroup{groups}, inner, height-2-title)
 	}
@@ -810,6 +813,12 @@ func itoa(n int) string {
 // it has nothing to show.
 func mutedLine(s string, width int) string {
 	return lipgloss.NewStyle().Foreground(theme.TextMuted).Render(fit(s, width))
+}
+
+// mutedLines is the same text wrapped, for anything that can run past a
+// narrow column.
+func mutedLines(s string, width int) []string {
+	return wrapStyled(s, width, lipgloss.NewStyle().Foreground(theme.TextMuted))
 }
 
 // wrapStyled wraps text and paints each line, for the information panel.

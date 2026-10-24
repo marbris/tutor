@@ -540,7 +540,7 @@ func (l *deckList) lines(width, height int, focused bool, m *Model) []string {
 		if l.filter != "" {
 			what = "nothing matches"
 		}
-		return fillTo([]string{mutedLine(what, width)}, width, height)
+		return fillTo(mutedLines(what, width), width, height)
 	}
 
 	l.cursor.scrollInto(height, len(l.rows))
@@ -915,23 +915,23 @@ func (l *deckList) info(width int) []string {
 	// differ only there.
 	var out []string
 	for _, line := range hardWrap(e.name, width) {
-		out = append(out, head.Render(fit(line, width)))
+		out = append(out, wrapStyled(line, width, head)...)
 	}
 	out = append(out, "")
 	switch e.kind {
 	case entryFolder:
-		out = append(out, dim.Render(fit("folder", width)))
-		out = append(out, dim.Render(fit(itoa(e.count)+" decks inside", width)))
+		out = append(out, wrapStyled("folder", width, dim)...)
+		out = append(out, wrapStyled(itoa(e.count)+" decks inside", width, dim)...)
 		state := "enter: collapse"
 		if !e.open {
 			state = "enter: expand"
 		}
-		out = append(out, "", mutedLine(state, width))
+		out = append(append(out, ""), mutedLines(state, width)...)
 		if !virtualFolder(e.slug) {
-			out = append(out, mutedLine("p put", width))
+			out = append(out, mutedLines("p put", width)...)
 		}
 	case entryLocal:
-		out = append(out, dim.Render(fit("local deck", width)))
+		out = append(out, wrapStyled("local deck", width, dim)...)
 		if globalTags.active(e.slug) {
 			out = append(out, lipgloss.NewStyle().Foreground(theme.Highlight).
 				Render(fit("pinned to the global tags", width)))
@@ -941,47 +941,47 @@ func (l *deckList) info(width int) []string {
 			location = "in " + e.folder
 		}
 		for _, line := range hardWrap(location, width) {
-			out = append(out, dim.Render(fit(line, width)))
+			out = append(out, wrapStyled(line, width, dim)...)
 		}
-		out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
+		out = append(out, wrapStyled(itoa(e.count)+" cards", width, dim)...)
 		if age := shortAge(e.modified); age != "" {
-			out = append(out, dim.Render(fit("touched "+age+" ago", width)))
+			out = append(out, wrapStyled("touched "+age+" ago", width, dim)...)
 		}
 		out = append(out, "")
 		out = append(out, legalityLines(e.legal, width)...)
-		out = append(out, "", mutedLine("enter: open", width))
+		out = append(append(out, ""), mutedLines("enter: open", width)...)
 		toggle := "t: pin to the global tags"
 		if globalTags.active(e.slug) {
 			toggle = "t: unpin from the global tags"
 		}
-		out = append(out, mutedLine(toggle, width))
-		out = append(out, "", mutedLine("gv: versions", width))
+		out = append(out, mutedLines(toggle, width)...)
+		out = append(append(out, ""), mutedLines("gv: versions", width)...)
 	case entryRemote, entryUserDeck:
-		out = append(out, dim.Render(fit("Moxfield", width)))
+		out = append(out, wrapStyled("Moxfield", width, dim)...)
 		if e.kind == entryUserDeck {
-			out = append(out, dim.Render(fit("by "+e.user, width)))
+			out = append(out, wrapStyled("by "+e.user, width, dim)...)
 		}
 		if e.format != "" {
-			out = append(out, dim.Render(fit(e.format, width)))
+			out = append(out, wrapStyled(e.format, width, dim)...)
 		}
 		if e.count > 0 {
-			out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
+			out = append(out, wrapStyled(itoa(e.count)+" cards", width, dim)...)
 		}
 		if age := shortAge(e.modified); age != "" {
-			out = append(out, dim.Render(fit("updated "+age+" ago", width)))
+			out = append(out, wrapStyled("updated "+age+" ago", width, dim)...)
 		}
-		out = append(out, "",
-			mutedLine("enter: look", width),
-			mutedLine("c: copy deck", width),
-			mutedLine("C: copy deck & considering", width))
+		out = append(out, "")
+		for _, line := range []string{"enter: look", "c: copy deck", "C: copy deck & considering"} {
+			out = append(out, mutedLines(line, width)...)
+		}
 	case entryUser:
-		out = append(out, dim.Render(fit("Moxfield user", width)))
-		out = append(out, dim.Render(fit(itoa(e.count)+" public decks", width)))
+		out = append(out, wrapStyled("Moxfield user", width, dim)...)
+		out = append(out, wrapStyled(itoa(e.count)+" public decks", width, dim)...)
 		state := "enter: collapse"
 		if !e.open {
 			state = "enter: expand"
 		}
-		out = append(out, "", mutedLine(state, width), mutedLine("d: unfollow", width))
+		out = append(append(append(out, ""), mutedLines(state, width)...), mutedLines("d: unfollow", width)...)
 	}
 	return out
 }

@@ -38,7 +38,9 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 		if i > 0 {
 			fmt.Println()
 		}
-		fmt.Println(faceHeading(f, width))
+		for _, line := range faceHeading(f, width) {
+			fmt.Println(line)
+		}
 		for _, line := range typeLine(f, width) {
 			fmt.Println(lipgloss.NewStyle().Foreground(theme.TextDim).Render(line))
 		}

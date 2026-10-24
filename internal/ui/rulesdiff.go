@@ -100,7 +100,7 @@ func (v *rulesDiff) subtitle() string {
 
 func (v *rulesDiff) lines(width, height int, focused bool, m *Model) []string {
 	if len(v.changes) == 0 {
-		return fillTo([]string{mutedLine("no rules changed between the two releases", width)}, width, height)
+		return fillTo(mutedLines("no rules changed between the two releases", width), width, height)
 	}
 
 	v.cursor.scrollInto(height, len(v.changes))
@@ -186,16 +186,16 @@ func (v *rulesDiff) info(width int) []string {
 		kind = "changed"
 	}
 
-	out := []string{head.Render(fit(c.Number+" · "+kind, width)), ""}
+	out := append(wrapStyled(c.Number+" · "+kind, width, head), "")
 	if c.Old != "" {
-		out = append(out, dim.Render(fit("before", width)))
+		out = append(out, wrapStyled("before", width, dim)...)
 		out = append(out, wrapStyled(c.Old, width, remove)...)
 	}
 	if c.Old != "" && c.New != "" {
 		out = append(out, "")
 	}
 	if c.New != "" {
-		out = append(out, dim.Render(fit("after", width)))
+		out = append(out, wrapStyled("after", width, dim)...)
 		out = append(out, wrapStyled(c.New, width, add)...)
 	}
 	return out

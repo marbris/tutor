@@ -123,7 +123,7 @@ func (l *versionList) subtitle() string {
 
 func (l *versionList) lines(width, height int, focused bool, m *Model) []string {
 	if len(l.commits) == 0 {
-		return fillTo([]string{mutedLine("no versions recorded", width)}, width, height)
+		return fillTo(mutedLines("no versions recorded", width), width, height)
 	}
 
 	l.cursor.scrollInto(height, len(l.commits))
@@ -251,12 +251,12 @@ func (l *versionList) info(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
-	out := []string{
-		head.Render(fit(c.Subject, width)),
-		dim.Render(fit(c.Short+" · "+c.When, width)),
-		mutedLine("r revert to this · c copy from it", width),
-		"",
-	}
+	// The subject is the commit's one sentence, and the end of it is the
+	// point: it wraps.
+	out := wrapStyled(c.Subject, width, head)
+	out = append(out, wrapStyled(c.Short+" · "+c.When, width, dim)...)
+	out = append(out, mutedLines("r revert to this · c copy from it", width)...)
+	out = append(out, "")
 
 	diff, have := l.diffs[c.Hash]
 	if !have {
@@ -281,17 +281,17 @@ func renderDiff(diff string, width int) []string {
 			strings.HasPrefix(line, "@@"):
 			continue
 		case strings.HasPrefix(line, "+"):
-			out = append(out, add.Render(fit(line, width)))
+			out = append(out, wrapStyled(line, width, add)...)
 		case strings.HasPrefix(line, "-"):
-			out = append(out, remove.Render(fit(line, width)))
+			out = append(out, wrapStyled(line, width, remove)...)
 		case strings.TrimSpace(line) == "":
 			continue
 		default:
-			out = append(out, same.Render(fit(line, width)))
+			out = append(out, wrapStyled(line, width, same)...)
 		}
 	}
 	if len(out) == 0 {
-		return []string{mutedLine("nothing changed in the deck itself", width)}
+		return mutedLines("nothing changed in the deck itself", width)
 	}
 	return out
 }

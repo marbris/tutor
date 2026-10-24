@@ -341,9 +341,9 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		if i > 0 {
 			out = append(out, "")
 		}
-		out = append(out, faceHeading(f, width))
+		out = append(out, faceHeading(f, width)...)
 		for _, line := range typeLine(f, width) {
-			out = append(out, dim.Render(fit(line, width)))
+			out = append(out, wrapStyled(line, width, dim)...)
 		}
 		if text := f.OracleText; text != "" {
 			out = append(out, "")
@@ -416,7 +416,7 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 	// What Scryfall Tagger says the card does: its own tags, not the
 	// families they belong to, in a colour apart from yours.
 	if tags := tagger.Current().Of(c.Card.OracleID); len(tags) > 0 {
-		out = append(out, "", head.Render(fit("scryfall tagger", width)))
+		out = append(append(out, ""), wrapStyled("scryfall tagger", width, head)...)
 		if pick == nil {
 			out = append(out, wrapStyled(strings.Join(tags, " "), width, lipgloss.NewStyle().Foreground(theme.Info))...)
 		} else {
@@ -436,19 +436,19 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 
 	if legal := legalities(c.Card, width); len(legal) > 0 {
 		out = append(out, "")
-		out = append(out, head.Render(fit("legal in", width)))
+		out = append(out, wrapStyled("legal in", width, head)...)
 		out = append(out, legal...)
 	}
 
 	out = append(out, "")
-	out = append(out, head.Render(fit("rulings", width)))
+	out = append(out, wrapStyled("rulings", width, head)...)
 	switch {
 	case rulingsErr != nil:
-		out = append(out, muted.Render(fit("couldn't fetch them", width)))
+		out = append(out, wrapStyled("couldn't fetch them", width, muted)...)
 	case rulings == nil:
-		out = append(out, muted.Render(fit("…", width)))
+		out = append(out, wrapStyled("fetching…", width, muted)...)
 	case len(rulings) == 0:
-		out = append(out, muted.Render(fit("none", width)))
+		out = append(out, wrapStyled("none", width, muted)...)
 	default:
 		for i, r := range rulings {
 			if i > 0 {
@@ -460,18 +460,25 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 	return out
 }
 
-// faceHeading is a face's name and its cost on one line, the cost pushed to
-// the right where the eye can find it down a column of them.
-func faceHeading(f mtg.Card, width int) string {
+// faceHeading is a face's name and its cost, the cost pushed to the right of
+// the first line where the eye can find it down a column of them.
+func faceHeading(f mtg.Card, width int) []string {
 	name := lipgloss.NewStyle().Foreground(theme.TextBright).Bold(true)
 	cost := renderMana(f.ManaCost)
 	costWidth := textWidth(f.DisplayManaCost()) - 2*strings.Count(f.DisplayManaCost(), "{")
 
 	room := width - costWidth
 	if costWidth == 0 || room < 6 {
-		return name.Render(fit(f.Name, width))
+		return wrapStyled(f.Name, width, name)
 	}
-	return name.Render(fit(f.Name, room-1)) + " " + cost
+	// A long name wraps under itself, the cost staying on the first line,
+	// where the card prints it.
+	lines := wrapStyled(f.Name, room-1, name)
+	lines[0] += " " + cost
+	for i := 1; i < len(lines); i++ {
+		lines[i] += strings.Repeat(" ", costWidth+1)
+	}
+	return lines
 }
 
 // typeLine is the card's type line on its own rows, wrapped: a long one
@@ -516,7 +523,7 @@ func printingFacts(c mtg.Card, width int) []string {
 	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
 	var out []string
 	for _, line := range factLines(c) {
-		wrapped := wrap(line, width)
+		wrapped := hardWrap(line, width)
 		for i, w := range wrapped {
 			w = fit(w, width)
 			text := strings.TrimRight(w, " ")

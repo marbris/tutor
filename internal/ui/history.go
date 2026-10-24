@@ -199,7 +199,7 @@ func contains(xs []string, want string) bool {
 func (m Model) renderHistory(c mtg.Card, width int) []string {
 	h, ok := m.histories[c.OracleID]
 	if !ok {
-		return []string{mutedLine("gv for how its text has changed", width)}
+		return mutedLines("gv for how its text has changed", width)
 	}
 
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
@@ -208,7 +208,7 @@ func (m Model) renderHistory(c mtg.Card, width int) []string {
 
 	switch h.state {
 	case histPrintings:
-		return []string{muted.Render(fit("finding the printings…", width))}
+		return wrapStyled("finding the printings…", width, muted)
 	case histFailed:
 		return wrapStyled(errorText(h.err), width, lipgloss.NewStyle().Foreground(theme.Error))
 	}
@@ -234,18 +234,19 @@ func (m Model) renderHistory(c mtg.Card, width int) []string {
 		if rev.Current {
 			label += " · current"
 		}
-		out = append(out, head.Render(fit(label, width)))
+		out = append(out, wrapStyled(label, width, head)...)
 		out = append(out, highlightOracle(rev.Text, c, width, m.rules)...)
 	}
 
 	if len(h.revisions) == 0 && h.state == histReady {
-		out = append(out, muted.Render(fit("no printed text on record", width)))
+		out = append(out, wrapStyled("no printed text on record", width, muted)...)
 	}
 
 	if h.state == histFetching {
 		n := h.remaining()
-		out = append(out, "", dim.Render(fit("fetching "+itoa(n)+" more "+plural("set", n)+
-			" from MTGJSON, newest first…", width)))
+		out = append(out, "")
+		out = append(out, wrapStyled("fetching "+itoa(n)+" more "+plural("set", n)+
+			" from MTGJSON, newest first…", width, dim)...)
 	}
 	return out
 }
