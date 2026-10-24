@@ -71,7 +71,7 @@ func TestWalkingTheBarsDoesntNarrow(t *testing.T) {
 	// every category without the list moving under you.
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
-	m = drive(m, "s", "J", "J", "J")
+	m = drive(m, "s", "ctrl+j", "ctrl+j", "ctrl+j")
 
 	if l.count() != 6 {
 		t.Errorf("walking the bars narrowed the list to %d", l.count())
@@ -107,7 +107,7 @@ func TestSGoesBackToTheList(t *testing.T) {
 	}
 }
 
-func TestShiftJAndKTurnTheGroupsOver(t *testing.T) {
+func TestTheGroupsAreInTheirOwnOrder(t *testing.T) {
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
 	m = drive(m, "s")
 
@@ -124,24 +124,6 @@ func TestShiftJAndKTurnTheGroupsOver(t *testing.T) {
 	}
 	if strings.Join(have, ",") != strings.Join(want, ",") {
 		t.Fatalf("opened in the order %v", have)
-	}
-
-	m = drive(m, "ctrl+j")
-	if got := statGroupTitles(m); strings.Join(got, ",") != strings.Join(append(want[1:], want[0]), ",") {
-		t.Errorf("J: %v", got)
-	}
-	m = drive(m, "ctrl+j")
-	if got := statGroupTitles(m); strings.Join(got, ",") != strings.Join(append(want[2:], want[:2]...), ",") {
-		t.Errorf("J J: %v", got)
-	}
-	m = drive(m, "ctrl+k", "ctrl+k", "ctrl+k")
-	last := len(want) - 1
-	if got := statGroupTitles(m); strings.Join(got, ",") != strings.Join(append([]string{want[last]}, want[:last]...), ",") {
-		t.Errorf("K from the start: %v", got)
-	}
-	// The highlight goes to the new top.
-	if row, _ := m.statUnder(); row.Group != statRows(m.statGroups())[0].Group {
-		t.Errorf("highlight on %s %s, not the top group", row.Group, row.Label)
 	}
 }
 
@@ -375,7 +357,7 @@ func TestThePanelScrollsToKeepTheCategoryInView(t *testing.T) {
 		t.Fatalf("started scrolled to %d", m.statOffset(room))
 	}
 	for i := 0; i < 12; i++ {
-		m = drive(m, "J")
+		m = drive(m, "ctrl+j")
 	}
 	if m.statOffset(room) == 0 {
 		t.Error("walking down twelve categories never scrolled")
@@ -393,10 +375,10 @@ func TestScrollingComesBackUpAgain(t *testing.T) {
 	m := withCards(sized(90, 16), "d", deckSample(), sortArrival)
 	m = drive(m, "s")
 	for i := 0; i < 12; i++ {
-		m = drive(m, "J")
+		m = drive(m, "ctrl+j")
 	}
 	for i := 0; i < 12; i++ {
-		m = drive(m, "K")
+		m = drive(m, "ctrl+k")
 	}
 	if got := m.statOffset(8); got != 0 {
 		t.Errorf("came back to the top still scrolled to %d", got)
@@ -572,46 +554,31 @@ func TestTheHighlightedStatWearsItsBarsColour(t *testing.T) {
 	}
 }
 
-func TestJAndKWalkRoundTheGroups(t *testing.T) {
-	// The groups are a ring: k off the top brings the group before round to
-	// the top and lands on its last row; j off the bottom sends the top group
-	// round to the bottom and lands on its first. Either way the highlight
-	// moves one row, never jumps.
-	m := withCards(sized(90, 40), "d", deckSample(), sortArrival)
+func TestCtrlJAndKWalkTheStatisticsAndJKScrollTheCard(t *testing.T) {
+	// ctrl+j and ctrl+k walk the categories and stop at either end; J and K
+	// are the card's beside them, as they are with the statistics down.
+	m := withCards(sized(150, 40), "d", deckSample(), sortArrival)
 	m = drive(m, "s")
-
-	groups := m.statGroups()
-	if len(groups) < 2 {
-		t.Fatalf("need two groups to wrap between, have %d", len(groups))
+	first, _ := m.statUnder()
+	m = drive(m, "ctrl+k")
+	if r, _ := m.statUnder(); r.Path != first.Path || r.Label != first.Label {
+		t.Errorf("ctrl+k off the top moved to %s/%s", r.Group, r.Label)
 	}
-	first, last := groups[0], groups[len(groups)-1]
-
-	m = drive(m, "K")
-	got := m.statGroups()
-	if got[0].Title != last.Title {
-		t.Errorf("k off the top brought %q to the top, want %q", got[0].Title, last.Title)
+	m = drive(m, "ctrl+j")
+	if r, _ := m.statUnder(); r.Label == first.Label && r.Group == first.Group {
+		t.Error("ctrl+j didn't move")
 	}
-	if r, _ := m.statUnder(); r.Group != last.Rows[0].Group || r.Label != last.Rows[len(last.Rows)-1].Label {
-		t.Errorf("k off the top landed on %s/%s, want the last row of %s", r.Group, r.Label, last.Title)
-	}
-	if got[1].Title != first.Title {
-		t.Errorf("the old top group isn't just below: %q", got[1].Title)
-	}
-
-	// And back down: j off the last row sends the top group to the bottom.
-	m = drive(m, "J") // onto what was the first row
 	rows := statRows(m.statGroups())
-	for m.statCursor(m.statGroups()) < len(rows)-1 {
-		m = drive(m, "J")
+	for i := 0; i < len(rows)+3; i++ {
+		m = drive(m, "ctrl+j")
 	}
-	top := m.statGroups()[0]
-	m = drive(m, "J")
-	got = m.statGroups()
-	if got[len(got)-1].Title != top.Title {
-		t.Errorf("j off the bottom sent %q to the bottom, want %q", got[len(got)-1].Title, top.Title)
+	if got := m.statCursor(m.statGroups()); got != len(rows)-1 {
+		t.Errorf("ctrl+j past the bottom is on row %d of %d", got, len(rows))
 	}
-	if r, _ := m.statUnder(); r.Label != top.Rows[0].Label || r.Group != top.Rows[0].Group {
-		t.Errorf("j off the bottom landed on %s/%s, want the first row of %s", r.Group, r.Label, top.Title)
+	before, _ := m.statUnder()
+	m = drive(m, "J", "K")
+	if r, _ := m.statUnder(); r.Label != before.Label || r.Group != before.Group {
+		t.Error("J/K moved the statistics' highlight")
 	}
 }
 
@@ -660,9 +627,9 @@ func TestTabOnATagSortsTheTagsByName(t *testing.T) {
 	}
 
 	// Off the tags, tab is not the statistics' to take.
-	m = drive(m, "ctrl+j")
+	m = pointStat(t, m, "Type", "Creature")
 	if m.onTags() {
-		t.Fatal("J stayed on the tags")
+		t.Fatal("still on the tags")
 	}
 	if offers("tags by count") {
 		t.Error("the tab hint shows off the tags")
@@ -673,7 +640,7 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 	m := withCards(sized(90, 16), "d", deckSample(), sortArrival)
 	m = drive(m, "s")
 	for i := 0; i < 12; i++ {
-		m = drive(m, "J")
+		m = drive(m, "ctrl+j")
 	}
 	bottom := m.stats.offset
 	if bottom == 0 {
@@ -684,7 +651,7 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 	line := statLine(groups, m.statCursor(groups))
 	// Up through the rows on screen: the view stays where it is.
 	for line-1 > bottom {
-		m = drive(m, "K")
+		m = drive(m, "ctrl+k")
 		groups = m.statGroups()
 		line = statLine(groups, m.statCursor(groups))
 		if line <= bottom {
@@ -696,7 +663,7 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 	}
 	// Past the top edge it follows.
 	for i := 0; i < 12; i++ {
-		m = drive(m, "K")
+		m = drive(m, "ctrl+k")
 	}
 	if m.stats.offset >= bottom {
 		t.Errorf("going on up never scrolled back (%d)", m.stats.offset)
@@ -711,7 +678,7 @@ func TestTheBarsAreCountedOnceUntilSomethingTheyCountChanges(t *testing.T) {
 	m = drive(m, "s")
 	m.View()
 	counted := m.stats.memo.groups
-	m = drive(m, "J", "J", "K", "ctrl+j", "ctrl+k")
+	m = drive(m, "ctrl+j", "ctrl+j", "ctrl+k")
 	m.View()
 	if &m.stats.memo.groups[0] != &counted[0] {
 		t.Error("walking the bars counted them again")
@@ -784,7 +751,7 @@ func TestWithTheStatisticsUpTheListKeepsItsKeys(t *testing.T) {
 		t.Error("j moved the bars")
 	}
 
-	m = drive(m, "J")
+	m = drive(m, "ctrl+j")
 	if m.statCursor(m.statGroups()) == row {
 		t.Error("J didn't move the bars")
 	}

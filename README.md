@@ -206,7 +206,7 @@ Opening a person's folder asks Moxfield for their decks again, so a deck they ma
 
 ## Statistics
 
-The statistics panel shows bar charts of a list: your tags, card types, colors, mana values (X
+The statistics open as a column of their own, left of the card view, and show bar charts of a list: your tags, card types, colors, mana values (X
 spells get a row of their own), rarity, price, and last the Scryfall Tagger tags. `enter` on a card
 type opens it into the subtypes in the list: the creature types under Creature, Equipment under
 Artifact. Build a filter from the rows, and the list and the bars narrow to the cards that match.
@@ -215,8 +215,7 @@ Artifact. Build a filter from the rows, and the list and the bars narrow to the 
 | --- | --- |
 | `s` | open (or close) the statistics of the active list |
 | `S` | open the statistics of the editing list |
-| `J` `K` | walk through the rows |
-| `ctrl+j` `ctrl+k` | jump between groups |
+| `ctrl+j` `ctrl+k` | walk through the rows |
 | `alt+a` | add AND *row* to the filter |
 | `alt+o` | add OR *row* to the filter |
 | `alt+n` | add AND NOT *row* to the filter |
@@ -225,7 +224,7 @@ Artifact. Build a filter from the rows, and the list and the bars narrow to the 
 | | on a row already in the filter, `alt+a` `alt+o` `alt+n` switch it to that join; the same key twice takes it out |
 | `alt+p` | show the odds of drawing each row in your opening hand |
 
-The list keeps its own keys while the panel is open: `j` `k` move through the cards, `a` `x` add
+The list keeps its own keys while the panel is open, and `J` `K` still scroll the card beside it: `j` `k` move through the cards, `a` `x` add
 and remove, `esc` clears the filters a step at a time, `h` `l` move between lists and `e` `E`
 change the editing list. Only `s` closes the statistics.
 

@@ -110,11 +110,7 @@ func TestEnterOpensATaggerTagInTheStatistics(t *testing.T) {
 	if r, _ := m.statUnder(); r.Group == stats.TaggerGroup {
 		t.Fatal("the statistics open on the Tagger group, want it last")
 	}
-	// The Tagger group is the last, so K from the first wraps round to it.
-	m = drive(m, "ctrl+k")
-	if r, _ := m.statUnder(); r.Group != stats.TaggerGroup || r.Label != "removal" {
-		t.Fatalf("K from the top lands on %s/%s, want the Tagger group's removal", r.Group, r.Label)
-	}
+	m = pointStat(t, m, stats.TaggerGroup, "removal")
 	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "show the tags under it") {
 		t.Error("enter isn't offered on removal")
 	}
@@ -123,12 +119,12 @@ func TestEnterOpensATaggerTagInTheStatistics(t *testing.T) {
 	if !strings.Contains(body, "▾ removal") || !strings.Contains(body, "    removal-artifact") {
 		t.Errorf("removal didn't open:\n%s", body)
 	}
-	m = drive(m, "J", "alt+a")
+	m = drive(m, "ctrl+j", "alt+a")
 	l := m.ws.current().cardsView()
 	if len(l.rows) != 2 {
 		t.Errorf("filtering by removal-artifact left %d cards, want 2", len(l.rows))
 	}
-	m = drive(m, "K", "enter")
+	m = drive(m, "ctrl+k", "enter")
 	if body := stripANSI(strings.Join(m.renderStats(60), "\n")); strings.Contains(body, "removal-enchantment") {
 		t.Errorf("a second enter didn't close removal:\n%s", body)
 	}
@@ -153,39 +149,6 @@ func TestATaggerFilterFromLastSessionWorksOnceTheTagsArrive(t *testing.T) {
 	}
 }
 
-func TestKBringsTheTaggerGroupAboveTheRestInTheirOrder(t *testing.T) {
-	// The ring ctrl+j and ctrl+k turn is the order the groups are drawn in: K from the
-	// top brings the last group, Tagger, above the rest, and they follow in
-	// the same order as before. Tagger isn't shown twice or in the middle.
-	withTagger(t)
-	// A tag of your own, so the Tags group leads: the case the ring got
-	// wrong, putting Tagger right under Tags as well as last.
-	cards := taggedCards()
-	cards[0].Tags = []string{"wincon"}
-	m := withCards(sized(140, 50), "f", cards, sortArrival)
-	m = drive(m, "s")
-	titles := func() []string {
-		var out []string
-		for _, g := range m.statGroups() {
-			out = append(out, g.Title)
-		}
-		return out
-	}
-	before := titles()
-	if before[len(before)-1] != stats.TaggerGroup {
-		t.Fatalf("groups %v, want Tagger last", before)
-	}
-	m = drive(m, "ctrl+k")
-	want := append([]string{stats.TaggerGroup}, before[:len(before)-1]...)
-	if got := titles(); fmt.Sprint(got) != fmt.Sprint(want) {
-		t.Errorf("after K the groups are %v, want %v", got, want)
-	}
-	m = drive(m, "ctrl+j")
-	if got := titles(); fmt.Sprint(got) != fmt.Sprint(before) {
-		t.Errorf("J didn't turn them back: %v, want %v", got, before)
-	}
-}
-
 func TestATaggerTagsMeaningShowsUnderItInTheStatistics(t *testing.T) {
 	const lines = `{"id":"r","label":"removal","description":"Get things off the table. See also [spot removal](spot-removal).","parent_ids":[],"child_ids":["ra"],"taggings":[]}
 {"id":"ra","label":"removal-artifact","parent_ids":["r"],"child_ids":[],"taggings":[{"oracle_id":"shatter"}]}
@@ -203,13 +166,13 @@ func TestATaggerTagsMeaningShowsUnderItInTheStatistics(t *testing.T) {
 	t.Cleanup(func() { tagger.SetCurrent(old) })
 
 	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
-	m = drive(m, "s", "ctrl+k") // ctrl+k from the top: the Tagger group
+	m = pointStat(t, drive(m, "s"), stats.TaggerGroup, "removal")
 	body := stripANSI(strings.Join(m.renderStats(70), "\n"))
 	if !strings.Contains(body, "Get things off the table. See also spot removal.") {
 		t.Errorf("removal's meaning isn't under it, links made plain:\n%s", body)
 	}
 	// One without a description says so.
-	m = drive(m, "enter", "J")
+	m = drive(m, "enter", "ctrl+j")
 	body = stripANSI(strings.Join(m.renderStats(70), "\n"))
 	if !strings.Contains(body, "no description on Tagger") {
 		t.Errorf("a tag with no description doesn't say so:\n%s", body)
@@ -224,7 +187,7 @@ func TestAltTShowsATaggerTagWithTheTagsAndKeepsIt(t *testing.T) {
 	freshGlobalTags(t)
 	withTagger(t)
 	m := withCards(sized(140, 50), "f", taggedCards(), sortArrival)
-	m = drive(m, "s", "ctrl+k")
+	m = pointStat(t, drive(m, "s"), stats.TaggerGroup, "removal")
 	if r, _ := m.statUnder(); r.Label != "removal" {
 		t.Fatalf("on %s/%s, want the Tagger group's removal", r.Group, r.Label)
 	}

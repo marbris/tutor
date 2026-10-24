@@ -126,8 +126,6 @@ const (
 
 	StatsDown       Action = "down"
 	StatsUp         Action = "up"
-	StatsNextGroup  Action = "group.next"
-	StatsPrevGroup  Action = "group.prev"
 	StatsAnd        Action = "and"
 	StatsOr         Action = "or"
 	StatsNot        Action = "not"
@@ -273,13 +271,12 @@ var defaults = []binding{
 	{Settings, SettingsClear, k("d")},
 	{Settings, SettingsRefresh, k("r")},
 
-	// The statistics sit in the information panel, so they take its keys,
-	// shift, and leave the list its own: j, k, a, x, p and esc still act on
-	// the cards. The filter keys are the old letters with alt.
-	{Stats, StatsDown, k("J", "shift+down")},
-	{Stats, StatsUp, k("K", "shift+up")},
-	{Stats, StatsNextGroup, k("ctrl+j")},
-	{Stats, StatsPrevGroup, k("ctrl+k")},
+	// The statistics are a column beside the information panel. They walk
+	// on ctrl, so J and K still scroll the card beside them, and leave the
+	// list its own: j, k, a, x, p and esc still act on the cards. The filter
+	// keys are the old letters with alt.
+	{Stats, StatsDown, k("ctrl+j", "ctrl+down")},
+	{Stats, StatsUp, k("ctrl+k", "ctrl+up")},
 	{Stats, StatsAnd, k("alt+a")},
 	{Stats, StatsOr, k("alt+o")},
 	{Stats, StatsNot, k("alt+n")},
@@ -350,7 +347,9 @@ var renamed = map[Scope]map[string]Action{
 // let be rather than warned about: there is nothing left for it to move.
 var retired = map[Scope]map[string]bool{
 	Decks: {"open-beside": true}, // enter opens beside since 9.0.0
-	Stats: {"back": true},        // esc is the list's since 9.0.0; s closes
+	// esc is the list's since 9.0.0; s closes. The groups stopped turning
+	// in 11.0.0: they fold instead.
+	Stats: {"back": true, "group.next": true, "group.prev": true},
 }
 
 // The keymap in force: each scope's actions and their keys, and the same

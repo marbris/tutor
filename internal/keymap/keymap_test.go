@@ -210,3 +210,16 @@ func TestARenamedActionStillMoves(t *testing.T) {
 		t.Fatalf("tag-list, the old name, should move global-tags; P = %q", got)
 	}
 }
+
+func TestTheStatisticsLeaveTheCardItsScrollKeys(t *testing.T) {
+	// The statistics are looked up before the workspace while they're up,
+	// so a key of theirs that is also the card's scroll would take it.
+	Reset()
+	for _, a := range []Action{GlobalInfoUp, GlobalInfoDown} {
+		for _, key := range Keys(Global, a) {
+			if got := Lookup(Stats, key); got != "" {
+				t.Errorf("%s is %s in the statistics, and %s outside them", key, got, a)
+			}
+		}
+	}
+}

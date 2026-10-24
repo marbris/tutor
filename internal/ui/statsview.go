@@ -15,11 +15,11 @@ import (
 	"ttr/internal/theme"
 )
 
-// Statistics, in the information panel.
+// Statistics, in a column of their own left of the information panel.
 //
-// s takes you there and s brings you back. While the statistics are up they
-// take the information panel's keys, J/K walking the categories, and leave
-// the list its own: j, k, a, x, esc. A category narrows the list only when
+// s opens them and s closes them. While they are up ctrl+j/ctrl+k walk the
+// categories, J/K still scroll the card beside them, and the list keeps its
+// own keys: j, k, a, x, esc. A category narrows the list only when
 // you add it — alt+a to add it with AND, alt+o with OR — so reading the bars and filtering by them are separate acts, and
 // several categories can narrow at once. h and l still move between lists,
 // and the bars follow.
@@ -48,9 +48,6 @@ type statsState struct {
 	// path is the highlighted row's place in the Scryfall Tagger tree,
 	// where the same tag can sit under two parents.
 	path string
-	// top is the group drawn first. ctrl+j and ctrl+k turn the order over, so the
-	// group you want to read sits at the top rather than off the bottom.
-	top string
 	// editing is S: the deck you're editing, wherever you are.
 	editing bool
 	// odds is 0 for counts, or n for the chance of at least n in the
@@ -97,7 +94,6 @@ type statsMemo struct {
 // drawKey is everything the drawn bars depend on beyond the counting.
 type drawKey struct {
 	counted statsKey
-	top     string
 	width   int
 	odds    int
 	expr    string
@@ -118,14 +114,9 @@ func statRows(groups []stats.Group) []stats.Row {
 // statGroups counts the cards, in the order they're drawn. The source decides
 // which categories exist — the whole list — while the counted set is what the
 // numbers describe, so a category the narrowing has emptied stays put and
-// reads zero rather than vanishing under the cursor.
+// reads zero rather than vanishing under the cursor. It is the kept count
+// when nothing it was counted from has changed.
 func (m Model) statGroups() []stats.Group {
-	return rotateGroups(m.countedGroups(), m.stats.top)
-}
-
-// countedGroups is the groups in their own order, before J or K turns them:
-// the kept count when nothing it was counted from has changed.
-func (m Model) countedGroups() []stats.Group {
 	l := m.statList()
 	key := statsKey{
 		list: l, tagGen: globalTags.gen, tagger: tagger.Current(), catalog: catalog.Current(),
@@ -163,38 +154,6 @@ func taggerKept(l *cardList) map[string]bool {
 		}
 	}
 	return keep
-}
-
-// rotateGroups turns the groups over so top comes first, the rest following
-// in their usual order and wrapping round. A top that isn't there — a list
-// with no tags has no Tags — starts at the next group that is.
-func rotateGroups(groups []stats.Group, top string) []stats.Group {
-	if len(groups) == 0 || top == "" {
-		return groups
-	}
-	start := groupIndex(top)
-	if start < 0 {
-		return groups
-	}
-	var out []stats.Group
-	for i := range stats.GroupOrder {
-		title := stats.GroupOrder[(start+i)%len(stats.GroupOrder)]
-		for _, g := range groups {
-			if g.Title == title {
-				out = append(out, g)
-			}
-		}
-	}
-	return out
-}
-
-func groupIndex(title string) int {
-	for i, t := range stats.GroupOrder {
-		if t == title {
-			return i
-		}
-	}
-	return -1
 }
 
 // statCards is what the statistics describe: the focused list, or the
@@ -315,13 +274,8 @@ func (m *Model) toggleGlobalOtag() bool {
 	return true
 }
 
-// moveStat walks the categories. Only moving; nothing narrows until you add.
-//
-// The groups are a ring, so the walk never stops. k on the first row turns
-// the ring back a group, the way K does, and lands on the last row of the
-// group that comes round to the top — the row that was out of sight above.
-// j on the last row turns it forward, and lands on the first row of the
-// group that has gone round to the bottom.
+// moveStat walks the categories, stopping at either end. Only moving;
+// nothing narrows until you add.
 func (m *Model) moveStat(delta int) {
 	groups := m.statGroups()
 	rows := statRows(groups)
@@ -329,39 +283,7 @@ func (m *Model) moveStat(delta int) {
 		return
 	}
 	at := m.statCursor(groups) + delta
-	switch {
-	case at < 0:
-		m.rotateStat(-1)
-		top := m.statGroups()[0]
-		m.pointAt(top.Rows[len(top.Rows)-1])
-	case at >= len(rows):
-		m.rotateStat(1)
-		groups = m.statGroups()
-		m.pointAt(groups[len(groups)-1].Rows[0])
-	default:
-		m.pointAt(rows[at])
-	}
-}
-
-// rotateStat turns the group order over by one: J brings the next group to
-// the top, K the one before. The highlight goes with it, to the new top.
-func (m *Model) rotateStat(delta int) {
-	groups := m.countedGroups()
-	if len(groups) == 0 {
-		return
-	}
-	// Where the present top sits among the groups this list has.
-	cur := 0
-	if top := rotateGroups(groups, m.stats.top); len(top) > 0 {
-		for i, g := range groups {
-			if g.Title == top[0].Title {
-				cur = i
-			}
-		}
-	}
-	next := groups[((cur+delta)%len(groups)+len(groups))%len(groups)]
-	m.stats.top = next.Title
-	m.pointAt(next.Rows[0])
+	m.pointAt(rows[maxInt(minInt(at, len(rows)-1), 0)])
 }
 
 // addStat narrows the list by the highlighted category, joined to whatever
@@ -461,10 +383,6 @@ func (m *Model) statsKey(key string) bool {
 		m.moveStat(1)
 	case keymap.StatsUp:
 		m.moveStat(-1)
-	case keymap.StatsNextGroup:
-		m.rotateStat(1)
-	case keymap.StatsPrevGroup:
-		m.rotateStat(-1)
 	case keymap.StatsOr:
 		m.addStat(stats.Or)
 	case keymap.StatsAnd:
@@ -563,8 +481,7 @@ func statHeading(groups []stats.Group, row int) int {
 // the highlight reaches an edge.
 //
 // At the top edge it goes far enough back to show the group's heading too,
-// whenever the two fit together. ctrl+j and ctrl+k turn a group to the top and put
-// the highlight on its first category; scrolling only as far as the
+// whenever the two fit together: scrolling only as far as a group's first
 // category left the heading — the one line saying what the bars count —
 // just above the top edge.
 func (m Model) statScroll(offset, height, total int) int {
@@ -655,7 +572,7 @@ func (m Model) renderStats(width int) []string {
 
 	cursor := m.statCursor(groups)
 	memo := m.stats.memo
-	key := drawKey{counted: memo.keyOrZero(), top: m.stats.top, width: width, odds: m.stats.odds,
+	key := drawKey{counted: memo.keyOrZero(), width: width, odds: m.stats.odds,
 		expr: expr.String(), hints: m.hintsExpanded}
 	if memo != nil && memo.ok && memo.drawnOK && memo.drawnKey == key {
 		return memo.highlight(cursor, m.tagMeaning(width))

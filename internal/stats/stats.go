@@ -560,11 +560,10 @@ var ordered = map[string]bool{
 	TaggerGroup: true, TypeGroup: true, "Tags": true,
 }
 
-// GroupOrder is the order the groups are built and drawn in, before J or K
-// turns it. Most telling first: what the deck's author called their cards,
-// then what those cards are, and the printing details. Scryfall Tagger's
-// tree is long, so it goes last, where it doesn't push the rest down, and K
-// reaches it in one step up from the top, wrapping round.
+// GroupOrder is the order the groups are built and drawn in. Most telling
+// first: what the deck's author called their cards, then what those cards
+// are, and the printing details. Scryfall Tagger's tree is long, so it goes
+// last, where it doesn't push the rest down.
 var GroupOrder = []string{
 	"Tags", TypeGroup, "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)", TaggerGroup,
 }

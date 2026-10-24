@@ -97,7 +97,7 @@ func TestNInTheStatisticsNegates(t *testing.T) {
 		if r, ok := m.statUnder(); ok && r.Group == "Type" && r.Label == "Land" {
 			break
 		}
-		m = drive(m, "J")
+		m = drive(m, "ctrl+j")
 	}
 	m = drive(m, "alt+n")
 	l := m.ws.current().cardsView()
