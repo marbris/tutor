@@ -1,5 +1,7 @@
 package ui
 
+import "slices"
+
 // The workspace: a row of panels, one of which has focus, with the
 // information panel pinned to the right.
 //
@@ -304,11 +306,13 @@ func (w *workspace) deriveEditing() {
 }
 
 // cycleEditing moves the target to the next open deck of yours. e and E walk
-// it in either direction, and the row it lands on is the one a/x/t write to.
+// it in either direction, and the deck it lands on is the one a/x/t write to.
+// It walks decks, not panels: a deck in two panels (space n) is one step, and
+// lands on the first panel that shows it.
 func (w *workspace) cycleEditing(delta int) {
 	var decks []int
 	for i := range w.panels {
-		if w.editable(i) {
+		if w.editable(i) && !slices.ContainsFunc(decks, func(d int) bool { return w.sameDeck(d, i) }) {
 			decks = append(decks, i)
 		}
 	}
@@ -319,7 +323,7 @@ func (w *workspace) cycleEditing(delta int) {
 
 	at := -1
 	for i, p := range decks {
-		if p == w.editing {
+		if p == w.editing || w.sameDeck(p, w.editing) {
 			at = i
 			break
 		}
@@ -337,6 +341,21 @@ func (w *workspace) cycleEditing(delta int) {
 
 	n := len(decks)
 	w.editing = decks[((at+delta)%n+n)%n]
+}
+
+// sameDeck reports whether panels i and j show the same deck of yours.
+func (w *workspace) sameDeck(i, j int) bool {
+	if !w.editable(i) || !w.editable(j) {
+		return false
+	}
+	return w.panels[i].cardsView().deck.Slug == w.panels[j].cardsView().deck.Slug
+}
+
+// showsEditing reports whether panel i shows the editing deck: the panel e
+// chose, or any other showing the same deck. They are one list, so every one
+// of them is drawn as the editing deck, and a/x/t in any of them act on it.
+func (w *workspace) showsEditing(i int) bool {
+	return i == w.editing || w.sameDeck(i, w.editing)
 }
 
 // awaitingDeck reports whether a panel is in the middle of opening a deck,

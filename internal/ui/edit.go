@@ -182,7 +182,7 @@ func sameTags(a, b []string) bool {
 // where a gives another copy rather than bringing the card in.
 func (m *Model) fromEditing() bool {
 	p := m.ws.current()
-	return p != nil && p.cardsView() != nil && p.cardsView() == m.ws.editingList()
+	return p != nil && p.cardsView() != nil && m.ws.showsEditing(m.ws.focused)
 }
 
 // add is a: the cards into the editing deck, with their tags. In the deck

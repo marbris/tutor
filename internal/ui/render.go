@@ -50,7 +50,7 @@ func (m Model) viewPanel(p *panel, index, width, height, headHeight int) string 
 	// panel loses the focus border and neither panel offers its keys.
 	picking := m.picking() != nil
 	focused := index == m.ws.focused && !picking
-	editing := index == m.ws.editing
+	editing := m.ws.showsEditing(index)
 
 	// The border says which panel has the keys, and which one a/x/t are
 	// going to write to — the two things you need to know without looking.
@@ -194,14 +194,14 @@ func (m Model) membersFor(l *cardList) map[string]membership {
 	out := map[string]membership{}
 	for _, other := range m.ws.panels {
 		o := other.cardsView()
-		if o == nil || o == l {
-			continue
+		if o == nil || o == l || sameList(o, l) {
+			continue // nor its copies in other panels: they're the same list
 		}
 		level := inOther
-		switch o {
-		case editing:
+		switch {
+		case o == editing || sameList(o, editing):
 			level = inEditing
-		case focused:
+		case o == focused:
 			level = inFocused
 		}
 		// Only the list's own cards are ever looked up, so only they are
@@ -217,6 +217,13 @@ func (m Model) membersFor(l *cardList) map[string]membership {
 		}
 	}
 	return out
+}
+
+// sameList reports whether two lists are the same deck of yours, shown in
+// two panels.
+func sameList(a, b *cardList) bool {
+	return a != nil && b != nil && a.deck != nil && b.deck != nil && a.deck.Local() && b.deck.Local() &&
+		a.deck.Slug == b.deck.Slug
 }
 
 // resortInclusion keeps every list's idea of where else its cards are

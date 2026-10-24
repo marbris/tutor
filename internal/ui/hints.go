@@ -567,11 +567,11 @@ func (m Model) statsHints() [][2]string {
 // editableCount is how many decks of yours are open — how many places e and
 // E have to go.
 func (m Model) editableCount() int {
-	n := 0
-	for i := range m.ws.panels {
+	slugs := map[string]bool{}
+	for i, p := range m.ws.panels {
 		if m.ws.editable(i) {
-			n++
+			slugs[p.cardsView().deck.Slug] = true
 		}
 	}
-	return n
+	return len(slugs)
 }
