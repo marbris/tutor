@@ -38,8 +38,24 @@ func TestABlurredTtrDrawsNoFocusAndAFocusedOneDoes(t *testing.T) {
 	}
 	next, _ := m.Update(tea.BlurMsg{})
 	m = next.(Model)
-	if blurred := panel(m); strings.Contains(blurred, focusFg) || strings.Contains(blurred, cursorBg) {
+	blurred := panel(m)
+	if strings.Contains(blurred, focusFg) {
 		t.Error("the background window still draws its panel as focused")
+	}
+	// The card under the cursor keeps a grey bar, for the card column and
+	// the statistics beside it: in the selection's colours, which always read.
+	c, _ := m.ws.current().cardsView().current()
+	row := func(frame string) string {
+		for _, line := range splitLines(frame) {
+			if strings.Contains(stripANSI(line), c.Card.Name) {
+				return line
+			}
+		}
+		return ""
+	}
+	selFg, _ := ansiOf(theme.SelectionFg)
+	if idle := row(blurred); !strings.Contains(idle, cursorBg) || !strings.Contains(idle, selFg) || idle == row(before) {
+		t.Errorf("the cursor row in the background isn't the grey bar:\n%q\nfocused:\n%q", idle, row(before))
 	}
 	next, _ = m.Update(tea.FocusMsg{})
 	m = next.(Model)

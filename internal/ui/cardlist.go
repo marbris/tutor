@@ -431,7 +431,7 @@ func filterTerms(s string) []string {
 
 // render draws the visible rows. members says which cards to flag as living
 // in the editing deck as well as here.
-func (l *cardList) render(width, height int, members map[string]membership, focused bool) []string {
+func (l *cardList) render(width, height int, members map[string]membership, focused, idle bool) []string {
 	l.cursor.scrollInto(height, len(l.rows))
 
 	// When the column beside the name is a type line it can be long enough to
@@ -453,6 +453,7 @@ func (l *cardList) render(width, height int, members map[string]membership, focu
 			selected: l.marked(c),
 			member:   members[markKey(c)],
 			cursor:   focused && i == l.cursor.at,
+			idle:     idle && i == l.cursor.at,
 			then:     l.order2,
 		}, width, nameCol))
 	}
@@ -591,7 +592,10 @@ func (l *cardList) lines(width, height int, focused bool, m *Model) []string {
 		}
 		return fillTo(mutedLines(what, width), width, height)
 	}
-	return l.render(width, height, m.membersFor(l), focused)
+	// The focused panel of a linked ttr in a background window still says
+	// which card is shown beside it.
+	idle := !focused && m.inactive() && m.ws.current() != nil && m.ws.current().top() == view(l)
+	return l.render(width, height, m.membersFor(l), focused, idle)
 }
 
 func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {

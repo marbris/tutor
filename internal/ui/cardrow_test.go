@@ -64,7 +64,7 @@ func TestTypeColumnSharesANameBoundaryAcrossRows(t *testing.T) {
 	}}
 	l := newCardList([]deck.Card{short, long}, sortType, "")
 
-	lines := l.render(40, 5, nil, false)
+	lines := l.render(40, 5, nil, false, false)
 	joined := stripANSI(lines[0]) + "\n" + stripANSI(lines[1])
 	// The long name — which fits — sets the shared column wide, leaving the
 	// type column too narrow for the full line, so both rows show the
@@ -88,7 +88,7 @@ func TestTheTypeColumnListNeverOverrunsItsWidth(t *testing.T) {
 	}
 	l := newCardList(cards, sortType, "")
 	for width := 6; width <= 60; width++ {
-		for _, line := range l.render(width, len(cards), nil, false) {
+		for _, line := range l.render(width, len(cards), nil, false, false) {
 			if got := textWidth(stripANSI(line)); got > width {
 				t.Errorf("width %d rendered %d columns: %q", width, got, stripANSI(line))
 			}

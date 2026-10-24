@@ -45,6 +45,10 @@ type rowState struct {
 	selected bool       // picked out with v
 	member   membership // where else on screen the card is — see membersFor
 	cursor   bool       // under the cursor
+	// idle is under the cursor of a linked ttr whose window is in the
+	// background: a plain grey bar, saying which card its info panel and
+	// statistics are on without looking like the one with the keys.
+	idle bool
 	// then is the list's second order. The first decides the column; this
 	// one decides the colour of the name.
 	then cardSort
@@ -105,6 +109,13 @@ func renderRowCol(c deck.Card, order cardSort, st rowState, width, nameCol int) 
 		return line
 	}
 
+	if st.idle {
+		// In the selection's own two colours, not the card's: a card's
+		// colour can be the grey of the bar (colourless, in the terminal's
+		// theme) and vanish into it.
+		plain := lipgloss.NewStyle().Foreground(theme.SelectionFg)
+		return highlightLine(plain.Render(pad(mark, gutter)+text+colText), width, theme.SelectionBg)
+	}
 	nameStyle := lipgloss.NewStyle().Foreground(hue)
 	markStyle := lipgloss.NewStyle().Foreground(markCol).Bold(st.selected)
 	return markStyle.Render(pad(mark, gutter)) + nameStyle.Render(text) + paintColumn(colText, c.Card, order)

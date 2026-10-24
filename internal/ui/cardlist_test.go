@@ -287,7 +287,7 @@ func TestAnEmptyFilterResultDoesNotBreakTheCursor(t *testing.T) {
 		t.Error("there is a current card in an empty list")
 	}
 	l.move(1)
-	l.render(20, 5, nil, true) // must not panic
+	l.render(20, 5, nil, true, false) // must not panic
 }
 
 // newCardList2 is newCardList with the arrival name left to its default, so
