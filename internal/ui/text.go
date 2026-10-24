@@ -45,9 +45,11 @@ func runeWidth(r rune) int {
 	return runewidth.RuneWidth(r)
 }
 
-// truncate cuts to a display width, marking the cut. Walks runes with the
-// same measure as textWidth, rather than runewidth's own, so the two can't
-// disagree about where the cut falls.
+// truncate cuts to a display width, clean: no "…" after the cut. Text that
+// can run long wraps instead (wrapStyled); what is cut here is a one-line row
+// whose whole text the info panel shows. Walks runes with the same measure as
+// textWidth, rather than runewidth's own, so the two can't disagree about
+// where the cut falls.
 func truncate(s string, max int) string {
 	if max <= 0 {
 		return ""
@@ -55,22 +57,17 @@ func truncate(s string, max int) string {
 	if textWidth(s) <= max {
 		return s
 	}
-	if max == 1 {
-		return "…"
-	}
-
-	room := max - 1 // the ellipsis takes one
 	w, cut := 0, 0
 	for i, r := range s {
 		rw := runeWidth(r)
-		if w+rw > room {
+		if w+rw > max {
 			cut = i
 			break
 		}
 		w += rw
 		cut = i + len(string(r))
 	}
-	return s[:cut] + "…"
+	return s[:cut]
 }
 
 // pad extends a string to a display width, for lining columns up by hand

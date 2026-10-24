@@ -404,3 +404,20 @@ func TestTheCursorRowWearsItsOwnColours(t *testing.T) {
 		t.Error("the cursor changed the row's text, not just its colours")
 	}
 }
+
+func TestTruncateCutsCleanWithoutDots(t *testing.T) {
+	for _, c := range []struct {
+		s     string
+		width int
+		want  string
+	}{
+		{"Craterhoof Behemoth", 10, "Craterhoof"},
+		{"Craterhoof Behemoth", 1, "C"},
+		{"Sol Ring", 8, "Sol Ring"},
+		{"日本語の名前", 5, "日本"},
+	} {
+		if got := truncate(c.s, c.width); got != c.want {
+			t.Errorf("truncate(%q, %d) = %q, want %q", c.s, c.width, got, c.want)
+		}
+	}
+}
