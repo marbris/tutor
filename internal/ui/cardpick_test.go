@@ -67,6 +67,21 @@ func TestFPicksATagOffTheCardAndFiltersByIt(t *testing.T) {
 	}
 }
 
+func TestThePickerStaysOnItsCardWhenTheRowsAboveItGo(t *testing.T) {
+	mk := func(name string, tags ...string) deck.Card {
+		return deck.Card{Qty: 1, Tags: tags, Card: mtg.Card{Name: name, TypeLine: "Sorcery"}}
+	}
+	cards := []deck.Card{mk("Opt", "draw"), mk("Ponder", "draw"), mk("Cultivate", "ramp"),
+		mk("Kodama's Reach", "ramp"), mk("Rampant Growth", "ramp")}
+	m := withCards(sized(150, 40), "d", cards, sortArrival)
+	l := m.ws.current().cardsView()
+	m = drive(m, "j", "j", "j") // Kodama's Reach, fourth
+	m = drive(m, "F", "a")      // ramp: the two above it go
+	if c, _ := l.current(); c.Card.Name != "Kodama's Reach" || l.pick == nil {
+		t.Errorf("after filtering by ramp the cursor is on %s, picker %v", c.Card.Name, l.pick)
+	}
+}
+
 func TestNOnTheCardsOwnTagPutsThePickerAway(t *testing.T) {
 	m := withCards(sized(150, 40), "d", pickSample(), sortArrival)
 	l := m.ws.current().cardsView()

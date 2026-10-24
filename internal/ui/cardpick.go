@@ -129,7 +129,10 @@ func (m *Model) pickKey(l *cardList, key string) {
 	}
 	l.statFilter = l.statFilter.Toggle(op, rows[l.pick.at])
 	l.refresh()
-	if now, ok := l.current(); !ok || now.Card.Name != l.pick.card {
+	// The cursor stays on the card while the rows change round it, so the
+	// picker stays on the tags it was walking; only a filter that hides the
+	// card itself takes it away.
+	if !l.selectByName(l.pick.card) {
 		l.pick = nil
 		m.notice = c.Card.Name + " is filtered out — " + keymap.Hint(keymap.Global, keymap.GlobalPick) + " on another card picks again"
 	}
