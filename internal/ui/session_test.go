@@ -238,3 +238,64 @@ func TestThePrintingViewComesBack(t *testing.T) {
 		t.Errorf("came back in %v after leaving the printing view", back.info.mode)
 	}
 }
+
+func TestTheCursorCardAndTheStatisticsComeBack(t *testing.T) {
+	withStore(t)
+	seedDeck(t, "where-was-i", "name: Where\nformat: commander\n[mainboard]\n1 Sol Ring\n1 Llanowar Elves\n1 Dwynen, Gilt-Leaf Daen\n")
+	t.Cleanup(func() { deck.Delete("where-was-i") })
+
+	m, l := openFromDisk(t, "where-was-i")
+	m = drive(m, "j", "j")
+	was, _ := l.current()
+	m = drive(m, "s")
+	if !m.stats.open {
+		t.Fatal("s didn't open the statistics")
+	}
+	m.stats.group, m.stats.label = "Types", "Creature"
+	m.saveSession()
+
+	back, cmd := NewRestored()
+	back = settle(back, cmd)
+	bl := back.ws.current().cardsView()
+	if bl == nil {
+		t.Fatal("the deck didn't come back")
+	}
+	if c, _ := bl.current(); c.Card.Name != was.Card.Name {
+		t.Errorf("the cursor came back on %q, want %q", c.Card.Name, was.Card.Name)
+	}
+	if !back.stats.open || back.stats.editing {
+		t.Errorf("statistics open %v, for the editing deck %v; want s's, open", back.stats.open, back.stats.editing)
+	}
+	if back.stats.group != "Types" || back.stats.label != "Creature" {
+		t.Errorf("the statistics highlight came back on %s/%s", back.stats.group, back.stats.label)
+	}
+}
+
+func TestClosedStatisticsStayClosed(t *testing.T) {
+	m := withCards(sized(140, 30), "f", sample(), sortArrival)
+	m.ws.current().cardsView().name = "t:elf"
+	m.saveSession()
+	back, _ := NewRestored()
+	if back.stats.open {
+		t.Error("the statistics came back open")
+	}
+}
+
+func TestFocusComesBackOnItsPanelWhenOneBeforeItIsLeftOut(t *testing.T) {
+	seedDeck(t, "focus-me", "name: Focus\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.Delete("focus-me") })
+	m := withCards(sized(200, 30), "d", sample(), sortArrival)
+	m.ws.current().cardsView().deck = &deck.Info{Name: "Borrowed", ID: "Y8dZ7"} // left out
+	m, _ = openDeckPanel(t, m, "focus-me", "Focus", sample())
+	m = drive(m, "space", "d") // the decks panel, after it
+	m = focusOn(m, 1)          // back on the deck
+	m.saveSession()
+
+	back, _ := NewRestored()
+	if back.ws.count() != 2 {
+		t.Fatalf("came back to %d panels", back.ws.count())
+	}
+	if p := back.ws.current(); p.title != "focus-me" {
+		t.Errorf("focus came back on %q (%v), want the deck", p.title, p.kind)
+	}
+}

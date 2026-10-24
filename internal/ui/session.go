@@ -17,10 +17,10 @@ import (
 // What `ttr` on its own comes back to.
 //
 // The workspace is the thing worth restoring: which panels were open, what
-// each was showing, how it was sorted and filtered, and which deck you were
-// building. Not the cursor, and not what was highlighted — coming back to a
-// card you don't remember selecting is disorienting in a way that coming
-// back to your panels isn't.
+// each was showing, how it was sorted and filtered, which deck you were
+// building, the card each list's cursor was on, and the statistics column
+// as you left it. Not what was picked out with v: a selection you don't
+// remember making is a trap for the next a or x.
 //
 // Only things that will still be there tomorrow are recorded. A deck browsed
 // off Moxfield isn't yours and might be gone; a search can always be run
@@ -51,6 +51,20 @@ type panelSession struct {
 	// QuerySort and QueryDir are the order a find panel asks Scryfall for.
 	QuerySort string `json:"querySort,omitempty"`
 	QueryDir  string `json:"queryDir,omitempty"`
+	// Card is the card under the cursor, by name: the cards may come back
+	// in another order, or with one gone.
+	Card string `json:"card,omitempty"`
+}
+
+// statsSession is the statistics column: whether it was up, for which list
+// (S: the editing deck), the category highlighted, and counts or odds.
+type statsSession struct {
+	Open    bool   `json:"open,omitempty"`
+	Editing bool   `json:"editing,omitempty"`
+	Group   string `json:"group,omitempty"`
+	Label   string `json:"label,omitempty"`
+	Path    string `json:"path,omitempty"`
+	Odds    int    `json:"odds,omitempty"`
 }
 
 // savedClause is one statistics category. A category is found again by its
@@ -78,9 +92,11 @@ type session struct {
 	// OpenGroups is the statistics groups opened from their heading.
 	OpenGroups []string `json:"openGroups,omitempty"`
 	// Info is the information panel's view, when it is one worth coming
-	// back to: "printing" for gx's. The others are put up for a moment —
-	// the statistics are s away, a printed history is about one card.
+	// back to: "printing" for gx's. The others are put up for a moment:
+	// a printed history is about one card. (The statistics have their own.)
 	Info string `json:"info,omitempty"`
+	// Stats is the statistics column.
+	Stats statsSession `json:"stats,omitempty"`
 }
 
 func sessionPath() string { return filepath.Join(paths.State(), sessionFile) }
@@ -101,7 +117,9 @@ func loadSession() session {
 // a few keystrokes tomorrow, and a dialogue about it on the way out would
 // cost more.
 func (m Model) saveSession() {
-	s := session{Focused: m.ws.focused, Editing: -1, LastTag: m.lastTag, TagsByName: m.stats.tagsByName}
+	s := session{Editing: -1, LastTag: m.lastTag, TagsByName: m.stats.tagsByName}
+	st := m.stats
+	s.Stats = statsSession{Open: st.open, Editing: st.editing, Group: st.group, Label: st.label, Path: st.path, Odds: st.odds}
 	for path := range m.stats.openTags {
 		s.OpenTags = append(s.OpenTags, path)
 	}
@@ -158,14 +176,16 @@ func (m Model) saveSession() {
 			ps.QuerySort, ps.QueryDir = p.queryOrder(), p.queryDirection()
 		}
 
+		// By where the panel lands among those saved: a panel left out
+		// (somebody's deck, an empty one) mustn't shift the focus or the
+		// editing deck onto its neighbour.
 		if m.ws.editing == i {
 			s.Editing = len(s.Panels)
 		}
+		if m.ws.focused >= i {
+			s.Focused = len(s.Panels)
+		}
 		s.Panels = append(s.Panels, ps)
-	}
-
-	if s.Focused >= len(s.Panels) {
-		s.Focused = maxInt(len(s.Panels)-1, 0)
 	}
 
 	body, err := json.Marshal(s)
@@ -266,6 +286,12 @@ func (m *Model) restore() tea.Cmd {
 	if s.Editing >= 0 && s.Editing < m.ws.count() {
 		m.ws.editing = s.Editing
 	}
+	// The statistics come back as they were, counting whatever list they
+	// were counting once its cards arrive.
+	if st := s.Stats; st.Open {
+		m.stats.open, m.stats.editing = true, st.Editing
+		m.stats.group, m.stats.label, m.stats.path, m.stats.odds = st.Group, st.Label, st.Path, st.Odds
+	}
 	return tea.Batch(cmds...)
 }
 
@@ -286,6 +312,9 @@ func (ps *panelSession) keepLayout(l *cardList) {
 		ps.Sort2, ps.Desc2 = l.order2.String(), l.desc2
 	}
 	ps.Filter = l.filter
+	if c, ok := l.current(); ok {
+		ps.Card = c.Card.Name
+	}
 	for _, cl := range l.statFilter {
 		ps.Stats = append(ps.Stats, savedClause{Op: opName(cl.Op), Group: cl.Row.Group, Label: cl.Row.Label, Path: cl.Row.Path})
 	}
@@ -328,6 +357,10 @@ func (ps *panelSession) applyLayout(l *cardList) {
 		}
 	}
 	l.refresh()
+	// A card no longer there, or filtered away, leaves the cursor at the top.
+	if ps.Card != "" {
+		l.selectByName(ps.Card)
+	}
 }
 
 func findRow(groups []stats.Group, group, label string) (stats.Row, bool) {
