@@ -184,9 +184,9 @@ func (m Model) Init() tea.Cmd {
 	// catalogs): read from disk while under a week old, and only then
 	// downloaded again, behind. The settings panel turns them on and off.
 	cmds = append(cmds, downloadLoads()...)
-	// Decks open here that another ttr or an editor changes are looked at
-	// every second (outside.go).
-	cmds = append(cmds, filesTick())
+	// Decks open here that another ttr or an editor changes, and the shared
+	// editing deck, are watched (outside.go).
+	cmds = append(cmds, m.watchFiles())
 	return tea.Batch(cmds...)
 }
 

@@ -15,7 +15,7 @@ import (
 //
 // Two ttrs (or ttr and an editor) can have the same deck open. Each keeps
 // the version of the file it last read or wrote, and looks at the file's
-// stamp every second: a stamp it didn't write is somebody else's change,
+// stamp every tenth of a second (watchFiles): a stamp it didn't write is somebody else's change,
 // which it reads and merges into what it shows, card by card. Writing does
 // the same the other way round: if the file changed since the version an
 // edit was made on, the edit is merged onto the file rather than written over
@@ -140,12 +140,43 @@ func (m Model) rebase(slug string, base, theirs []deck.Card) {
 
 // ── Looking at the files ────────────────────────────────────────
 
-const filesEvery = time.Second
+// The files are stat'ed every filesPoll, off the main loop, and the main
+// loop only hears of it when one changed, or after filesEvery regardless.
+// A message costs a whole redraw (a couple of milliseconds for a full
+// screen), and a stat a few microseconds: polling fast and waking the main
+// loop rarely gets another ttr's e to this one in a tenth of a second for
+// no more than the old once-a-second look.
+const (
+	filesPoll  = 100 * time.Millisecond
+	filesEvery = time.Second
+)
 
 type filesTickMsg struct{}
 
-func filesTick() tea.Cmd {
-	return tea.Tick(filesEvery, func(time.Time) tea.Msg { return filesTickMsg{} })
+// watchFiles waits for a change to an open deck's file, editing.json or the
+// share switch, or for filesEvery to pass.
+func (m Model) watchFiles() tea.Cmd {
+	paths := []string{sharedPath(), shareSwitchPath()}
+	for _, d := range m.openDecks() {
+		if d.list.deck.Local() {
+			paths = append(paths, deck.Path(d.list.deck.Slug))
+		}
+	}
+	return func() tea.Msg {
+		stamps := make([]string, len(paths))
+		for i, p := range paths {
+			stamps[i] = fileStamp(p)
+		}
+		for waited := time.Duration(0); waited < filesEvery; waited += filesPoll {
+			time.Sleep(filesPoll)
+			for i, p := range paths {
+				if fileStamp(p) != stamps[i] {
+					return filesTickMsg{}
+				}
+			}
+		}
+		return filesTickMsg{}
+	}
 }
 
 // outsideChange is a deck file another ttr or an editor has written.
@@ -159,7 +190,7 @@ type outsideChange struct {
 type outsideChangesMsg struct{ changes []outsideChange }
 
 func (m Model) handleFilesTick() (tea.Model, tea.Cmd) {
-	return m, tea.Batch(m.checkFiles(), checkDownloads(), m.checkShared(), filesTick())
+	return m, tea.Batch(m.checkFiles(), checkDownloads(), m.checkShared(), m.watchFiles())
 }
 
 // checkDownloads reads the card data and the rulings in again when another

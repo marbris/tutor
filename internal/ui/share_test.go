@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"ttr/internal/deck"
 )
@@ -124,5 +125,22 @@ func TestWithSharingOffEachTtrKeepsItsOwn(t *testing.T) {
 	}
 	if cmd := a.checkShared(); cmd != nil && cmd() != nil {
 		t.Error("a choice was taken with the switch off")
+	}
+}
+
+// Another ttr's choice wakes this one at once, not on the once-a-second
+// look that idles.
+func TestTheWatchWakesSoonAfterAChoiceIsShared(t *testing.T) {
+	shareOn(t)
+	m := sized(160, 30)
+	done := make(chan time.Time)
+	go func() { m.watchFiles()(); done <- time.Now() }()
+	time.Sleep(2 * filesPoll)
+	written := time.Now()
+	if err := writeShared(sharedEditing{Slug: "elsewhere", By: 7, At: written.UnixNano()}); err != nil {
+		t.Fatal(err)
+	}
+	if woke := (<-done).Sub(written); woke > 3*filesPoll {
+		t.Errorf("woke %v after the choice, want within %v", woke, 3*filesPoll)
 	}
 }
