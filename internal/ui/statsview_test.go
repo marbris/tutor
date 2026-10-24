@@ -933,3 +933,21 @@ func TestSAndSAreOfferedUnderTheListsTheyCount(t *testing.T) {
 		t.Errorf("the card column still offers the statistics: %s", info)
 	}
 }
+
+func TestTheGroupsSitRowOnRowAndKeysWaitForQuestionMark(t *testing.T) {
+	m := withCards(sized(150, 40), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	lines := m.renderStats(60)
+	if got := strings.TrimSpace(stripANSI(lines[1])); !strings.HasPrefix(got, "▸ Type") {
+		t.Errorf("the line under Tags is %q, want the next heading", got)
+	}
+	view := stripANSI(m.View())
+	for _, key := range []string{"ctrl+a", "and/or/not", "enter opens"} {
+		if strings.Contains(view, key) {
+			t.Errorf("%q is offered with ? off", key)
+		}
+	}
+	if view := stripANSI(drive(m, "?").View()); !strings.Contains(view, "open the group") {
+		t.Error("? doesn't show the statistics' keys")
+	}
+}

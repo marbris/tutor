@@ -214,8 +214,8 @@ func headingRow(title string) stats.Row {
 }
 
 // statWalk is what ctrl+j and ctrl+k walk, in the order it's drawn: every
-// group's heading, each followed by its rows if the group is open, with a
-// blank line between groups. Drawing, scrolling and walking all read it, so
+// group's heading, each followed by its rows if the group is open, the next
+// heading straight under them. Drawing, scrolling and walking all read it, so
 // they can't disagree about which line a row is on.
 func (m Model) statWalk(groups []stats.Group) []statEntry {
 	var out []statEntry
@@ -223,9 +223,6 @@ func (m Model) statWalk(groups []stats.Group) []statEntry {
 	for _, g := range groups {
 		if len(g.Rows) == 0 {
 			continue
-		}
-		if line > 0 {
-			line++ // the blank line between groups
 		}
 		head := line
 		out = append(out, statEntry{headingRow(g.Title), line, head})
@@ -657,8 +654,6 @@ func (m Model) renderStats(width int) []string {
 	// Two columns for the and/or mark, beside the label.
 	barWidth := maxInt(width-labelWidth-countWidth-4, 1)
 
-	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
-
 	cursor := m.statCursor(groups)
 	memo := m.stats.memo
 	key := drawKey{counted: memo.keyOrZero(), width: width, odds: m.stats.odds,
@@ -674,9 +669,6 @@ func (m Model) renderStats(width int) []string {
 	for _, e := range m.statWalk(groups) {
 		r := e.row
 		if r.Heading {
-			if len(out) > 0 {
-				out = append(out, "")
-			}
 			bar := statBar{row: r, heading: true, open: m.stats.openGroups[r.Label],
 				value: headingNote(expr, groups, r.Label), labelWidth: width}
 			bars = append(bars, bar)
@@ -702,10 +694,6 @@ func (m Model) renderStats(width int) []string {
 	if len(expr) > 0 {
 		// Wrapped, not cut: the end of a filter is as much of it as the start.
 		out = append(out, wrapStyled("filter: "+expr.String(), width, lipgloss.NewStyle().Foreground(theme.Marked))...)
-	}
-	// The short reminder, for when ? isn't drawing the whole keymap below.
-	if !m.hintsExpanded {
-		out = append(out, wrapStyled("enter opens · ctrl+ a/o/n and/or/not · x remove · p odds · s close", width, dim)...)
 	}
 	if memo == nil || !memo.ok {
 		d := statsMemo{drawn: out, bars: bars, barLine: barLine}
