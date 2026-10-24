@@ -373,7 +373,11 @@ const (
 // tagRows is the tags the cards in rowSource have, of their own or borrowed,
 // and the chosen otags they have, commonest first or by name, each opened one
 // followed by its two halves, and the untagged at the bottom.
-func tagRows(rowSource []deck.Card, byName bool, open map[string]bool, otags []string) []Row {
+//
+// Commonest is among the counted cards, the ones the list shows: filter the
+// list and the tags it leaves the most of come first. The whole list breaks
+// ties, so tags the filter has emptied keep an order among themselves.
+func tagRows(rowSource, counted []deck.Card, byName bool, open map[string]bool, otags []string) []Row {
 	own := map[string]bool{}
 	borrowed := map[string]bool{}
 	base := map[string]int{}
@@ -402,8 +406,17 @@ func tagRows(rowSource []deck.Card, byName bool, open map[string]bool, otags []s
 	// Your tags and the otags sort together, each with its own count: a tag
 	// and an otag of the same name are two rows, told apart by colour.
 	type entry struct {
-		row  Row
-		base int
+		row       Row
+		now, base int
+	}
+	count := func(r Row, cards []deck.Card) int {
+		n := 0
+		for _, e := range cards {
+			if r.Match(e) {
+				n += copies(e)
+			}
+		}
+		return n
 	}
 	var entries []entry
 	for _, tag := range labels {
@@ -412,22 +425,19 @@ func tagRows(rowSource []deck.Card, byName bool, open map[string]bool, otags []s
 			r.Color = theme.MemberOther
 		}
 		r.Expandable = own[tag] && borrowed[tag]
-		entries = append(entries, entry{r, base[tag]})
+		entries = append(entries, entry{r, count(r, counted), base[tag]})
 	}
 	for _, label := range otags {
 		r := OtagRow(otagPathPrefix + label)
-		n := 0
-		for _, e := range rowSource {
-			if r.Match(e) {
-				n += copies(e)
-			}
-		}
-		if n > 0 {
-			entries = append(entries, entry{r, n})
+		if n := count(r, rowSource); n > 0 {
+			entries = append(entries, entry{r, count(r, counted), n})
 		}
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		a, b := entries[i], entries[j]
+		if !byName && a.now != b.now {
+			return a.now > b.now
+		}
 		if !byName && a.base != b.base {
 			return a.base > b.base
 		}
@@ -571,7 +581,7 @@ var GroupOrder = []string{
 func GroupsBy(rowSource, counted []deck.Card, o Options) []Group {
 	tagsByName, openTags := o.TagsByName, o.Open
 	built := map[string][]Row{
-		"Tags":                     tagRows(rowSource, tagsByName, openTags, o.Otags),
+		"Tags":                     tagRows(rowSource, counted, tagsByName, openTags, o.Otags),
 		TypeGroup:                  typeRows(rowSource, openTags),
 		"Color (excl. lands)":      colorRows(),
 		"Mana Value (excl. lands)": cmcRows(),

@@ -299,3 +299,37 @@ func TestBorrowedTagsAreColouredApartAndATagBothGiveOpensIntoItsHalves(t *testin
 		t.Error("a tag with a slash in it should still match")
 	}
 }
+
+func TestTagsSortByWhatTheFilteredListHolds(t *testing.T) {
+	mk := func(name string, tags ...string) deck.Card {
+		return deck.Card{Qty: 1, Tags: tags, Card: mtg.Card{Name: name, TypeLine: "Sorcery"}}
+	}
+	all := []deck.Card{
+		mk("A", "ramp"), mk("B", "ramp"), mk("C", "ramp"),
+		mk("D", "draw"), mk("E", "draw", "ramp"),
+		mk("F", "removal"),
+	}
+	tags := func(counted []deck.Card, byName bool) string {
+		for _, g := range GroupsBy(all, counted, Options{TagsByName: byName}) {
+			if g.Title == "Tags" {
+				var out []string
+				for _, r := range g.Rows {
+					out = append(out, r.Label)
+				}
+				return strings.Join(out, " ")
+			}
+		}
+		return ""
+	}
+	if got := tags(all, false); got != "ramp draw removal" {
+		t.Errorf("whole list: %q", got)
+	}
+	// Filtered to D and E, draw holds two and ramp one; removal, emptied,
+	// keeps its place behind them by the whole list.
+	if got := tags(all[3:5], false); got != "draw ramp removal" {
+		t.Errorf("filtered: %q", got)
+	}
+	if got := tags(all, true); got != "draw ramp removal" {
+		t.Errorf("by name: %q", got)
+	}
+}
