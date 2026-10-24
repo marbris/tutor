@@ -908,3 +908,28 @@ func TestALongStatisticsFilterWraps(t *testing.T) {
 		t.Errorf("the filter was cut, not wrapped: %q", text)
 	}
 }
+
+func TestSAndSAreOfferedUnderTheListsTheyCount(t *testing.T) {
+	m, _, _ := editing(t)
+	m = focusOn(m, 0)
+	has := func(groups []hintGroup, key string) bool {
+		for _, g := range groups {
+			for _, k := range g.keys {
+				if k[0] == key && k[1] == "stats" {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !has(m.panelHintGroups(m.ws.current()), "s") {
+		t.Error("s stats isn't under the focused list")
+	}
+	if !has([]hintGroup{{"", m.editHints()}}, "S") {
+		t.Error("S stats isn't under the editing deck")
+	}
+	info := fmt.Sprint(m.infoHintGroups())
+	if strings.Contains(info, "stats") {
+		t.Errorf("the card column still offers the statistics: %s", info)
+	}
+}

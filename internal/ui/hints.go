@@ -227,6 +227,12 @@ func (m Model) panelHintGroups(p *panel) []hintGroup {
 		nav = append(nav, hint(esc, keymap.Global, keymap.GlobalBack))
 	}
 
+	// s counts the list in front of you, so it sits under that list. While
+	// the statistics are up it closes them, and their column says so.
+	if p.cardsView() != nil {
+		nav = append(nav, hint("stats", keymap.Global, keymap.GlobalStats))
+	}
+
 	groups := append([]hintGroup{{"", nav}}, rest...)
 
 	// With no deck being edited, e is how to choose one — offered where the
@@ -436,6 +442,8 @@ func (m Model) editHints() [][2]string {
 	if m.editableCount() > 1 {
 		keys = append(keys, hint("next/prev deck", keymap.Global, keymap.GlobalEditNext, keymap.GlobalEditPrev))
 	}
+	// S counts the editing deck from anywhere, so it sits under that deck.
+	keys = append(keys, hint("stats", keymap.Global, keymap.GlobalStatsEdit))
 	var out [][2]string
 	for _, k := range keys {
 		if k[0] != "" {
@@ -501,8 +509,6 @@ func (m Model) infoKeys(p *panel) [][2]string {
 		keys = append(keys, hint("filter by a tag of this card", keymap.Global, keymap.GlobalPick))
 	}
 	return append(keys,
-		hint("stats", keymap.Global, keymap.GlobalStats),
-		hint("editing deck stats", keymap.Global, keymap.GlobalStatsEdit),
 		hint("half page", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown),
 		[2]string{gotoHint(keymap.GotoVersions), "card history"},
 		[2]string{gotoHint(keymap.GotoImage), printing},
