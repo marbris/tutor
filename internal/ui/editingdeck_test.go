@@ -65,3 +65,24 @@ func TestOneDeckInTwoPanelsDoesntOfferE(t *testing.T) {
 		t.Error("e E offered with only one deck to go to")
 	}
 }
+
+// One deck in two panels, one filtered: the filtered one marks what it picks
+// out in the full one, and the full one marks nothing in the filtered one.
+func TestAFilteredCopyOfADeckMarksItsCardsInTheFullOne(t *testing.T) {
+	withStore(t)
+	seedDeck(t, "ed-split", "name: Split\nformat: commander\n[mainboard]\n1 Sol Ring [ramp]\n1 Llanowar Elves\n")
+	t.Cleanup(func() { deck.Delete("ed-split") })
+	m, full := openFromDisk(t, "ed-split")
+	m = openAlso(t, m, "ed-split")
+	part := m.ws.current().cardsView()
+	m = drive(m, "/", "e", "l", "v", "e", "s", "enter")
+	if len(part.rows) != 1 {
+		t.Fatalf("the filter shows %d cards", len(part.rows))
+	}
+	if full.members["llanowar elves"] == notElsewhere || full.members["sol ring"] != notElsewhere {
+		t.Errorf("in the full list: elves %v, sol ring %v", full.members["llanowar elves"], full.members["sol ring"])
+	}
+	if part.members["llanowar elves"] != notElsewhere {
+		t.Errorf("the unfiltered copy marked %v in the filtered one", part.members["llanowar elves"])
+	}
+}

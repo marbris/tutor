@@ -194,8 +194,13 @@ func (m Model) membersFor(l *cardList) map[string]membership {
 	out := map[string]membership{}
 	for _, other := range m.ws.panels {
 		o := other.cardsView()
-		if o == nil || o == l || sameList(o, l) {
-			continue // nor its copies in other panels: they're the same list
+		if o == nil || o == l {
+			continue
+		}
+		// The same deck in another panel marks what its filter picks out of
+		// this one. Unfiltered, it would mark every card, which says nothing.
+		if sameList(o, l) && len(o.shownNames()) == len(o.names()) {
+			continue
 		}
 		level := inOther
 		switch {
