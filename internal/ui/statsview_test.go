@@ -106,7 +106,7 @@ func TestWalkingTheBarsDoesntNarrow(t *testing.T) {
 func TestSGoesBackToTheList(t *testing.T) {
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
-	m = drive(m, "s", "enter", "ctrl+j", "alt+a") // narrow to the first category: tagged ramp
+	m = drive(m, "s", "enter", "ctrl+j", "ctrl+a") // narrow to the first category: tagged ramp
 	narrowed := l.count()
 	if narrowed != 3 {
 		t.Fatalf("adding ramp left %d cards, want 3", narrowed)
@@ -152,17 +152,17 @@ func TestAddingCategoriesFoldsAndAndOr(t *testing.T) {
 	m = drive(m, "s")
 
 	m = pointStat(t, m, "Type", "Creature")
-	m = drive(m, "alt+a")
+	m = drive(m, "ctrl+a")
 	if l.count() != 3 {
 		t.Fatalf("creatures: %d", l.count())
 	}
 	m = pointStat(t, m, "Mana Value", "1")
-	m = drive(m, "alt+a")
+	m = drive(m, "ctrl+a")
 	if l.count() != 2 {
 		t.Errorf("creatures ∧ 1: %d, want the two elves", l.count())
 	}
 	m = pointStat(t, m, "Type", "Artifact")
-	m = drive(m, "alt+o")
+	m = drive(m, "ctrl+o")
 	if l.count() != 3 {
 		t.Errorf("(creatures ∧ 1) ∨ artifact: %d, want the elves and the Sol Ring", l.count())
 	}
@@ -175,7 +175,7 @@ func TestAddingCategoriesFoldsAndAndOr(t *testing.T) {
 
 	// x takes out the highlighted category alone: Artifact goes, Creature
 	// from the same group stays.
-	m = drive(m, "alt+x")
+	m = drive(m, "ctrl+x")
 	if got := l.statFilter.String(); got != "Creature ∧ 1" {
 		t.Errorf("after x on Artifact: %q", got)
 	}
@@ -183,17 +183,17 @@ func TestAddingCategoriesFoldsAndAndOr(t *testing.T) {
 		t.Errorf("creatures ∧ 1: %d cards", l.count())
 	}
 	// The same key twice takes a category out; another key switches it.
-	m = drive(m, "alt+o", "alt+o")
+	m = drive(m, "ctrl+o", "ctrl+o")
 	if got := l.statFilter.String(); got != "Creature ∧ 1" {
-		t.Errorf("alt+o twice on Artifact: filter reads %q", got)
+		t.Errorf("ctrl+o twice on Artifact: filter reads %q", got)
 	}
 	m = pointStat(t, m, "Mana Value", "1")
-	m = drive(m, "alt+n")
+	m = drive(m, "ctrl+n")
 	if got := l.statFilter.String(); got != "Creature ∧¬ 1" {
-		t.Errorf("alt+n on 1: filter reads %q", got)
+		t.Errorf("ctrl+n on 1: filter reads %q", got)
 	}
 	// X clears the rest: x, only more.
-	m = drive(m, "alt+X")
+	m = drive(m, "ctrl+b")
 	if len(l.statFilter) != 0 || l.count() != 6 {
 		t.Errorf("X left %q, %d cards", l.statFilter.String(), l.count())
 	}
@@ -204,7 +204,7 @@ func TestBInTheStatisticsClearsBothFilters(t *testing.T) {
 	// categories together, as it does with the statistics closed.
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
-	m = drive(m, "/", "e", "l", "enter", "s", "enter", "ctrl+j", "alt+a")
+	m = drive(m, "/", "e", "l", "enter", "s", "enter", "ctrl+j", "ctrl+a")
 	if l.filter == "" || len(l.statFilter) == 0 {
 		t.Fatal("not narrowed both ways")
 	}
@@ -220,7 +220,7 @@ func TestBInTheStatisticsClearsBothFilters(t *testing.T) {
 func TestEscStepsBackAFilterAtATime(t *testing.T) {
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
-	m = drive(m, "/", "e", "l", "enter", "s", "enter", "ctrl+j", "alt+a")
+	m = drive(m, "/", "e", "l", "enter", "s", "enter", "ctrl+j", "ctrl+a")
 	if l.filter == "" || len(l.statFilter) == 0 {
 		t.Fatal("not narrowed both ways")
 	}
@@ -246,7 +246,7 @@ func TestEscStepsBackAFilterAtATime(t *testing.T) {
 
 func TestPStepsThroughTheOdds(t *testing.T) {
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
-	m = drive(m, "s", "enter", "alt+p")
+	m = drive(m, "s", "enter", "ctrl+p")
 	if m.stats.odds != 1 {
 		t.Fatalf("odds = %d", m.stats.odds)
 	}
@@ -254,20 +254,16 @@ func TestPStepsThroughTheOdds(t *testing.T) {
 	if !strings.Contains(view, "P(≥1 in opening 7)") || !strings.Contains(view, "%") {
 		t.Errorf("no odds on show:\n%s", view)
 	}
-	m = drive(m, "alt+p", "alt+p", "alt+p", "alt+p")
+	m = drive(m, "ctrl+p", "ctrl+p", "ctrl+p", "ctrl+p")
 	if m.stats.odds != 0 {
 		t.Errorf("five presses left odds at %d, want back to counts", m.stats.odds)
-	}
-	m = drive(m, "alt+P")
-	if m.stats.odds != 4 {
-		t.Errorf("P from counts: %d, want 4", m.stats.odds)
 	}
 }
 
 func TestTheOddsAreForTheWholeList(t *testing.T) {
 	// Twelve Forests in eighteen cards, seven drawn: all but certain.
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
-	m = drive(m, "s", "enter", "alt+p")
+	m = drive(m, "s", "enter", "ctrl+p")
 	for _, line := range m.renderStats(60) {
 		plain := stripANSI(line)
 		if strings.Contains(plain, "Land ") && !strings.Contains(plain, "100%") {
@@ -307,7 +303,7 @@ func TestShiftSCountsTheEditingDeck(t *testing.T) {
 	if len(counted) != len(target.all) {
 		t.Errorf("counted %d, want the editing deck's %d", len(counted), len(target.all))
 	}
-	m = drive(m, "enter", "ctrl+j", "alt+a")
+	m = drive(m, "enter", "ctrl+j", "ctrl+a")
 	if len(target.statFilter) == 0 || len(search.statFilter) != 0 {
 		t.Error("the filter should land on the editing deck alone")
 	}
@@ -317,10 +313,10 @@ func TestShiftBClearsEveryList(t *testing.T) {
 	m := sized(200, 30)
 	m = withCards(m, "f", sample(), sortArrival)
 	search := m.ws.panels[0].cardsView()
-	m = drive(m, "s", "enter", "ctrl+j", "alt+a", "s")
+	m = drive(m, "s", "enter", "ctrl+j", "ctrl+a", "s")
 	m = withCards(m, "d", deckSample(), sortArrival)
 	target := m.ws.panels[1].cardsView()
-	m = drive(m, "s", "enter", "ctrl+j", "alt+a", "s")
+	m = drive(m, "s", "enter", "ctrl+j", "ctrl+a", "s")
 	if len(search.statFilter) == 0 || len(target.statFilter) == 0 {
 		t.Fatal("not both narrowed")
 	}
@@ -709,7 +705,7 @@ func TestTheBarsAreCountedOnceUntilSomethingTheyCountChanges(t *testing.T) {
 
 	// Filtering by one changes what they count: counted again.
 	m = pointStat(t, m, "Type", "Creature")
-	m = drive(m, "alt+a")
+	m = drive(m, "ctrl+a")
 	m.View()
 	if &m.stats.memo.groups[0] == &counted[0] {
 		t.Fatal("filtering didn't count the bars again")
@@ -720,7 +716,7 @@ func TestTheBarsAreCountedOnceUntilSomethingTheyCountChanges(t *testing.T) {
 
 	// So does an edit to the list.
 	before := m.stats.memo.groups
-	m = drive(m, "alt+X")
+	m = drive(m, "ctrl+b")
 	l.all = l.all[:len(l.all)-1]
 	l.refresh()
 	m.View()
@@ -745,7 +741,7 @@ func TestEnterOpensATypeIntoItsSubtypesToFilterBy(t *testing.T) {
 
 	// Elf is a filter like any other.
 	m = pointStat(t, m, "Type", "Elf")
-	m = drive(m, "alt+a")
+	m = drive(m, "ctrl+a")
 	if l.count() != 2 {
 		t.Errorf("filtering by Elf left %d cards, want the two elves", l.count())
 	}
@@ -796,9 +792,9 @@ func TestWithTheStatisticsUpTheListKeepsItsKeys(t *testing.T) {
 		t.Error("a filtered by the bars")
 	}
 
-	m = drive(m, "alt+a")
+	m = drive(m, "ctrl+a")
 	if len(l.statFilter) != 1 {
-		t.Error("alt+a didn't filter by the bars")
+		t.Error("ctrl+a didn't filter by the bars")
 	}
 	if !m.stats.open {
 		t.Error("the statistics closed")
@@ -843,10 +839,10 @@ func TestTheGroupsOpenFromTheirHeadings(t *testing.T) {
 	if r, _ := m.statUnder(); !r.Heading || r.Label != "Tags" {
 		t.Fatalf("opened on %+v, want the Tags heading", r)
 	}
-	// alt+a on a heading filters nothing.
-	m = drive(m, "alt+a")
+	// ctrl+a on a heading filters nothing.
+	m = drive(m, "ctrl+a")
 	if l := m.ws.current().cardsView(); len(l.statFilter) != 0 {
-		t.Error("alt+a on a heading filtered")
+		t.Error("ctrl+a on a heading filtered")
 	}
 	if fmt.Sprint(m.statsHints()) == "" || !strings.Contains(fmt.Sprint(m.statsHints()), "open the group") {
 		t.Error("enter isn't offered on a folded heading")
@@ -861,7 +857,7 @@ func TestTheGroupsOpenFromTheirHeadings(t *testing.T) {
 	if r, _ := m.statUnder(); r.Heading || r.Group != "Tags" {
 		t.Fatalf("ctrl+j went to %+v, want the first tag", r)
 	}
-	m = drive(m, "alt+a", "ctrl+k", "enter")
+	m = drive(m, "ctrl+a", "ctrl+k", "enter")
 	body = stripANSI(strings.Join(m.renderStats(60), "\n"))
 	if strings.Contains(body, "█") || !strings.Contains(body, "▸ Tags · 1 in filter") {
 		t.Errorf("Tags didn't fold, or doesn't say what's in the filter:\n%s", body)

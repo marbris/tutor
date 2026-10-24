@@ -99,7 +99,7 @@ func TestNInTheStatisticsNegates(t *testing.T) {
 		}
 		m = drive(m, "ctrl+j")
 	}
-	m = drive(m, "alt+n")
+	m = drive(m, "ctrl+n")
 	l := m.ws.current().cardsView()
 	for _, c := range l.rows {
 		if mtg.IsLand(c.Card) {

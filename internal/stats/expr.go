@@ -89,7 +89,7 @@ func (e Expr) Add(op Op, r Row) (Expr, bool) {
 	return append(append(Expr(nil), e...), Clause{Op: op, Row: r}), true
 }
 
-// Toggle is alt+a, alt+o and alt+n: a category not in the narrowing is
+// Toggle is ctrl+a, ctrl+o and ctrl+n: a category not in the narrowing is
 // added with op; one already in with op is taken out; one in with another op
 // takes this one, keeping its place. So pressing the same key twice always
 // undoes it. The first category's And and Or are the same thing, so there

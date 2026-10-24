@@ -524,7 +524,7 @@ func (m Model) statsHints() [][2]string {
 	}
 	keys = append(keys,
 		hint("clear stats-filter", keymap.Stats, keymap.StatsClear),
-		hint("odds", keymap.Stats, keymap.StatsOddsNext, keymap.StatsOddsPrev),
+		hint("odds", keymap.Stats, keymap.StatsOddsNext),
 		hint("close", keymap.Stats, keymap.StatsClose),
 	)
 	if m.onTags() {

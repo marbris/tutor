@@ -134,7 +134,6 @@ const (
 	StatsDrop       Action = "drop"
 	StatsClear      Action = "clear"
 	StatsOddsNext   Action = "odds.next"
-	StatsOddsPrev   Action = "odds.prev"
 	StatsClose      Action = "close"
 	SettingsChange  Action = "change"
 	SettingsClear   Action = "clear"
@@ -285,20 +284,21 @@ var defaults = []binding{
 	// The statistics are a column beside the information panel. They walk
 	// on ctrl, so J and K still scroll the card beside them, and leave the
 	// list its own: j, k, a, x, p and esc still act on the cards. The filter
-	// keys are the old letters with alt.
+	// keys are the old letters with ctrl (alt until 11.0.0).
 	{Stats, StatsDown, k("ctrl+j", "ctrl+down")},
 	{Stats, StatsUp, k("ctrl+k", "ctrl+up")},
-	{Stats, StatsAnd, k("alt+a")},
-	{Stats, StatsOr, k("alt+o")},
-	{Stats, StatsNot, k("alt+n")},
-	{Stats, StatsDrop, k("alt+x")},
-	{Stats, StatsClear, k("alt+X")},
-	{Stats, StatsOddsNext, k("alt+p")},
-	{Stats, StatsOddsPrev, k("alt+P")},
+	{Stats, StatsAnd, k("ctrl+a")},
+	{Stats, StatsOr, k("ctrl+o")},
+	{Stats, StatsNot, k("ctrl+n")},
+	{Stats, StatsDrop, k("ctrl+x")},
+	// ctrl+b is b, only for the statistics' own filter. A terminal sends
+	// ctrl+X as ctrl+x, so the shifted keys alt had can't move to ctrl.
+	{Stats, StatsClear, k("ctrl+b")},
+	{Stats, StatsOddsNext, k("ctrl+p")},
 	{Stats, StatsClose, k("s")},
 	{Stats, StatsTagOrder, k("tab")},
 	{Stats, StatsExpand, k("enter")},
-	{Stats, StatsOtag, k("alt+t")},
+	{Stats, StatsOtag, k("ctrl+t")},
 
 	// While F has a tag of the card highlighted, the keys are the picker's:
 	// the moving keys walk the tags and the filter letters filter, bare,
@@ -370,7 +370,8 @@ var retired = map[Scope]map[string]bool{
 	Decks: {"open-beside": true}, // enter opens beside since 9.0.0
 	// esc is the list's since 9.0.0; s closes. The groups stopped turning
 	// in 11.0.0: they fold instead.
-	Stats: {"back": true, "group.next": true, "group.prev": true},
+	// odds.prev went with ctrl+p: ctrl+p steps on round to the counts.
+	Stats: {"back": true, "group.next": true, "group.prev": true, "odds.prev": true},
 }
 
 // The keymap in force: each scope's actions and their keys, and the same

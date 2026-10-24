@@ -361,7 +361,7 @@ func TestTheEscCascadeInAList(t *testing.T) {
 	m = drive(m, "/", "e", "l", "f", "enter")
 	// And a statistics filter on top: Creature, the second type down —
 	// the first is Land, the commonest, which would leave no elves.
-	m = drive(m, "s", "enter", "ctrl+j", "ctrl+j", "alt+a", "s")
+	m = drive(m, "s", "enter", "ctrl+j", "ctrl+j", "ctrl+a", "s")
 	m = drive(m, "v") // pick one out
 
 	m = drive(m, "esc") // the selection is transient, so it goes first

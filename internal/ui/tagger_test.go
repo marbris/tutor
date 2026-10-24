@@ -119,7 +119,7 @@ func TestEnterOpensATaggerTagInTheStatistics(t *testing.T) {
 	if !strings.Contains(body, "▾ removal") || !strings.Contains(body, "    removal-artifact") {
 		t.Errorf("removal didn't open:\n%s", body)
 	}
-	m = drive(m, "ctrl+j", "alt+a")
+	m = drive(m, "ctrl+j", "ctrl+a")
 	l := m.ws.current().cardsView()
 	if len(l.rows) != 2 {
 		t.Errorf("filtering by removal-artifact left %d cards, want 2", len(l.rows))
@@ -192,9 +192,9 @@ func TestAltTShowsATaggerTagWithTheTagsAndKeepsIt(t *testing.T) {
 		t.Fatalf("on %s/%s, want the Tagger group's removal", r.Group, r.Label)
 	}
 	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "show with the tags") {
-		t.Error("alt+t isn't offered on removal")
+		t.Error("ctrl+t isn't offered on removal")
 	}
-	m = drive(m, "alt+t")
+	m = drive(m, "ctrl+t")
 	r, ok := findRow(m.statGroups(), "Tags", "removal")
 	if !ok || r.Count != 2 || r.Path != "otag:removal" {
 		t.Fatalf("removal isn't among the tags counting 2: %+v", r)
@@ -207,9 +207,9 @@ func TestAltTShowsATaggerTagWithTheTagsAndKeepsIt(t *testing.T) {
 	m = unfold(m)
 	m.pointAt(r)
 	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "take out of the tags") {
-		t.Error("alt+t isn't offered on the otag row")
+		t.Error("ctrl+t isn't offered on the otag row")
 	}
-	m = drive(m, "alt+t")
+	m = drive(m, "ctrl+t")
 	if _, ok := findRow(m.statGroups(), "Tags", "removal"); ok {
 		t.Error("removal is still among the tags")
 	}
@@ -224,7 +224,7 @@ func TestAltNOnATaggerRowCanBeTakenBackThoughItCountsNothing(t *testing.T) {
 	l := m.ws.current().cardsView()
 	m = drive(m, "s")
 	m = pointStat(t, m, stats.TaggerGroup, "ramp")
-	m = drive(m, "alt+n")
+	m = drive(m, "ctrl+n")
 	if l.count() != 3 {
 		t.Fatalf("not ramp left %d cards, want 3", l.count())
 	}
@@ -235,8 +235,8 @@ func TestAltNOnATaggerRowCanBeTakenBackThoughItCountsNothing(t *testing.T) {
 	if u, _ := m.statUnder(); u.Label != "ramp" {
 		t.Errorf("the highlight moved to %s", u.Label)
 	}
-	m = drive(m, "alt+n")
+	m = drive(m, "ctrl+n")
 	if len(l.statFilter) != 0 || l.count() != 4 {
-		t.Errorf("alt+n again left the filter %v and %d cards", l.statFilter, l.count())
+		t.Errorf("ctrl+n again left the filter %v and %d cards", l.statFilter, l.count())
 	}
 }

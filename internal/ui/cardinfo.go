@@ -401,7 +401,7 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 
 	// The card's own tags, then in another list's colour the ones the global
 	// tags give it — they count the same, but they aren't in this list's file —
-	// then in Tagger's the otags shown with the tags (alt+t) it has.
+	// then in Tagger's the otags shown with the tags (ctrl+t) it has.
 	// Wrapped like Tagger's below: a well-tagged card has more than a line's worth.
 	otags := cardOtags(c)
 	if global := c.Borrowed; len(c.Tags) > 0 || len(global) > 0 || len(otags) > 0 {

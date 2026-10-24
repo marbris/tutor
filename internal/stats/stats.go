@@ -341,7 +341,7 @@ func priceRows() []Row {
 // one set of opened rows.
 const tagPathPrefix = "tag:"
 
-// The otags chosen with alt+t sit among the tags too, in Tagger's colour:
+// The otags chosen with ctrl+t sit among the tags too, in Tagger's colour:
 // a row a Scryfall Tagger tag, counting the cards under it as the Tagger
 // group does. They aren't tags on the cards, so tag: in / doesn't find them
 // — otag: does already. Their paths start otag:, apart from your tags'.
@@ -551,7 +551,7 @@ type Options struct {
 	TagsByName bool
 	// Open is the tree rows opened to show their children, by path.
 	Open map[string]bool
-	// Otags is the Scryfall Tagger tags shown among the tags (alt+t).
+	// Otags is the Scryfall Tagger tags shown among the tags (ctrl+t).
 	Otags []string
 	// Keep is the Scryfall Tagger paths in the filter, shown even when they
 	// count nothing, so the filter can still be taken off them.

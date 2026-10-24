@@ -57,7 +57,7 @@ type tagIndex struct {
 	// read, by slug. Pinned lists run to thousands of lines and rebuild runs
 	// after every edit, so a file is read again only once it has changed.
 	read map[string]readList
-	// otags is the Scryfall Tagger tags alt+t has put among the tags in the
+	// otags is the Scryfall Tagger tags ctrl+t has put among the tags in the
 	// statistics, by label. They aren't lent to the cards: they're rows of
 	// the Tags group, counting what Tagger says, in Tagger's colour.
 	otags []string

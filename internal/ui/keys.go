@@ -177,7 +177,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// While the statistics are up they have first claim on their own keys:
-	// ctrl+j and ctrl+k walk the bars, alt and a letter filters. Those
+	// ctrl+j and ctrl+k walk the bars, ctrl and a letter filters. Those
 	// cover nothing the list needs, so j, k, a, x and esc go on to the list behind them and then the workspace, as they
 	// would without them, and J and K still scroll the card beside them.
 	// Moved onto something that isn't a list of cards, there's nothing to

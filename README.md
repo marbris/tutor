@@ -218,19 +218,19 @@ its rows are in the filter), and Tutor remembers which are open. Build a filter 
 | `S` | open the statistics of the editing list |
 | `ctrl+j` `ctrl+k` | walk through the rows |
 | `enter` | on a group's heading: open or fold the group |
-| `alt+a` | add AND *row* to the filter |
-| `alt+o` | add OR *row* to the filter |
-| `alt+n` | add AND NOT *row* to the filter |
-| `alt+x` | take *row* out of the filter |
-| `alt+X` | clear the filter |
-| | on a row already in the filter, `alt+a` `alt+o` `alt+n` switch it to that join; the same key twice takes it out |
-| `alt+p` | show the odds of drawing each row in your opening hand |
+| `ctrl+a` | add AND *row* to the filter |
+| `ctrl+o` | add OR *row* to the filter |
+| `ctrl+n` | add AND NOT *row* to the filter |
+| `ctrl+x` | take *row* out of the filter |
+| `ctrl+b` | clear the filter |
+| | on a row already in the filter, `ctrl+a` `ctrl+o` `ctrl+n` switch it to that join; the same key twice takes it out |
+| `ctrl+p` | show the odds of drawing each row in your opening hand |
 
 The list keeps its own keys while the panel is open, and `J` `K` still scroll the card beside it: `j` `k` move through the cards, `a` `x` add
 and remove, `esc` clears the filters a step at a time, `h` `l` move between lists and `e` `E`
 change the editing list. Only `s` closes the statistics.
 
-For example, `s`, then `alt+a` on *creature*, `alt+o` on *artifact* and `alt+n` on *ramp* filters
+For example, `s`, then `ctrl+a` on *creature*, `ctrl+o` on *artifact* and `ctrl+n` on *ramp* filters
 the list to `(creature OR artifact) AND NOT ramp`.
 
 ![The statistics panel, filtered to a combination of categories](screenshots/stats-filter.png)
@@ -350,7 +350,7 @@ From the statistics:
 1. In your list, press `s` to open the statistics.
 2. `ctrl+k` to the Scryfall Tagger group (it's the last group, one step up from the top), then
    `J` to the tag you want.
-3. `alt+a` to filter the list by it, and `s` to close the statistics.
+3. `ctrl+a` to filter the list by it, and `s` to close the statistics.
 4. `V` to select every card left, and `t` to tag them.
 5. Type a name for the tag and press `enter`.
 

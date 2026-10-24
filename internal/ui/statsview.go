@@ -21,7 +21,7 @@ import (
 // s opens them and s closes them. While they are up ctrl+j/ctrl+k walk the
 // categories, J/K still scroll the card beside them, and the list keeps its
 // own keys: j, k, a, x, esc. A category narrows the list only when
-// you add it — alt+a to add it with AND, alt+o with OR — so reading the bars and filtering by them are separate acts, and
+// you add it — ctrl+a to add it with AND, ctrl+o with OR — so reading the bars and filtering by them are separate acts, and
 // several categories can narrow at once. h and l still move between lists,
 // and the bars follow.
 //
@@ -351,7 +351,7 @@ func (m *Model) toggleBranch() bool {
 	return true
 }
 
-// otagUnder is the Scryfall Tagger tag alt+t would put among the tags, or
+// otagUnder is the Scryfall Tagger tag ctrl+t would put among the tags, or
 // take out: the highlighted Tagger row's, or an otag row's in the Tags group.
 func (m Model) otagUnder() (string, bool) {
 	r, ok := m.statUnder()
@@ -364,7 +364,7 @@ func (m Model) otagUnder() (string, bool) {
 	return stats.OtagLabel(r)
 }
 
-// toggleGlobalOtag is alt+t: the highlighted Tagger tag shown with the
+// toggleGlobalOtag is ctrl+t: the highlighted Tagger tag shown with the
 // tags, kept across sessions, or no longer. Taken out, it leaves any filter
 // it was in too, since its row is gone from under it.
 func (m *Model) toggleGlobalOtag() bool {
@@ -516,8 +516,6 @@ func (m *Model) statsKey(key string) bool {
 		clearStatFilter(m.statList())
 	case keymap.StatsOddsNext:
 		m.stepOdds(1)
-	case keymap.StatsOddsPrev:
-		m.stepOdds(-1)
 	case keymap.StatsClose:
 		m.closeStats()
 	case keymap.StatsExpand:
@@ -707,7 +705,7 @@ func (m Model) renderStats(width int) []string {
 	}
 	// The short reminder, for when ? isn't drawing the whole keymap below.
 	if !m.hintsExpanded {
-		out = append(out, dim.Render(fit("enter opens · a/o/n and/or/not · x remove · p odds · s back", width)))
+		out = append(out, dim.Render(fit("enter opens · ctrl+ a/o/n and/or/not · x remove · p odds · s close", width)))
 	}
 	if memo == nil || !memo.ok {
 		d := statsMemo{drawn: out, bars: bars, barLine: barLine}
