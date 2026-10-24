@@ -28,7 +28,7 @@ func TestTheShareSwitchIsInTheSettingsWithItsKey(t *testing.T) {
 	t.Cleanup(func() { setSharingEditing(false) })
 	m := withCards(sized(160, 40), "d", deckSample(), sortArrival)
 	m, v := settingsPanel(t, m)
-	pointRow(t, v, "one editing deck")
+	pointRow(t, v, "link windows")
 	// With ? off, the info panel says the key; with it on, the hints do.
 	if view := stripANSI(m.View()); !strings.Contains(view, "enter turns it on or off") {
 		t.Errorf("the share row doesn't say its key:\n%s", view)

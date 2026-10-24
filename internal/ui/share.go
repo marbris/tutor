@@ -15,7 +15,7 @@ import (
 
 // Sharing the editing deck between ttrs.
 //
-// With the switch on (the settings panel's decks row), every ttr edits the
+// With link windows on (a switch in the settings panel), every ttr edits the
 // same deck: e or E in one, or opening a deck that becomes the editing one,
 // writes its slug to editing.json in the state directory, and the others
 // take it up on their next look at the files (outside.go), opening it in a
