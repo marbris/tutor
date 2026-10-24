@@ -63,9 +63,10 @@ type Model struct {
 	// storeLoading is the cards on disk on their way in at the start, which
 	// a search from the session or the command line waits for.
 	storeLoading bool
-	// blurred is the terminal window in the background (it reports focus),
-	// and then no panel is drawn as having the keys: with two ttrs side by
-	// side, the one you're typing in is the one that looks it.
+	// blurred is the terminal window in the background (it reports focus).
+	// With the editing deck shared, no panel is then drawn as having the
+	// keys (inactive, share.go): the ttr you're typing in is the one that
+	// looks it.
 	blurred bool
 	// files is the version of each open deck's file this ttr knows, for
 	// telling another ttr's changes from its own (outside.go).

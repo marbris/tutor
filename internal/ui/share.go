@@ -171,3 +171,9 @@ func (m Model) handleSharedChoice(msg sharedChoiceMsg) (tea.Model, tea.Cmd) {
 	m.notice = "editing " + s.Slug + ", as in another ttr"
 	return m, openLocalDeck(p.id, true, s.Slug)
 }
+
+// inactive reports whether this ttr should look as if it hasn't the keys:
+// its terminal window is in the background, and the ttrs share an editing
+// deck, so the one you're typing in has to stand out. Unshared, each ttr is
+// on its own, and keeps showing its focused panel and cursor.
+func (m Model) inactive() bool { return m.blurred && sharingEditing() }

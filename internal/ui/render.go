@@ -49,7 +49,7 @@ func (m Model) viewPanel(p *panel, index, width, height, headHeight int) string 
 	// While F's picker is up the keys are its, in the card column: the
 	// panel loses the focus border and neither panel offers its keys.
 	picking := m.picking() != nil
-	focused := index == m.ws.focused && !picking && !m.blurred
+	focused := index == m.ws.focused && !picking && !m.inactive()
 	editing := m.ws.showsEditing(index)
 
 	// The border says which panel has the keys, and which one a/x/t are
@@ -137,7 +137,7 @@ func (m Model) viewPanelBody(p *panel, width, height int) []string {
 	}
 
 	if v := p.top(); v != nil {
-		focused := m.ws.panels[m.ws.focused] == p && !m.blurred
+		focused := m.ws.panels[m.ws.focused] == p && !m.inactive()
 		return v.lines(width, height, focused, &m)
 	}
 
@@ -294,7 +294,7 @@ func (m Model) viewInfo(width, height int) string {
 	border := theme.Border
 	// F's picker has the keys, so the card column wears the focus, the way
 	// the panel with the keys always does.
-	if m.picking() != nil && !m.blurred {
+	if m.picking() != nil && !m.inactive() {
 		border = theme.BorderFocus
 	}
 	return viewColumn(m.infoHeading(), m.infoContent(inner), m.info.offset, hints, inner, room, height, border)

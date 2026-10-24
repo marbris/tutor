@@ -18,9 +18,11 @@ func ansiOf(c lipgloss.Color) (fg, bg string) {
 	return f[:strings.Index(f, "x")], b[:strings.Index(b, "x")]
 }
 
-// A ttr whose window is in the background draws no panel as having the
-// keys: no focus border, no cursor row. Focus back, and it looks as before.
+// With the editing deck shared, a ttr whose window is in the background
+// draws no panel as having the keys: no focus border, no cursor row. Focus
+// back, and it looks as before.
 func TestABlurredTtrDrawsNoFocusAndAFocusedOneDoes(t *testing.T) {
+	shareOn(t)
 	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(prev)
@@ -50,5 +52,21 @@ func TestABlurredTtrDrawsNoFocusAndAFocusedOneDoes(t *testing.T) {
 	m = drive(next.(Model), "j")
 	if m.blurred {
 		t.Error("a key press left the window blurred")
+	}
+}
+
+// Unshared, each ttr is on its own: in the background it still shows its
+// focused panel and cursor.
+func TestUnsharedABlurredTtrKeepsItsFocus(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := withCards(sized(160, 30), "d", deckSample(), sortArrival)
+	panel := func(m Model) string { return m.viewPanel(m.ws.current(), m.ws.focused, 50, 20, 3) }
+	before := panel(m)
+	next, _ := m.Update(tea.BlurMsg{})
+	if panel(next.(Model)) != before {
+		t.Error("with sharing off, the background window lost its focused look")
 	}
 }

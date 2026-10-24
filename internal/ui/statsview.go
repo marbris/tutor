@@ -655,7 +655,7 @@ func (m Model) renderStats(width int) []string {
 	barWidth := maxInt(width-labelWidth-countWidth-4, 1)
 
 	cursor := m.statCursor(groups)
-	if m.blurred {
+	if m.inactive() {
 		cursor = -1 // nothing highlighted in a window in the background
 	}
 	memo := m.stats.memo

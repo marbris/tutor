@@ -278,7 +278,8 @@ func (v *settingsView) info(width int) []string {
 	case srowShare:
 		body = []string{
 			"With this on, every ttr you have open edits the same deck: choose it with e or E in any of them and the others follow. " +
-				"Each keeps its own panels, cursor and statistics. A deck the others don't have open is opened in a panel of its own.",
+				"Each keeps its own panels, cursor and statistics. A deck the others don't have open is opened in a panel of its own. " +
+				"Only the ttr whose window you're in shows its focused panel and cursor.",
 			"Off, each ttr has its own editing deck. Either way, an edit one ttr makes to a deck another has open shows there within a second.",
 			"enter turns it on or off",
 		}
