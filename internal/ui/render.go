@@ -17,7 +17,7 @@ import (
 // viewWorkspace lays the whole frame out.
 func (m Model) viewWorkspace() string {
 	ws := m.ws // a copy: layout records the scroll position, and View is a
-	l := ws.layoutWithTop(m.topHeight())
+	l := ws.layoutWithTop(m.topHeight(), m.stats.open)
 
 	// Every visible panel's header is as tall as the tallest, so the rules
 	// under them — and the first rows of cards — line up across the row.
@@ -30,6 +30,9 @@ func (m Model) viewWorkspace() string {
 	for i, width := range l.panels {
 		at := l.first + i
 		columns = append(columns, m.viewPanel(ws.panels[at], at, width, l.height, headHeight))
+	}
+	if l.stats > 0 {
+		columns = append(columns, m.viewStats(l.stats, l.height))
 	}
 	if l.info > 0 {
 		columns = append(columns, m.viewInfo(l.info, l.height))
@@ -278,26 +281,27 @@ func sameMembers(a, b map[string]membership) bool {
 // viewInfo draws the information panel.
 func (m Model) viewInfo(width, height int) string {
 	inner, hints, room := m.infoFrame(width, height)
+	return viewColumn(m.infoTitle(), m.infoContent(inner), m.info.offset, hints, inner, room, height)
+}
+
+// viewStats draws the statistics column, left of the information panel.
+func (m Model) viewStats(width, height int) string {
+	inner, hints, room := m.statsFrame(width, height)
+	body := m.renderStats(inner)
+	// Kept by followStats as the highlight moves; checked again here, so a
+	// frame drawn before that — a resize, cards arriving — still shows the
+	// highlighted category.
+	offset := m.statScroll(m.stats.offset, room, len(body))
+	return viewColumn(m.statTitle(), body, offset, hints, inner, room, height)
+}
+
+// viewColumn is one of the read-only columns on the right: a title, a rule,
+// the body scrolled to offset in the room the keys leave it, and the keys.
+func viewColumn(title string, body []string, offset int, hints []string, inner, room, height int) string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
-
-	title := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).
-		Render(fit(m.infoTitle(), inner))
-
 	lines := []string{
-		title,
+		lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render(fit(title, inner)),
 		lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)),
-	}
-
-	height -= len(hints) // the body scrolls in what the keys leave it
-
-	body := m.infoContent(inner)
-	offset := m.info.offset
-	if m.info.mode == infoStats {
-		// Kept by followStats as the highlight moves; checked again here,
-		// so a frame drawn before that — a resize, cards arriving — still
-		// shows the highlighted category. J past the bottom used to move a
-		// cursor you could no longer see.
-		offset = m.statScroll(offset, room, len(body))
 	}
 	// Scrolled with K and J from wherever you are — the panel is read, never
 	// focused.
@@ -310,18 +314,17 @@ func (m Model) viewInfo(width, height int) string {
 		body = nil
 	}
 	lines = append(lines, body...)
-
 	if len(body) == 0 {
 		lines = append(lines, dim.Render(fit("nothing highlighted", inner)))
 	}
-	for len(lines) < height-2 {
+	top := height - len(hints) - 2
+	for len(lines) < top {
 		lines = append(lines, strings.Repeat(" ", inner))
 	}
-	if len(lines) > height-2 {
-		lines = lines[:maxInt(height-2, 1)]
+	if len(lines) > top {
+		lines = lines[:maxInt(top, 1)]
 	}
 	lines = append(lines, hints...)
-	height += len(hints)
 
 	block := lipgloss.NewStyle().Width(inner).Height(maxInt(height-2, 1)).
 		MaxWidth(inner).Render(strings.Join(lines, "\n"))
@@ -337,8 +340,6 @@ func (m Model) viewInfo(width, height int) string {
 // "card" while showing a git diff is a small lie told constantly.
 func (m Model) infoTitle() string {
 	switch m.info.shows(m.ws.current()) {
-	case infoStats:
-		return m.statTitle()
 	case infoVersions:
 		return "printed text"
 	case infoImage:
@@ -365,8 +366,6 @@ func (m Model) infoTitle() string {
 // from the same place, so they can't disagree about where the bottom is.
 func (m Model) infoContent(inner int) []string {
 	switch m.info.shows(m.ws.current()) {
-	case infoStats:
-		return m.renderStats(inner)
 	case infoVersions:
 		return m.infoVersions(inner)
 	case infoImage:
@@ -381,10 +380,19 @@ func (m Model) infoContent(inner int) []string {
 // body it shows between them and its title. One function for drawing and
 // for scrolling, so the two agree on where the bottom is.
 func (m Model) infoFrame(width, height int) (inner int, hints []string, room int) {
+	return columnFrame(m.infoHintGroups(), m.hintsExpanded, width, height)
+}
+
+// statsFrame is the same for the statistics column.
+func (m Model) statsFrame(width, height int) (inner int, hints []string, room int) {
+	return columnFrame(m.statsHintGroups(), m.hintsExpanded, width, height)
+}
+
+func columnFrame(groups []hintGroup, expanded bool, width, height int) (inner int, hints []string, room int) {
 	inner = maxInt(width-2, 1)
 	const title = 2 // the title and the rule under it
-	if m.hintsExpanded {
-		hints = hintFooter([][]hintGroup{m.infoHintGroups()}, inner, height-2-title)
+	if expanded {
+		hints = hintFooter([][]hintGroup{groups}, inner, height-2-title)
 	}
 	return inner, hints, maxInt(height-len(hints)-2-title, 1)
 }
@@ -394,12 +402,27 @@ func (m Model) infoFrame(width, height int) (inner int, hints []string, room int
 // scroll. False when the terminal is too narrow to have one.
 func (m Model) infoSpan() (inner, room, most int, ok bool) {
 	ws := m.ws // a copy: layout records the scroll position
-	l := ws.layoutWithTop(m.topHeight())
+	l := ws.layoutWithTop(m.topHeight(), m.stats.open)
 	if l.info == 0 {
 		return 0, 0, 0, false
 	}
 	inner, _, room = m.infoFrame(l.info, l.height)
 	return inner, room, maxInt(len(m.infoContent(inner))-room, 0), true
+}
+
+// statsSpan is the statistics column's: the width its bars are drawn at and
+// how many lines it shows. False when they aren't up.
+func (m Model) statsSpan() (inner, room int, ok bool) {
+	if !m.stats.open {
+		return 0, 0, false
+	}
+	ws := m.ws
+	l := ws.layoutWithTop(m.topHeight(), true)
+	if l.stats == 0 {
+		return 0, 0, false
+	}
+	inner, _, room = m.statsFrame(l.stats, l.height)
+	return inner, room, true
 }
 
 // scrollInfoHalf moves the information panel half its height, K up and J

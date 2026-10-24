@@ -7,17 +7,15 @@ package ui
 // you have to go and come back from. The cost is two keys in the shift
 // space; the saving is a whole mode.
 //
-// In statistics J and K walk the categories instead, and ctrl+j and ctrl+k
-// turn the groups over.
+// The statistics are not one of its modes: they open as a column of their
+// own beside it (statsState.open), so the card stays in view while you read
+// the bars.
 
 type infoMode int
 
 const (
 	// infoCard follows the cursor: whatever is highlighted, described.
 	infoCard infoMode = iota
-	// infoStats is the histograms, which double as a filter for the list
-	// they were counted from.
-	infoStats
 	// infoVersions is gv: a deck's git history, or a card's printed text
 	// through the years.
 	infoVersions
@@ -27,8 +25,6 @@ const (
 
 func (i infoMode) String() string {
 	switch i {
-	case infoStats:
-		return "statistics"
 	case infoVersions:
 		return "versions"
 	case infoImage:
@@ -45,9 +41,8 @@ type infoPanel struct {
 	// history is about one card, so it lasts exactly as long as the cursor
 	// stays on that card; see leaveVersions.
 	oracle string
-	// prev is what the statistics or a printed history were opened over,
-	// so closing them goes back there: the printing view if that is where
-	// you were.
+	// prev is what a printed history was opened over, so closing it goes
+	// back there: the printing view if that is where you were.
 	prev infoMode
 }
 
@@ -85,7 +80,7 @@ func (p *infoPanel) open(mode infoMode) {
 	case mode:
 	case infoImage:
 		p.prev = infoImage
-	case infoStats, infoVersions:
+	case infoVersions:
 		// Over a view that is itself over something: what's under that
 		// is still what to go back to.
 	default:

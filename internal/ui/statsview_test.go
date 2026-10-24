@@ -94,7 +94,7 @@ func TestSGoesBackToTheList(t *testing.T) {
 	}
 
 	m = drive(m, "s")
-	if m.info.mode == infoStats {
+	if m.stats.open {
 		t.Fatal("s did not close the statistics")
 	}
 	if l.count() != narrowed {
@@ -211,7 +211,7 @@ func TestBInTheStatisticsClearsBothFilters(t *testing.T) {
 	if l.filter != "" || len(l.statFilter) != 0 {
 		t.Errorf("b left the filter %q and the categories %q", l.filter, l.statFilter.String())
 	}
-	if m.info.mode != infoStats {
+	if !m.stats.open {
 		t.Error("b closed the statistics")
 	}
 }
@@ -227,15 +227,15 @@ func TestEscStepsBackAFilterAtATime(t *testing.T) {
 	// esc is the list's, as it is without the statistics: the text filter,
 	// then the categories. Only s closes the statistics.
 	m = drive(m, "esc")
-	if l.filter != "" || len(l.statFilter) == 0 || m.info.mode != infoStats {
+	if l.filter != "" || len(l.statFilter) == 0 || !m.stats.open {
 		t.Error("the first esc should take the text filter and stay in the statistics")
 	}
 	m = drive(m, "esc")
-	if len(l.statFilter) != 0 || m.info.mode != infoStats {
+	if len(l.statFilter) != 0 || !m.stats.open {
 		t.Error("the second esc should take the categories and stay in the statistics")
 	}
 	m = drive(m, "esc")
-	if m.info.mode != infoStats {
+	if !m.stats.open {
 		t.Error("esc left the statistics")
 	}
 	if m.ws.count() != 1 {
@@ -286,7 +286,7 @@ func TestStatisticsFollowTheFocusedList(t *testing.T) {
 		t.Fatalf("counting %d", len(counted))
 	}
 	m = drive(m, "h")
-	if m.info.mode != infoStats {
+	if !m.stats.open {
 		t.Fatal("h left the statistics")
 	}
 	counted, _ = m.statCards()
@@ -675,11 +675,11 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		m = drive(m, "J")
 	}
-	bottom := m.info.offset
+	bottom := m.stats.offset
 	if bottom == 0 {
 		t.Fatal("walking down twelve categories never scrolled")
 	}
-	_, room, _, _ := m.infoSpan()
+	_, room, _ := m.statsSpan()
 	groups := m.statGroups()
 	line := statLine(groups, m.statCursor(groups))
 	// Up through the rows on screen: the view stays where it is.
@@ -690,16 +690,16 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 		if line <= bottom {
 			break // a heading or gap passed; the next k reaches the edge
 		}
-		if m.info.offset != bottom {
-			t.Fatalf("k on line %d moved the view from %d to %d (room %d)", line, bottom, m.info.offset, room)
+		if m.stats.offset != bottom {
+			t.Fatalf("k on line %d moved the view from %d to %d (room %d)", line, bottom, m.stats.offset, room)
 		}
 	}
 	// Past the top edge it follows.
 	for i := 0; i < 12; i++ {
 		m = drive(m, "K")
 	}
-	if m.info.offset >= bottom {
-		t.Errorf("going on up never scrolled back (%d)", m.info.offset)
+	if m.stats.offset >= bottom {
+		t.Errorf("going on up never scrolled back (%d)", m.stats.offset)
 	}
 }
 
@@ -810,7 +810,35 @@ func TestWithTheStatisticsUpTheListKeepsItsKeys(t *testing.T) {
 	if len(l.statFilter) != 1 {
 		t.Error("alt+a didn't filter by the bars")
 	}
-	if m.info.mode != infoStats {
+	if !m.stats.open {
 		t.Error("the statistics closed")
+	}
+}
+
+func TestTheStatisticsOpenBesideTheCard(t *testing.T) {
+	m := withCards(sized(150, 30), "d", deckSample(), sortArrival)
+	ws := m.ws
+	before := ws.layoutWithTop(m.topHeight(), false).panels[0]
+	m = drive(m, "s")
+	view := stripANSI(m.View())
+	for _, want := range []string{"statistics", "Mana Value", "Llanowar Elves", "Creature — Elf Druid"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("%q missing with the statistics up:\n%s", want, view)
+		}
+	}
+	// The statistics sit left of the card: on the title row, "statistics"
+	// comes before the card's title.
+	for _, line := range strings.Split(view, "\n") {
+		if s, c := strings.Index(line, "statistics"), strings.LastIndex(line, "card"); s >= 0 && c >= 0 && c < s {
+			t.Errorf("statistics drawn right of the card: %q", line)
+		}
+	}
+	ws = m.ws
+	if after := ws.layoutWithTop(m.topHeight(), true).panels[0]; after >= before {
+		t.Errorf("the panel kept its width (%d → %d) with a column more", before, after)
+	}
+	m = drive(m, "s")
+	if m.stats.open || strings.Contains(stripANSI(m.View()), "statistics") {
+		t.Error("s didn't take the statistics down")
 	}
 }

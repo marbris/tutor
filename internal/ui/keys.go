@@ -174,7 +174,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Moved onto something that isn't a list of cards, there's nothing to
 	// count, and the view there has its keys back — all but s, which still
 	// closes.
-	statsUp := m.info.mode == infoStats &&
+	statsUp := m.stats.open &&
 		(m.statList() != nil || keymap.Lookup(keymap.Stats, key) == keymap.StatsClose)
 	if statsUp && m.statsKey(key) {
 		return m, nil

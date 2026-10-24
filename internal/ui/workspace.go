@@ -381,14 +381,14 @@ func (w *workspace) editingPanel() *panel {
 
 // layout works out this frame's widths and remembers where the row was
 // scrolled to, so the next frame starts from the same place.
-func (w *workspace) layout() layout { return w.layoutWithTop(topRows) }
+func (w *workspace) layout() layout { return w.layoutWithTop(topRows, false) }
 
 // layoutWithTop is the same, told how many rows the top of the screen is
 // taking. That is two, except for a leader menu too wide for two lines on a
 // narrow terminal: then the panels give up the room rather than being pushed
-// off the bottom.
-func (w *workspace) layoutWithTop(top int) layout {
-	l := computeLayout(w.width, w.height-(top-topRows), w.count(), w.focused, w.scroll)
+// off the bottom. withStats makes room for the statistics column.
+func (w *workspace) layoutWithTop(top int, withStats bool) layout {
+	l := computeLayout(w.width, w.height-(top-topRows), w.count(), w.focused, w.scroll, withStats)
 	w.scroll = l.first
 	return l
 }

@@ -104,8 +104,7 @@ func (m Model) saveSession() {
 		s.OpenTags = append(s.OpenTags, path)
 	}
 	sort.Strings(s.OpenTags)
-	over := m.info.mode == infoStats || m.info.mode == infoVersions
-	if m.info.mode == infoImage || (over && m.info.prev == infoImage) {
+	if m.info.mode == infoImage || (m.info.mode == infoVersions && m.info.prev == infoImage) {
 		s.Info = infoImage.String()
 	}
 

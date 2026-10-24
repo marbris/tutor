@@ -36,6 +36,10 @@ import (
 // times a key — which, with a key held down, queued keys faster than they
 // were drawn, and the highlight ran on after the key came up.
 type statsState struct {
+	// open is s or S: the statistics column is up, left of the card.
+	open bool
+	// offset is how far the column is scrolled.
+	offset int
 	// group and label name the highlighted category. A name rather than an
 	// index, so the highlight survives the rows being recounted, reordered
 	// or swapped for another list's; when the name isn't there any more it
@@ -433,7 +437,7 @@ func (m *Model) stepOdds(delta int) {
 // the list, so closing leaves it in place and the panel's subtitle still
 // names it.
 func (m *Model) toggleStats(editing bool) {
-	if m.info.mode == infoStats && m.stats.editing == editing {
+	if m.stats.open && m.stats.editing == editing {
 		m.closeStats()
 		return
 	}
@@ -441,13 +445,12 @@ func (m *Model) toggleStats(editing bool) {
 		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
 		return
 	}
-	m.info.open(infoStats)
-	m.stats.editing = editing
+	m.stats.open, m.stats.editing, m.stats.offset = true, editing, 0
 }
 
-// closeStats puts the panel back to what the statistics were opened over:
-// the printing view if that is where you were, otherwise the card.
-func (m *Model) closeStats() { m.info.back() }
+// closeStats takes the statistics column down. The card beside it was
+// never touched.
+func (m *Model) closeStats() { m.stats.open = false }
 
 // statsKey is the keymap while the statistics are up. It returns false for
 // anything it leaves to the workspace — h and l among them, which still move
@@ -581,14 +584,11 @@ func (m Model) statScroll(offset, height, total int) int {
 // showed the highlight, so walking back up from the bottom dragged the view
 // along a line at a time.
 func (m *Model) followStats() {
-	if m.info.mode != infoStats {
-		return
-	}
-	inner, room, _, ok := m.infoSpan()
+	inner, room, ok := m.statsSpan()
 	if !ok {
 		return
 	}
-	m.info.offset = m.statScroll(m.info.offset, room, len(m.renderStats(inner)))
+	m.stats.offset = m.statScroll(m.stats.offset, room, len(m.renderStats(inner)))
 }
 
 // statOdds is the chance of at least n of a category in the opening hand,
@@ -838,7 +838,7 @@ func (b statBar) render() string {
 // which is the same arithmetic the render does. Exposed so a test can ask
 // without drawing.
 func (m Model) statOffset(height int) int {
-	return m.statScroll(m.info.offset, maxInt(height, 1), len(m.renderStats(30)))
+	return m.statScroll(m.stats.offset, maxInt(height, 1), len(m.renderStats(30)))
 }
 
 // statTitle heads the panel: what's being counted, and how.

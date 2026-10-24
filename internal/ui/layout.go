@@ -8,6 +8,10 @@ package ui
 // the screen wide, three panels each take a quarter, and so on. Every panel
 // opened makes every column — the information panel included — narrower.
 //
+// The statistics are a column of their own, to the left of the information
+// panel, while they're up: one share more on the right, one less for the
+// panels.
+//
 // That holds until they reach a floor, past which narrowing them further
 // would leave each one too thin to read a card name in; after that the row
 // scrolls instead, and the panels you can't see are still there.
@@ -30,6 +34,10 @@ type layout struct {
 	// info is the information panel's width, or 0 when the terminal is too
 	// narrow to afford one.
 	info int
+	// stats is the statistics column's width, or 0 when they aren't up.
+	// On a terminal with no room for both, the statistics have the one
+	// column and info is 0.
+	stats int
 	// panels are the widths of the visible panels, left to right.
 	panels []int
 	// first is the index of the leftmost visible panel.
@@ -45,12 +53,12 @@ func (l layout) visible() int { return len(l.panels) }
 func (l layout) shows(i int) bool { return i >= l.first && i < l.first+l.visible() }
 
 // computeLayout divides the terminal between the panels and the information
-// panel.
+// panel, and the statistics beside it when withStats.
 //
 // scroll is where the row was scrolled to last frame; it's honoured unless
 // it would put the focused panel off screen, because the panel you're typing
 // into has to be one you can see.
-func computeLayout(width, height, count, focused, scroll int) layout {
+func computeLayout(width, height, count, focused, scroll int, withStats bool) layout {
 	l := layout{height: maxInt(height-topRows, 1)}
 	if count == 0 {
 		return l
@@ -66,11 +74,20 @@ func computeLayout(width, height, count, focused, scroll int) layout {
 	// One column for the information panel, the rest for the panels. When
 	// there is only room for a single column the panel wins it: what you're
 	// working in beats what you're reading.
-	totalCols := count + 1
+	right := 1
+	if withStats {
+		right = 2
+	}
+	totalCols := count + right
 	if totalCols > maxCols {
 		totalCols = maxCols
 	}
-	visible := totalCols - 1
+	// No room for the statistics and the card both: the statistics, which
+	// were asked for last, have the column.
+	if withStats && totalCols-right < 1 {
+		right = 1
+	}
+	visible := totalCols - right
 	if visible < 1 {
 		visible = minInt(count, maxCols)
 		l.first = clampFirst(scroll, focused, visible, count)
@@ -83,7 +100,14 @@ func computeLayout(width, height, count, focused, scroll int) layout {
 	// width. The remainder lands on the leftmost panels; the information
 	// panel takes the last, plain share.
 	cols := share(width, totalCols)
-	l.info = cols[len(cols)-1]
+	switch {
+	case right == 2:
+		l.stats, l.info = cols[len(cols)-2], cols[len(cols)-1]
+	case withStats:
+		l.stats = cols[len(cols)-1]
+	default:
+		l.info = cols[len(cols)-1]
+	}
 	l.first = clampFirst(scroll, focused, visible, count)
 	l.panels = cols[:visible]
 	return l

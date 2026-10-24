@@ -148,6 +148,7 @@ func (m Model) hintGroups() []hintGroup {
 	if keys := m.editHints(); len(keys) > 0 {
 		groups = append(groups, hintGroup{"edit", keys})
 	}
+	groups = append(groups, m.statsHintGroups()...)
 	groups = append(groups, m.infoHintGroups()...)
 	return dropUnbound(append(groups, hintGroup{"", restingKeys()}))
 }
@@ -176,7 +177,7 @@ func statsTaken() map[string]bool {
 // narrowing, to leaving. The rest follow, and e — which chooses the deck the
 // edit keys go to — comes last, next to where those keys are.
 func (m Model) panelHintGroups(p *panel) []hintGroup {
-	statsUp := m.info.mode == infoStats && m.statList() != nil
+	statsUp := m.stats.open && m.statList() != nil
 
 	var viewNav [][2]string
 	var rest []hintGroup
@@ -294,21 +295,32 @@ func (m Model) iHint(p *panel) (string, bool) {
 	return p.kind.barLabel(), true
 }
 
+// statsHintGroups is what the statistics column shows at its bottom: its
+// keys, while it is up and has a list to count.
+func (m Model) statsHintGroups() []hintGroup {
+	p := m.ws.current()
+	if p == nil || (p.searchOpen && p.search.Focused()) || !m.stats.open || m.statList() == nil {
+		return nil
+	}
+	return dropUnbound([]hintGroup{{"statistics", m.statsHints()}})
+}
+
 // infoHintGroups is what the information panel shows at its bottom: the
-// statistics' keys while they're up, otherwise the keys that move within
-// what it shows.
+// keys that move within what it shows.
 func (m Model) infoHintGroups() []hintGroup {
 	p := m.ws.current()
 	if p == nil || (p.searchOpen && p.search.Focused()) {
 		return nil
 	}
-	if m.info.mode == infoStats && m.statList() != nil {
-		return dropUnbound([]hintGroup{{"statistics", m.statsHints()}})
-	}
 	// Untitled: the keys sit in the panel they move, so a heading naming
 	// that panel says nothing.
 	if keys := m.infoKeys(p); len(keys) > 0 {
-		return dropUnbound([]hintGroup{{"", keys}})
+		groups := []hintGroup{{"", keys}}
+		// s closes the statistics while they're up, and their column says so.
+		if m.stats.open && m.statList() != nil {
+			groups = withoutTaken(groups)
+		}
+		return dropUnbound(groups)
 	}
 	// A view that reads its own rows into the panel — a rule, a change —
 	// declares how to move through them.
@@ -422,7 +434,7 @@ func (m Model) editHints() [][2]string {
 			out = append(out, k)
 		}
 	}
-	if m.info.mode == infoStats && m.statList() != nil {
+	if m.stats.open && m.statList() != nil {
 		if g := withoutTaken([]hintGroup{{"", out}}); len(g) > 0 {
 			return g[0].keys
 		}

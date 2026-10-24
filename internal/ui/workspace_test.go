@@ -322,7 +322,7 @@ func TestSortingStillWorksWithTheStatisticsUp(t *testing.T) {
 	// re-sorted while they were up. The sort keys are clear of them now.
 	m := withCards(sized(140, 30), "f", sample(), sortArrival)
 	m = drive(m, "s")
-	if m.info.mode != infoStats {
+	if !m.stats.open {
 		t.Fatal("s did not bring the statistics up")
 	}
 	m = drive(m, ".")
