@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -137,11 +138,27 @@ func (m Model) statGroups() []stats.Group {
 	}
 	counted, source := m.statCards()
 	groups := stats.GroupsBy(source, counted, stats.Options{TagsByName: m.stats.tagsByName,
-		Open: m.stats.openTags, Otags: globalTags.otags, Keep: taggerKept(l)})
+		Open: m.stats.openTags, Otags: shownOtags(l), Keep: taggerKept(l)})
 	if memo != nil && l != nil {
 		memo.key, memo.groups, memo.ok = key, groups, true
 	}
 	return groups
+}
+
+// shownOtags is the otags the Tags group shows: the ones shown with the
+// tags, and any otag in the list's filter — one F picked off a card, say —
+// so it has a row to be taken off from.
+func shownOtags(l *cardList) []string {
+	out := globalTags.otags
+	if l == nil {
+		return out
+	}
+	for _, cl := range l.statFilter {
+		if label, ok := stats.OtagLabel(cl.Row); ok && !slices.Contains(out, label) {
+			out = append(slices.Clip(out), label)
+		}
+	}
+	return out
 }
 
 // taggerKept is the Scryfall Tagger paths in a list's filter, which the

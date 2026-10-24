@@ -466,6 +466,9 @@ func tagRows(rowSource, counted []deck.Card, byName bool, open map[string]bool, 
 	return rows
 }
 
+// NamedTagRow is the row for a tag of the cards, by its name.
+func NamedTagRow(tag string) Row { return TagRow(tagPathPrefix + tag) }
+
 // IsTagPath reports whether a path names a row of the Tags group.
 func IsTagPath(path string) bool {
 	return strings.HasPrefix(path, tagPathPrefix) || strings.HasPrefix(path, otagPathPrefix)

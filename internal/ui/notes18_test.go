@@ -32,7 +32,7 @@ func TestACardsTagsWrapInTheInfoPanel(t *testing.T) {
 	card.Tags = []string{"ramp", "mana-dork", "elf", "tribal-payoff", "one-drop", "untapper", "early-game"}
 	card.Borrowed = []string{"budget-staple"}
 
-	lines := splitLines(stripANSI(strings.Join(cardMeta(card, card.Card, 24, nil, nil), "\n")))
+	lines := splitLines(stripANSI(strings.Join(cardMeta(card, card.Card, 24, nil, nil, nil), "\n")))
 	// The tags are the first block, up to the blank line before the facts.
 	end := 1
 	for end < len(lines) && strings.TrimSpace(lines[end]) != "" {
@@ -89,7 +89,7 @@ func TestAListPanelsTitleWrapsAndTheHeadersStayLevel(t *testing.T) {
 
 func TestALongTypeLineWrapsInTheInfoPanel(t *testing.T) {
 	card := sample()[0] // Legendary Creature — Elf Archer
-	lines := splitLines(stripANSI(strings.Join(cardInfo(card, 20, rules.Data{}, nil, nil), "\n")))
+	lines := splitLines(stripANSI(strings.Join(cardInfo(card, 20, rules.Data{}, nil, nil, nil), "\n")))
 	// The type line follows the name, up to the blank line before the text.
 	end := 1
 	for end < len(lines) && strings.TrimSpace(lines[end]) != "" {

@@ -144,6 +144,11 @@ func (m Model) hintGroups() []hintGroup {
 			{"enter", "add and tag (empty: just add)"}, {"esc", "leave"}}}}
 	}
 
+	// F's picker has every key while it's up.
+	if m.picking() != nil {
+		return dropUnbound([]hintGroup{{"pick a tag", pickHints()}})
+	}
+
 	groups := m.panelHintGroups(p)
 	if keys := m.editHints(); len(keys) > 0 {
 		groups = append(groups, hintGroup{"edit", keys})
@@ -443,6 +448,15 @@ func (m Model) editHints() [][2]string {
 	return out
 }
 
+// pickHints are the keys while F has a tag of the card highlighted.
+func pickHints() [][2]string {
+	return [][2]string{
+		hint("next/prev tag", keymap.Pick, keymap.PickNext, keymap.PickPrev),
+		hint("filter and/or/not (again: off)", keymap.Pick, keymap.PickAnd, keymap.PickOr, keymap.PickNot),
+		hint("done", keymap.Pick, keymap.PickDone),
+	}
+}
+
 // cardEditHints is what the card keys do to the editing deck.
 func cardEditHints() [][2]string {
 	return [][2]string{
@@ -479,6 +493,9 @@ func (m Model) infoKeys(p *panel) [][2]string {
 	printing := "printing"
 	if m.info.mode == infoImage {
 		printing = "close printing"
+	}
+	if _, _, ok := m.pickable(); ok {
+		keys = append(keys, hint("filter by a tag of this card", keymap.Global, keymap.GlobalPick))
 	}
 	return append(keys,
 		hint("stats", keymap.Global, keymap.GlobalStats),

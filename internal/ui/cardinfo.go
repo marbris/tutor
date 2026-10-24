@@ -329,7 +329,7 @@ func renderMana(cost string) string {
 
 // cardInfo is everything worth saying about a card, in the order you want to
 // read it: what it is, what it does, and only then the bookkeeping.
-func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulingsErr error) []string {
+func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulingsErr error, pick *pickView) []string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
 	var out []string
@@ -357,19 +357,47 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		}
 	}
 
-	return append(out, cardMeta(c, c.Card, width, rulings, rulingsErr)...)
+	return append(out, cardMeta(c, c.Card, width, rulings, rulingsErr, pick)...)
 }
 
 // cardMeta is the bookkeeping under a card — its tags, which printing and
 // what it's worth, where it's legal, its rulings — for the printing p. The
 // card view passes the card's own printing; the printing view whichever
 // printing is up, since a price belongs to a printing.
-func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsErr error) []string {
+func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsErr error, pick *pickView) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	var out []string
+
+	// tagPieces is a set of tags drawn in a style, wrapped like Tagger's
+	// below. With F up, the highlighted one is drawn reversed and the ones
+	// in the list's filter carry the statistics' mark.
+	tagPieces := func(tags []string, style lipgloss.Style, row func(string) stats.Row) []string {
+		var parts []string
+		for _, tag := range tags {
+			st, mark := style, ""
+			if pick != nil {
+				r := row(tag)
+				if pick.index(r) == pick.at {
+					st = st.Reverse(true).Bold(true)
+				}
+				if m := statMark(pick.expr, r); m != " " {
+					mark = m
+				}
+			}
+			for i, piece := range hardWrap(mark+tag, width) {
+				if i == 0 && mark != "" {
+					piece = lipgloss.NewStyle().Foreground(theme.Marked).Bold(true).Render(mark) + st.Render(strings.TrimPrefix(piece, mark))
+				} else {
+					piece = st.Render(piece)
+				}
+				parts = append(parts, piece)
+			}
+		}
+		return parts
+	}
 
 	// The card's own tags, then in another list's colour the ones the global
 	// tags give it — they count the same, but they aren't in this list's file —
@@ -378,20 +406,9 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 	otags := cardOtags(c)
 	if global := c.Borrowed; len(c.Tags) > 0 || len(global) > 0 || len(otags) > 0 {
 		var parts []string
-		for _, set := range []struct {
-			tags  []string
-			style lipgloss.Style
-		}{
-			{c.Tags, lipgloss.NewStyle().Foreground(theme.Highlight)},
-			{global, lipgloss.NewStyle().Foreground(theme.MemberOther)},
-			{otags, lipgloss.NewStyle().Foreground(theme.Info)},
-		} {
-			for _, tag := range set.tags {
-				for _, piece := range hardWrap(tag, width) {
-					parts = append(parts, set.style.Render(piece))
-				}
-			}
-		}
+		parts = append(parts, tagPieces(c.Tags, lipgloss.NewStyle().Foreground(theme.Highlight), stats.NamedTagRow)...)
+		parts = append(parts, tagPieces(global, lipgloss.NewStyle().Foreground(theme.MemberOther), stats.NamedTagRow)...)
+		parts = append(parts, tagPieces(otags, lipgloss.NewStyle().Foreground(theme.Info), stats.OtagRow)...)
 		out = append(out, "")
 		out = append(out, packStyled(parts, " ", width)...)
 	}
@@ -400,7 +417,14 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 	// families they belong to, in a colour apart from yours.
 	if tags := tagger.Current().Of(c.Card.OracleID); len(tags) > 0 {
 		out = append(out, "", head.Render(fit("scryfall tagger", width)))
-		out = append(out, wrapStyled(strings.Join(tags, " "), width, lipgloss.NewStyle().Foreground(theme.Info))...)
+		if pick == nil {
+			out = append(out, wrapStyled(strings.Join(tags, " "), width, lipgloss.NewStyle().Foreground(theme.Info))...)
+		} else {
+			out = append(out, packStyled(tagPieces(tags, lipgloss.NewStyle().Foreground(theme.Info), stats.OtagRow), " ", width)...)
+		}
+	}
+	if pick != nil {
+		out = append(out, muted.Render(fit("F picking · h l move · a/o/n and/or/not · esc done", width)))
 	}
 
 	// EDHREC ranks the card, not the printing; a printing that doesn't carry

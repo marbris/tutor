@@ -371,6 +371,11 @@ every list and session, without changing any deck file. `f` turns a double-faced
 pictures of every card in the list, so walking through it is instant. Pictures are drawn in the
 terminal in kitty, Ghostty and WezTerm. In other terminals `gx` opens the card in your browser.
 
+`F` filters the list by one of the card's tags. It highlights the first of the card's tags in the
+info panel, your own, the global ones and Scryfall Tagger's. `h` `l` move along them, and `a` `o` `n`
+add the highlighted one to the list's filter with AND, OR or NOT (the same key again takes it out).
+`esc` finishes. It's the same filter the statistics build, so they show it too.
+
 ![A Scryfall search with the info panel showing oracle text, rulings and legalities](screenshots/rulings-inline.png)
 
 ### Card history
@@ -540,6 +545,7 @@ ttr cache clear [kind]          # delete it, all of it or one kind
 | `j` `k` | down / up |
 | `gg` `G` | first / last row |
 | `K` `J` | scroll the info panel |
+| `F` | filter by a tag of the highlighted card |
 | `b` `B` | clear this list's filters / every list's filters |
 | `space` | the menu |
 | `?` | show the keys |

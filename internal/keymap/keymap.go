@@ -49,6 +49,7 @@ const (
 	Goto     Scope = "goto"     // after g
 	TagMove  Scope = "tagmove"  // after T: moving tags between lists
 	Search   Scope = "search"   // a search bar, which is a text field first
+	Pick     Scope = "pick"     // after F: picking a tag off the card to filter by
 )
 
 const (
@@ -61,6 +62,7 @@ const (
 	GlobalBar       Action = "bar"
 	GlobalEditNext  Action = "editing.next"
 	GlobalEditPrev  Action = "editing.prev"
+	GlobalPick      Action = "pick-tag"
 	GlobalInfoUp    Action = "info.half-page-up"
 	GlobalInfoDown  Action = "info.half-page-down"
 	GlobalStats     Action = "stats"
@@ -138,6 +140,13 @@ const (
 	SettingsClear   Action = "clear"
 	SettingsRefresh Action = "refresh"
 
+	PickNext Action = "next"
+	PickPrev Action = "prev"
+	PickAnd  Action = "and"
+	PickOr   Action = "or"
+	PickNot  Action = "not"
+	PickDone Action = "done"
+
 	StatsTagOrder Action = "tag.order"
 	StatsExpand   Action = "expand"
 	StatsOtag     Action = "otag"
@@ -204,6 +213,8 @@ var defaults = []binding{
 	{Global, GlobalPrintingNewer, k("L")},
 	{Global, GlobalPrintingFace, k("f")},
 	{Global, GlobalStats, k("s")},
+	// Shift for the information panel: F walks the card's tags there.
+	{Global, GlobalPick, k("F")},
 	{Global, GlobalStatsEdit, k("S")},
 	{Global, GlobalHelp, k("?")},
 	{Global, GlobalBack, k("esc")},
@@ -288,6 +299,16 @@ var defaults = []binding{
 	{Stats, StatsTagOrder, k("tab")},
 	{Stats, StatsExpand, k("enter")},
 	{Stats, StatsOtag, k("alt+t")},
+
+	// While F has a tag of the card highlighted, the keys are the picker's:
+	// the moving keys walk the tags and the filter letters filter, bare,
+	// since nothing else is listening.
+	{Pick, PickNext, k("l", "j", "tab", "right", "down")},
+	{Pick, PickPrev, k("h", "k", "shift+tab", "left", "up")},
+	{Pick, PickAnd, k("a")},
+	{Pick, PickOr, k("o")},
+	{Pick, PickNot, k("n")},
+	{Pick, PickDone, k("esc", "F", "enter")},
 
 	{Leader, LeaderFind, k("f")},
 	{Leader, LeaderDecks, k("d")},

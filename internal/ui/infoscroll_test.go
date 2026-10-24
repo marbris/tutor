@@ -78,7 +78,7 @@ func TestPowerToughnessSitsUnderTheTextOnTheRight(t *testing.T) {
 		OracleText: "Trample", Power: "2", Toughness: "2",
 	}}
 	const width = 30
-	lines := cardInfo(c, width, rules.Data{}, []mtg.Ruling{}, nil)
+	lines := cardInfo(c, width, rules.Data{}, []mtg.Ruling{}, nil, nil)
 
 	text, pt := -1, -1
 	for i, l := range lines {

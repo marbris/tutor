@@ -85,12 +85,12 @@ func TestTabStillChangesTargetOnAnyOtherWord(t *testing.T) {
 func TestTheInfoPanelShowsTheCardsTaggerTags(t *testing.T) {
 	withTagger(t)
 	card := deck.Card{Card: mtg.Card{Name: "Disenchant", OracleID: "disenchant"}}
-	body := stripANSI(strings.Join(cardMeta(card, card.Card, 40, nil, nil), "\n"))
+	body := stripANSI(strings.Join(cardMeta(card, card.Card, 40, nil, nil, nil), "\n"))
 	if !strings.Contains(body, "scryfall tagger") || !strings.Contains(body, "removal-artifact removal-enchantment") {
 		t.Errorf("the tagger tags are missing:\n%s", body)
 	}
 	plain := deck.Card{Card: mtg.Card{Name: "Island", OracleID: "island"}}
-	if body := stripANSI(strings.Join(cardMeta(plain, plain.Card, 40, nil, nil), "\n")); strings.Contains(body, "scryfall tagger") {
+	if body := stripANSI(strings.Join(cardMeta(plain, plain.Card, 40, nil, nil, nil), "\n")); strings.Contains(body, "scryfall tagger") {
 		t.Errorf("a card Tagger hasn't tagged has a tagger heading:\n%s", body)
 	}
 }

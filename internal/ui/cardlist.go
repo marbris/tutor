@@ -21,6 +21,8 @@ import (
 // one type means every key that works on a list works on both.
 
 type cardList struct {
+	// pick is F's highlight on the current card's tags, while it is up.
+	pick *tagPick
 	// all is every card, in the order it arrived. Nothing reorders this;
 	// the sort and the filter build rows from it, so both can be undone.
 	all []deck.Card
@@ -687,7 +689,8 @@ func (l *cardList) info(width int) []string {
 	if !ok {
 		return nil
 	}
-	return cardInfo(effective(c, l.lenderKey()), width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
+	c = effective(c, l.lenderKey())
+	return cardInfo(c, width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID], l.pick.view(c, l.statFilter))
 }
 
 // keys is what this list offers, in two groups: ordering and narrowing it,

@@ -149,6 +149,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleFilterKey(msg)
 	}
 
+	// F's highlight on the card's tags takes every key while it's up, so
+	// h and l walk the tags rather than the panels.
+	if l := m.picking(); l != nil && !(p.searchOpen && p.search.Focused()) {
+		if key == "ctrl+c" {
+			return m.tryQuit()
+		}
+		m.pickKey(l, key)
+		return m, nil
+	}
+
 	// A focused search bar is a text field first: it gets the printable
 	// keys, and the leader with them, or you could never type a space.
 	if p.searchOpen && p.search.Focused() {
@@ -252,6 +262,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.stepPrinting(false)
 	case keymap.GlobalPrintingFace:
 		return m, m.flipPrinting()
+	case keymap.GlobalPick:
+		m.startPick()
 	case keymap.GlobalStats:
 		m.toggleStats(false)
 	case keymap.GlobalStatsEdit:
