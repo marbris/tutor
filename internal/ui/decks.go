@@ -29,6 +29,8 @@ type deckOpenedMsg struct {
 	// uncommitted is a deck of yours whose file has changes since its last
 	// commit — edits from last time, written but never committed.
 	uncommitted bool
+	// file is the version of a local deck's file it was opened from.
+	file diskCopy
 }
 
 // userDecksFetchedMsg is a person's public decks, fetched and cached.
@@ -93,9 +95,13 @@ func (m *Model) openEntry(l *deckList, p *panel) tea.Cmd {
 
 func openLocalDeck(panelID int, newPane bool, slug string) tea.Cmd {
 	return func() tea.Msg {
+		// Stamped before reading: a change made while it reads is a
+		// change the next look at the file finds.
+		file := diskCopy{stamp: fileStamp(deck.Path(slug)), ver: diskVer.Add(1)}
 		info, cards, err := deck.Open(slug)
+		file.cards = cards
 		return deckOpenedMsg{panel: panelID, newPane: newPane, info: info, cards: cards, err: err,
-			uncommitted: deck.HasUncommittedEdits(slug)}
+			uncommitted: deck.HasUncommittedEdits(slug), file: file}
 	}
 }
 
@@ -185,6 +191,9 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	l.deck = &msg.info
 	l.dirty = msg.uncommitted
 	l.recheck()
+	if msg.info.Local() {
+		m.opened(msg.info.Slug, msg.file, l)
+	}
 	restored := p.pending != nil
 	if restored {
 		p.pending.applyLayout(l)

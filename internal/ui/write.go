@@ -29,6 +29,7 @@ type deckSavedMsg struct {
 	subject string
 	warning string
 	err     error
+	file    fileWrite
 }
 
 // write is w and W.
@@ -38,7 +39,7 @@ func (m *Model) write(l *cardList, p *panel, newPane bool) tea.Cmd {
 			m.notice = "nothing to commit in " + l.deck.Name
 			return nil
 		}
-		return saveDeck(p.id, *l.deck, l.all)
+		return m.saveDeck(p.id, *l.deck, l.all)
 	}
 
 	// Not yours yet, so it needs a name before it can be.
@@ -55,18 +56,21 @@ func (m *Model) write(l *cardList, p *panel, newPane bool) tea.Cmd {
 // saveDeck writes the deck and commits the change, off the main thread.
 // It queues behind any autosave still in flight, so the commit can't be
 // overtaken by an older write.
-func saveDeck(panelID int, info deck.Info, cards []deck.Card) tea.Cmd {
+func (m Model) saveDeck(panelID int, info deck.Info, cards []deck.Card) tea.Cmd {
 	seq := writeSeq.Add(1)
 	cards = append([]deck.Card(nil), cards...)
+	f, base := m.files, m.files.seen[info.Slug]
 	return func() tea.Msg {
 		writeMu.Lock()
 		defer writeMu.Unlock()
-		file := deck.Updated(info, cards)
-		subject, warning, err := deck.CommitDeck(info.Slug, file)
+		cards, w := mergeOutside(info.Slug, base, cards)
+		subject, warning, err := deck.CommitDeck(info.Slug, deck.Updated(info, cards))
+		msg := deckSavedMsg{panel: panelID, slug: info.Slug, subject: subject, warning: warning, err: err}
 		if err == nil {
-			written[info.Slug] = seq
+			f.written[info.Slug] = seq
+			msg.file = f.wroteFile(w, cards)
 		}
-		return deckSavedMsg{panel: panelID, slug: info.Slug, subject: subject, warning: warning, err: err}
+		return msg
 	}
 }
 
@@ -76,16 +80,16 @@ func saveDeck(panelID int, info deck.Info, cards []deck.Card) tea.Cmd {
 // never lost; committing is what w is for. The writes happen off the main
 // thread, so they can finish out of order: each carries a number, and one
 // older than the last write of that deck is dropped rather than put back
-// over it.
+// over it (deckFiles.written keeps the last).
 var (
 	writeMu  sync.Mutex
 	writeSeq atomic.Uint64
-	written  = map[string]uint64{}
 )
 
 type deckAutosavedMsg struct {
 	slug string
 	err  error
+	file fileWrite
 }
 
 // autosave writes every deck with an edit the file hasn't had.
@@ -100,7 +104,7 @@ func (m Model) autosave() tea.Cmd {
 		if l.deck == nil || !l.deck.Local() {
 			continue
 		}
-		cmds = append(cmds, autosaveDeck(*l.deck, l.all, l.wasClean))
+		cmds = append(cmds, m.autosaveDeck(*l.deck, l.all, l.wasClean))
 		l.wasClean = false
 		m.mirrorDeck(l)
 	}
@@ -110,13 +114,14 @@ func (m Model) autosave() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func autosaveDeck(info deck.Info, cards []deck.Card, wasClean bool) tea.Cmd {
+func (m Model) autosaveDeck(info deck.Info, cards []deck.Card, wasClean bool) tea.Cmd {
 	seq := writeSeq.Add(1)
 	cards = append([]deck.Card(nil), cards...)
+	f, base := m.files, m.files.seen[info.Slug]
 	return func() tea.Msg {
 		writeMu.Lock()
 		defer writeMu.Unlock()
-		if written[info.Slug] > seq {
+		if f.written[info.Slug] > seq {
 			return nil
 		}
 		// The first edit since the last commit is the last chance to
@@ -124,11 +129,14 @@ func autosaveDeck(info deck.Info, cards []deck.Card, wasClean bool) tea.Cmd {
 		if wasClean {
 			deck.RecordOutsideEdits(info.Slug)
 		}
+		cards, w := mergeOutside(info.Slug, base, cards)
 		err := deck.Write(info.Slug, deck.Updated(info, cards))
+		msg := deckAutosavedMsg{slug: info.Slug, err: err}
 		if err == nil {
-			written[info.Slug] = seq
+			f.written[info.Slug] = seq
+			msg.file = f.wroteFile(w, cards)
 		}
-		return deckAutosavedMsg{slug: info.Slug, err: err}
+		return msg
 	}
 }
 
@@ -175,6 +183,7 @@ func (m Model) handleDeckSaved(msg deckSavedMsg) (tea.Model, tea.Cmd) {
 		m.notice = "error: " + msg.err.Error()
 		return m, nil
 	}
+	m.tookWrite(msg.file)
 
 	// By the deck rather than the panel: the list committed may not be the
 	// one on top of it any more.

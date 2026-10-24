@@ -665,7 +665,7 @@ func (m Model) saveEverything() tea.Cmd {
 	var cmds []tea.Cmd
 	for _, d := range m.openDecks() {
 		if d.list.dirty && d.list.deck.Local() {
-			cmds = append(cmds, saveDeck(d.panel.id, *d.list.deck, d.list.all))
+			cmds = append(cmds, m.saveDeck(d.panel.id, *d.list.deck, d.list.all))
 		}
 	}
 	return tea.Batch(cmds...)

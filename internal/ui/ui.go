@@ -63,6 +63,9 @@ type Model struct {
 	// storeLoading is the cards on disk on their way in at the start, which
 	// a search from the session or the command line waits for.
 	storeLoading bool
+	// files is the version of each open deck's file this ttr knows, for
+	// telling another ttr's changes from its own (outside.go).
+	files *deckFiles
 	// prefetch is gX, fetching every picture in a list ahead of you.
 	prefetch prefetchState
 	imageSeq int
@@ -101,6 +104,7 @@ func New() Model {
 		images:       map[string]*cardPrintings{},
 		pictures:     newPictureCache(),
 		storeLoading: expectCardStore(),
+		files:        newDeckFiles(),
 	}
 }
 
@@ -180,6 +184,9 @@ func (m Model) Init() tea.Cmd {
 	// catalogs): read from disk while under a week old, and only then
 	// downloaded again, behind. The settings panel turns them on and off.
 	cmds = append(cmds, downloadLoads()...)
+	// Decks open here that another ttr or an editor changes are looked at
+	// every second (outside.go).
+	cmds = append(cmds, filesTick())
 	return tea.Batch(cmds...)
 }
 
@@ -286,7 +293,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.notice = "couldn't write " + msg.slug + ": " + msg.err.Error()
 		}
+		m.tookWrite(msg.file)
 		return m, nil
+	case filesTickMsg:
+		return m.handleFilesTick()
+	case outsideChangesMsg:
+		return m.handleOutsideChanges(msg)
 
 	case deckWrittenMsg:
 		return m.handleDeckWritten(msg)

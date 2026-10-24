@@ -34,7 +34,7 @@ func TestWritingADeckReachesDiskAndGit(t *testing.T) {
 	m.add([]deck.Card{{Card: mtg.Card{Name: "Llanowar Elves"}}})
 	m.tag([]deck.Card{{Card: mtg.Card{Name: "Llanowar Elves"}}}, "ramp")
 
-	msg := saveDeck(m.ws.current().id, *l.deck, l.all)().(deckSavedMsg)
+	msg := m.saveDeck(m.ws.current().id, *l.deck, l.all)().(deckSavedMsg)
 	if msg.err != nil {
 		t.Fatalf("saving failed: %v", msg.err)
 	}
@@ -76,7 +76,7 @@ func TestSavingClearsTheUnsavedMark(t *testing.T) {
 		t.Fatal("the edit did not mark it unsaved")
 	}
 
-	msg := saveDeck(m.ws.current().id, *l.deck, l.all)().(deckSavedMsg)
+	msg := m.saveDeck(m.ws.current().id, *l.deck, l.all)().(deckSavedMsg)
 	next, _ := m.handleDeckSaved(msg)
 	m = next.(Model)
 
@@ -163,7 +163,7 @@ func TestAnEditIsWrittenStraightAwayButNotCommitted(t *testing.T) {
 	}
 
 	// w commits it, describing the change against the last commit.
-	msg := saveDeck(m.ws.current().id, *l.deck, l.all)().(deckSavedMsg)
+	msg := m.saveDeck(m.ws.current().id, *l.deck, l.all)().(deckSavedMsg)
 	if msg.subject != "+Llanowar Elves" {
 		t.Errorf("commit subject %q", msg.subject)
 	}
@@ -176,9 +176,10 @@ func TestAnOlderAutosaveNeverLandsOverANewerOne(t *testing.T) {
 	seedDeck(t, "ghen", "name: Ghen\nformat: commander\n[mainboard]\n1 Sol Ring\n")
 	t.Cleanup(func() { deck.Delete("ghen") })
 	info := deck.Info{Name: "Ghen", Slug: "ghen", Format: "commander"}
+	m := New()
 
-	older := autosaveDeck(info, []deck.Card{{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}}}, false)
-	newer := autosaveDeck(info, []deck.Card{{Qty: 1, Card: mtg.Card{Name: "Mana Crypt"}}}, false)
+	older := m.autosaveDeck(info, []deck.Card{{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}}}, false)
+	newer := m.autosaveDeck(info, []deck.Card{{Qty: 1, Card: mtg.Card{Name: "Mana Crypt"}}}, false)
 	newer()
 	older()
 	if d := mustRead(t, "ghen"); !strings.Contains(d.String(), "Mana Crypt") {
