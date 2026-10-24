@@ -802,8 +802,9 @@ func mutedLine(s string, width int) string {
 }
 
 // wrapStyled wraps text and paints each line, for the information panel.
+// A word longer than the line is broken rather than cut short with "…".
 func wrapStyled(s string, width int, style lipgloss.Style) []string {
-	lines := wrap(s, width)
+	lines := hardWrap(s, width)
 	for i, line := range lines {
 		lines[i] = style.Render(fit(line, width))
 	}

@@ -878,3 +878,33 @@ func TestFoldingAGroupMovesTheHighlightToItsHeading(t *testing.T) {
 		t.Errorf("on %+v, want the Type heading", r)
 	}
 }
+
+func TestALongStatisticsFilterWraps(t *testing.T) {
+	m := withCards(sized(150, 40), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	for _, label := range []string{"ramp", "removal", "wincon"} {
+		m = drive(pointStat(t, m, "Tags", label), "ctrl+o")
+	}
+	lines := m.renderStats(16)
+	var filter []string
+	for i, line := range lines {
+		if strings.HasPrefix(stripANSI(line), "filter:") {
+			filter = lines[i:]
+			break
+		}
+	}
+	text := ""
+	for _, line := range filter {
+		plain := strings.TrimSpace(stripANSI(line))
+		if strings.Contains(plain, "enter opens") {
+			break
+		}
+		if textWidth(stripANSI(line)) > 16 {
+			t.Errorf("line wider than the panel: %q", stripANSI(line))
+		}
+		text += plain + " "
+	}
+	if strings.Contains(text, "…") || !strings.Contains(text, "wincon") {
+		t.Errorf("the filter was cut, not wrapped: %q", text)
+	}
+}

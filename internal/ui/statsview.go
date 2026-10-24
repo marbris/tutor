@@ -700,12 +700,12 @@ func (m Model) renderStats(width int) []string {
 
 	out = append(out, "")
 	if len(expr) > 0 {
-		out = append(out, lipgloss.NewStyle().Foreground(theme.Marked).
-			Render(fit("filter: "+expr.String(), width)))
+		// Wrapped, not cut: the end of a filter is as much of it as the start.
+		out = append(out, wrapStyled("filter: "+expr.String(), width, lipgloss.NewStyle().Foreground(theme.Marked))...)
 	}
 	// The short reminder, for when ? isn't drawing the whole keymap below.
 	if !m.hintsExpanded {
-		out = append(out, dim.Render(fit("enter opens · ctrl+ a/o/n and/or/not · x remove · p odds · s close", width)))
+		out = append(out, wrapStyled("enter opens · ctrl+ a/o/n and/or/not · x remove · p odds · s close", width, dim)...)
 	}
 	if memo == nil || !memo.ok {
 		d := statsMemo{drawn: out, bars: bars, barLine: barLine}
