@@ -54,15 +54,34 @@ func statGroupTitles(m Model) []string {
 }
 
 // pointStat puts the highlight on a category by name.
+// pointStat puts the highlight on a category, opening its group the way
+// enter on the heading would.
 func pointStat(t *testing.T, m Model, group, label string) Model {
 	t.Helper()
-	for _, r := range statRows(m.statGroups()) {
-		if r.Group == group && r.Label == label {
-			m.pointAt(r)
-			return m
+	for _, g := range m.statGroups() {
+		for _, r := range g.Rows {
+			if r.Group == group && r.Label == label {
+				if m.stats.openGroups == nil {
+					m.stats.openGroups = map[string]bool{}
+				}
+				m.stats.openGroups[g.Title] = true
+				m.stats.foldGen++
+				m.pointAt(r)
+				return m
+			}
 		}
 	}
 	t.Fatalf("no %s %s row", group, label)
+	return m
+}
+
+// unfold opens every group of the statistics.
+func unfold(m Model) Model {
+	m.stats.openGroups = map[string]bool{}
+	for _, title := range stats.GroupOrder {
+		m.stats.openGroups[title] = true
+	}
+	m.stats.foldGen++
 	return m
 }
 
@@ -87,7 +106,7 @@ func TestWalkingTheBarsDoesntNarrow(t *testing.T) {
 func TestSGoesBackToTheList(t *testing.T) {
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
-	m = drive(m, "s", "alt+a") // narrow to the first category: tagged ramp
+	m = drive(m, "s", "enter", "ctrl+j", "alt+a") // narrow to the first category: tagged ramp
 	narrowed := l.count()
 	if narrowed != 3 {
 		t.Fatalf("adding ramp left %d cards, want 3", narrowed)
@@ -185,7 +204,7 @@ func TestBInTheStatisticsClearsBothFilters(t *testing.T) {
 	// categories together, as it does with the statistics closed.
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
-	m = drive(m, "/", "e", "l", "enter", "s", "alt+a")
+	m = drive(m, "/", "e", "l", "enter", "s", "enter", "ctrl+j", "alt+a")
 	if l.filter == "" || len(l.statFilter) == 0 {
 		t.Fatal("not narrowed both ways")
 	}
@@ -201,7 +220,7 @@ func TestBInTheStatisticsClearsBothFilters(t *testing.T) {
 func TestEscStepsBackAFilterAtATime(t *testing.T) {
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
-	m = drive(m, "/", "e", "l", "enter", "s", "alt+a")
+	m = drive(m, "/", "e", "l", "enter", "s", "enter", "ctrl+j", "alt+a")
 	if l.filter == "" || len(l.statFilter) == 0 {
 		t.Fatal("not narrowed both ways")
 	}
@@ -227,7 +246,7 @@ func TestEscStepsBackAFilterAtATime(t *testing.T) {
 
 func TestPStepsThroughTheOdds(t *testing.T) {
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
-	m = drive(m, "s", "alt+p")
+	m = drive(m, "s", "enter", "alt+p")
 	if m.stats.odds != 1 {
 		t.Fatalf("odds = %d", m.stats.odds)
 	}
@@ -248,7 +267,7 @@ func TestPStepsThroughTheOdds(t *testing.T) {
 func TestTheOddsAreForTheWholeList(t *testing.T) {
 	// Twelve Forests in eighteen cards, seven drawn: all but certain.
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
-	m = drive(m, "s", "alt+p")
+	m = drive(m, "s", "enter", "alt+p")
 	for _, line := range m.renderStats(60) {
 		plain := stripANSI(line)
 		if strings.Contains(plain, "Land ") && !strings.Contains(plain, "100%") {
@@ -288,7 +307,7 @@ func TestShiftSCountsTheEditingDeck(t *testing.T) {
 	if len(counted) != len(target.all) {
 		t.Errorf("counted %d, want the editing deck's %d", len(counted), len(target.all))
 	}
-	m = drive(m, "alt+a")
+	m = drive(m, "enter", "ctrl+j", "alt+a")
 	if len(target.statFilter) == 0 || len(search.statFilter) != 0 {
 		t.Error("the filter should land on the editing deck alone")
 	}
@@ -298,10 +317,10 @@ func TestShiftBClearsEveryList(t *testing.T) {
 	m := sized(200, 30)
 	m = withCards(m, "f", sample(), sortArrival)
 	search := m.ws.panels[0].cardsView()
-	m = drive(m, "s", "alt+a", "s")
+	m = drive(m, "s", "enter", "ctrl+j", "alt+a", "s")
 	m = withCards(m, "d", deckSample(), sortArrival)
 	target := m.ws.panels[1].cardsView()
-	m = drive(m, "s", "alt+a", "s")
+	m = drive(m, "s", "enter", "ctrl+j", "alt+a", "s")
 	if len(search.statFilter) == 0 || len(target.statFilter) == 0 {
 		t.Fatal("not both narrowed")
 	}
@@ -364,7 +383,7 @@ func TestThePanelScrollsToKeepTheCategoryInView(t *testing.T) {
 	}
 
 	// And the highlighted category is inside the window.
-	line := statLine(m.statGroups(), m.statCursor(m.statGroups()))
+	line := m.statLine(m.statGroups(), m.statCursor(m.statGroups()))
 	at := m.statOffset(room)
 	if line < at || line >= at+room {
 		t.Errorf("category on line %d, showing %d..%d", line, at, at+room)
@@ -389,20 +408,23 @@ func TestStatLineCountsHeadingsAndGaps(t *testing.T) {
 	// The panel scrolls by rendered lines, not by category, so this has to
 	// agree with what renderStats draws.
 	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
-	m = drive(m, "s")
-
-	groups := m.statGroups()
-	lines := m.renderStats(30)
-	rows := statRows(groups)
-
-	for row := 0; row < len(rows); row++ {
-		at := statLine(groups, row)
-		if at >= len(lines) {
-			t.Fatalf("category %d maps to line %d of %d", row, at, len(lines))
+	for _, folded := range []bool{true, false} {
+		m := drive(m, "s")
+		if !folded {
+			m = unfold(m)
 		}
-		if !strings.Contains(stripANSI(lines[at]), rows[row].Label) {
-			t.Errorf("category %d (%s) maps to line %d, which says %q",
-				row, rows[row].Label, at, stripANSI(lines[at]))
+		groups := m.statGroups()
+		lines := m.renderStats(30)
+		walk := m.statWalk(groups)
+		for row, e := range walk {
+			at := m.statLine(groups, row)
+			if at >= len(lines) {
+				t.Fatalf("row %d maps to line %d of %d", row, at, len(lines))
+			}
+			if !strings.Contains(stripANSI(lines[at]), e.row.Label) {
+				t.Errorf("folded %v: row %d (%s) maps to line %d, which says %q",
+					folded, row, e.row.Label, at, stripANSI(lines[at]))
+			}
 		}
 	}
 }
@@ -511,20 +533,20 @@ func TestTurningAGroupOverShowsItsHeading(t *testing.T) {
 }
 
 func TestStatHeadingIsTheGroupsFirstLine(t *testing.T) {
-	m := withCards(sized(110, 22), "d", deckSample(), sortArrival)
+	m := unfold(withCards(sized(110, 22), "d", deckSample(), sortArrival))
 	groups := m.statGroups()
-	row := 0
-	for _, g := range groups {
-		for range g.Rows {
-			if got, line := statHeading(groups, row), statLine(groups, row); got >= line {
-				t.Errorf("row %d on line %d has its heading on %d", row, line, got)
-			}
-			row++
+	for row, e := range m.statWalk(groups) {
+		got, line := m.statHeading(groups, row), m.statLine(groups, row)
+		if e.row.Heading && got != line {
+			t.Errorf("heading %d on line %d says its heading is on %d", row, line, got)
+		}
+		if !e.row.Heading && got >= line {
+			t.Errorf("row %d on line %d has its heading on %d", row, line, got)
 		}
 	}
 	// The first row of the second group: its heading is the line above it.
-	first := len(groups[0].Rows)
-	if statHeading(groups, first) != statLine(groups, first)-1 {
+	first := 1 + len(groups[0].Rows) + 1
+	if m.statHeading(groups, first) != m.statLine(groups, first)-1 {
 		t.Error("a group's first category isn't directly under its heading")
 	}
 }
@@ -558,7 +580,8 @@ func TestCtrlJAndKWalkTheStatisticsAndJKScrollTheCard(t *testing.T) {
 	// ctrl+j and ctrl+k walk the categories and stop at either end; J and K
 	// are the card's beside them, as they are with the statistics down.
 	m := withCards(sized(150, 40), "d", deckSample(), sortArrival)
-	m = drive(m, "s")
+	m = drive(unfold(drive(m, "s")), "ctrl+j")
+	m = drive(m, "ctrl+k") // back onto the first heading
 	first, _ := m.statUnder()
 	m = drive(m, "ctrl+k")
 	if r, _ := m.statUnder(); r.Path != first.Path || r.Label != first.Label {
@@ -568,7 +591,7 @@ func TestCtrlJAndKWalkTheStatisticsAndJKScrollTheCard(t *testing.T) {
 	if r, _ := m.statUnder(); r.Label == first.Label && r.Group == first.Group {
 		t.Error("ctrl+j didn't move")
 	}
-	rows := statRows(m.statGroups())
+	rows := m.statWalk(m.statGroups())
 	for i := 0; i < len(rows)+3; i++ {
 		m = drive(m, "ctrl+j")
 	}
@@ -586,7 +609,7 @@ func TestTabOnATagSortsTheTagsByName(t *testing.T) {
 	cards := deckSample()
 	cards[3].Tags = []string{"anthem"} // Beast Within: alone, but first by name
 	m := withCards(sized(120, 30), "d", cards, sortArrival)
-	m = drive(m, "s")
+	m = drive(unfold(drive(m, "s")), "ctrl+j")
 	tags := func() string {
 		for _, g := range m.statGroups() {
 			if g.Title == "Tags" {
@@ -638,7 +661,7 @@ func TestTabOnATagSortsTheTagsByName(t *testing.T) {
 
 func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 	m := withCards(sized(90, 16), "d", deckSample(), sortArrival)
-	m = drive(m, "s")
+	m = drive(unfold(drive(m, "s")), "ctrl+j")
 	for i := 0; i < 12; i++ {
 		m = drive(m, "ctrl+j")
 	}
@@ -648,12 +671,12 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 	}
 	_, room, _ := m.statsSpan()
 	groups := m.statGroups()
-	line := statLine(groups, m.statCursor(groups))
+	line := m.statLine(groups, m.statCursor(groups))
 	// Up through the rows on screen: the view stays where it is.
 	for line-1 > bottom {
 		m = drive(m, "ctrl+k")
 		groups = m.statGroups()
-		line = statLine(groups, m.statCursor(groups))
+		line = m.statLine(groups, m.statCursor(groups))
 		if line <= bottom {
 			break // a heading or gap passed; the next k reaches the edge
 		}
@@ -740,7 +763,7 @@ func TestEnterOpensATypeIntoItsSubtypesToFilterBy(t *testing.T) {
 func TestWithTheStatisticsUpTheListKeepsItsKeys(t *testing.T) {
 	// The statistics take shift, ctrl and alt; j, k, a and x are the list's.
 	m, l := ownDeck(sized(140, 30))
-	m = drive(m, "s")
+	m = drive(unfold(drive(m, "s")), "ctrl+j")
 	row := m.statCursor(m.statGroups())
 
 	m = drive(m, "j")
@@ -807,5 +830,59 @@ func TestTheStatisticsOpenBesideTheCard(t *testing.T) {
 	m = drive(m, "s")
 	if m.stats.open || strings.Contains(stripANSI(m.View()), "statistics") {
 		t.Error("s didn't take the statistics down")
+	}
+}
+
+func TestTheGroupsOpenFromTheirHeadings(t *testing.T) {
+	m := withCards(sized(150, 40), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	body := stripANSI(strings.Join(m.renderStats(60), "\n"))
+	if !strings.Contains(body, "▸ Tags") || !strings.Contains(body, "▸ Type") || strings.Contains(body, "ramp") {
+		t.Fatalf("the statistics didn't open folded:\n%s", body)
+	}
+	if r, _ := m.statUnder(); !r.Heading || r.Label != "Tags" {
+		t.Fatalf("opened on %+v, want the Tags heading", r)
+	}
+	// alt+a on a heading filters nothing.
+	m = drive(m, "alt+a")
+	if l := m.ws.current().cardsView(); len(l.statFilter) != 0 {
+		t.Error("alt+a on a heading filtered")
+	}
+	if fmt.Sprint(m.statsHints()) == "" || !strings.Contains(fmt.Sprint(m.statsHints()), "open the group") {
+		t.Error("enter isn't offered on a folded heading")
+	}
+
+	m = drive(m, "enter")
+	body = stripANSI(strings.Join(m.renderStats(60), "\n"))
+	if !strings.Contains(body, "▾ Tags") || !strings.Contains(body, "ramp") {
+		t.Fatalf("enter didn't open Tags:\n%s", body)
+	}
+	m = drive(m, "ctrl+j")
+	if r, _ := m.statUnder(); r.Heading || r.Group != "Tags" {
+		t.Fatalf("ctrl+j went to %+v, want the first tag", r)
+	}
+	m = drive(m, "alt+a", "ctrl+k", "enter")
+	body = stripANSI(strings.Join(m.renderStats(60), "\n"))
+	if strings.Contains(body, "█") || !strings.Contains(body, "▸ Tags · 1 in filter") {
+		t.Errorf("Tags didn't fold, or doesn't say what's in the filter:\n%s", body)
+	}
+
+	// Folds come back after a restart.
+	isolate(t)
+	m = drive(m, "enter")
+	m.saveSession()
+	back, _ := NewRestored()
+	if !back.stats.openGroups["Tags"] || back.stats.openGroups["Type"] {
+		t.Errorf("came back with %v open", back.stats.openGroups)
+	}
+}
+
+func TestFoldingAGroupMovesTheHighlightToItsHeading(t *testing.T) {
+	m := withCards(sized(150, 40), "d", deckSample(), sortArrival)
+	m = pointStat(t, drive(m, "s"), "Type", "Creature")
+	delete(m.stats.openGroups, "Type")
+	m.stats.foldGen++
+	if r, _ := m.statUnder(); !r.Heading || r.Label != "Type" {
+		t.Errorf("on %+v, want the Type heading", r)
 	}
 }

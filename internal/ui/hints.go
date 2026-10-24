@@ -493,14 +493,23 @@ func (m Model) infoKeys(p *panel) [][2]string {
 // statsHints are the keys while the statistics have them. tab reorders the
 // tags, so it is offered only on one, naming the order it would switch to.
 func (m Model) statsHints() [][2]string {
-	keys := [][2]string{
-		hint("category", keymap.Stats, keymap.StatsDown, keymap.StatsUp),
-		hint("filter and/or/not (again: off)", keymap.Stats, keymap.StatsAnd, keymap.StatsOr, keymap.StatsNot),
-		hint("remove from filter", keymap.Stats, keymap.StatsDrop),
+	keys := [][2]string{hint("category", keymap.Stats, keymap.StatsDown, keymap.StatsUp)}
+	if heading, open := m.onHeading(); heading {
+		what := "open the group"
+		if open {
+			what = "fold the group"
+		}
+		keys = append(keys, hint(what, keymap.Stats, keymap.StatsExpand))
+	} else {
+		keys = append(keys,
+			hint("filter and/or/not (again: off)", keymap.Stats, keymap.StatsAnd, keymap.StatsOr, keymap.StatsNot),
+			hint("remove from filter", keymap.Stats, keymap.StatsDrop))
+	}
+	keys = append(keys,
 		hint("clear stats-filter", keymap.Stats, keymap.StatsClear),
 		hint("odds", keymap.Stats, keymap.StatsOddsNext, keymap.StatsOddsPrev),
 		hint("close", keymap.Stats, keymap.StatsClose),
-	}
+	)
 	if m.onTags() {
 		order := "tags by name"
 		if m.stats.tagsByName {

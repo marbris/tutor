@@ -204,6 +204,7 @@ func TestAltTShowsATaggerTagWithTheTagsAndKeepsIt(t *testing.T) {
 	}
 
 	// Taken out again from its row among the tags.
+	m = unfold(m)
 	m.pointAt(r)
 	if hints := fmt.Sprint(m.statsHints()); !strings.Contains(hints, "take out of the tags") {
 		t.Error("alt+t isn't offered on the otag row")

@@ -209,13 +209,15 @@ Opening a person's folder asks Moxfield for their decks again, so a deck they ma
 The statistics open as a column of their own, left of the card view, and show bar charts of a list: your tags, card types, colors, mana values (X
 spells get a row of their own), rarity, price, and last the Scryfall Tagger tags. `enter` on a card
 type opens it into the subtypes in the list: the creature types under Creature, Equipment under
-Artifact. Build a filter from the rows, and the list and the bars narrow to the cards that match.
+Artifact. Each group starts folded to its heading; `enter` opens it (a folded group says how many of
+its rows are in the filter), and Tutor remembers which are open. Build a filter from the rows, and the list and the bars narrow to the cards that match.
 
 | Key | Does |
 | --- | --- |
 | `s` | open (or close) the statistics of the active list |
 | `S` | open the statistics of the editing list |
 | `ctrl+j` `ctrl+k` | walk through the rows |
+| `enter` | on a group's heading: open or fold the group |
 | `alt+a` | add AND *row* to the filter |
 | `alt+o` | add OR *row* to the filter |
 | `alt+n` | add AND NOT *row* to the filter |

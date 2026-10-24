@@ -60,6 +60,11 @@ type statsState struct {
 	openTags map[string]bool
 	// openGen counts enter on a Tagger row, which changes the rows in place.
 	openGen int
+	// openGroups is the groups opened with enter on their heading, by title.
+	// The rest show their heading alone.
+	openGroups map[string]bool
+	// foldGen counts the groups opened and closed, for the drawn bars.
+	foldGen int
 	// memo is the bars as last counted. A pointer, so every copy of the
 	// Model shares it; nil counts afresh every time.
 	memo *statsMemo
@@ -98,11 +103,12 @@ type drawKey struct {
 	odds    int
 	expr    string
 	hints   bool
+	folds   int
 }
 
 const maxOdds = 4
 
-// statRows flattens the groups into the rows j and k step through.
+// statRows is every category in the groups, folded or not.
 func statRows(groups []stats.Group) []stats.Row {
 	var out []stats.Row
 	for _, g := range groups {
@@ -177,25 +183,116 @@ func (m Model) statList() *cardList {
 	return p.cardsView()
 }
 
-// statCursor is the flattened index of the highlighted category in the rows
-// as drawn — the first row when the highlight names one that isn't there.
+// statEntry is one row the statistics walk: a group's heading, or a row of
+// an open group, with the line it is drawn on.
+type statEntry struct {
+	row stats.Row
+	// line is where it is drawn; heading is where its group's heading is.
+	line, heading int
+}
+
+// headingRow is a group's heading, as a row the highlight can sit on.
+func headingRow(title string) stats.Row {
+	return stats.Row{Label: title, Path: "heading:" + title, Heading: true}
+}
+
+// statWalk is what ctrl+j and ctrl+k walk, in the order it's drawn: every
+// group's heading, each followed by its rows if the group is open, with a
+// blank line between groups. Drawing, scrolling and walking all read it, so
+// they can't disagree about which line a row is on.
+func (m Model) statWalk(groups []stats.Group) []statEntry {
+	var out []statEntry
+	line := 0
+	for _, g := range groups {
+		if len(g.Rows) == 0 {
+			continue
+		}
+		if line > 0 {
+			line++ // the blank line between groups
+		}
+		head := line
+		out = append(out, statEntry{headingRow(g.Title), line, head})
+		line++
+		if !m.stats.openGroups[g.Title] {
+			continue
+		}
+		for _, r := range g.Rows {
+			out = append(out, statEntry{r, line, head})
+			line++
+		}
+	}
+	return out
+}
+
+// statCursor is the index of the highlighted category in the walk. When the
+// highlight names a row of a folded group, it is that group's heading; when
+// it names nothing that's there, the first heading.
 func (m Model) statCursor(groups []stats.Group) int {
-	for i, r := range statRows(groups) {
-		if r.Group == m.stats.group && r.Label == m.stats.label && r.Path == m.stats.path {
+	walk := m.statWalk(groups)
+	for i, e := range walk {
+		if e.row.Group == m.stats.group && e.row.Label == m.stats.label && e.row.Path == m.stats.path {
 			return i
+		}
+	}
+	for _, g := range groups {
+		for _, r := range g.Rows {
+			if r.Group == m.stats.group && r.Label == m.stats.label && r.Path == m.stats.path {
+				for i, e := range walk {
+					if e.row.Heading && e.row.Label == g.Title {
+						return i
+					}
+				}
+			}
 		}
 	}
 	return 0
 }
 
-// statUnder is the highlighted category, if there's anything to highlight.
+// statUnder is the highlighted category, or heading, if there's anything to
+// highlight.
 func (m Model) statUnder() (stats.Row, bool) {
 	groups := m.statGroups()
-	rows := statRows(groups)
-	if len(rows) == 0 {
+	walk := m.statWalk(groups)
+	if len(walk) == 0 {
 		return stats.Row{}, false
 	}
-	return rows[m.statCursor(groups)], true
+	return walk[m.statCursor(groups)].row, true
+}
+
+// onCategory is the highlighted row when it is a category, not a heading:
+// the only kind that filters.
+func (m Model) onCategory() (stats.Row, bool) {
+	r, ok := m.statUnder()
+	return r, ok && !r.Heading
+}
+
+// onHeading reports whether the highlight is on a group's heading, and
+// whether that group is open.
+func (m Model) onHeading() (heading, open bool) {
+	r, ok := m.statUnder()
+	if !ok || !r.Heading {
+		return false, false
+	}
+	return true, m.stats.openGroups[r.Label]
+}
+
+// toggleGroup is enter on a heading: the group's rows shown under it, or
+// folded away again.
+func (m *Model) toggleGroup() bool {
+	r, ok := m.statUnder()
+	if !ok || !r.Heading {
+		return false
+	}
+	if m.stats.openGroups == nil {
+		m.stats.openGroups = map[string]bool{}
+	}
+	if m.stats.openGroups[r.Label] {
+		delete(m.stats.openGroups, r.Label)
+	} else {
+		m.stats.openGroups[r.Label] = true
+	}
+	m.stats.foldGen++
+	return true
 }
 
 // onTags reports whether the highlight is on a tag, where tab reorders them.
@@ -278,12 +375,12 @@ func (m *Model) toggleGlobalOtag() bool {
 // nothing narrows until you add.
 func (m *Model) moveStat(delta int) {
 	groups := m.statGroups()
-	rows := statRows(groups)
-	if len(rows) == 0 {
+	walk := m.statWalk(groups)
+	if len(walk) == 0 {
 		return
 	}
 	at := m.statCursor(groups) + delta
-	m.pointAt(rows[maxInt(minInt(at, len(rows)-1), 0)])
+	m.pointAt(walk[maxInt(minInt(at, len(walk)-1), 0)].row)
 }
 
 // addStat narrows the list by the highlighted category, joined to whatever
@@ -291,7 +388,7 @@ func (m *Model) moveStat(delta int) {
 // to op, or takes it out if it already had op (stats.Expr.Toggle).
 func (m *Model) addStat(op stats.Op) {
 	l := m.statList()
-	r, ok := m.statUnder()
+	r, ok := m.onCategory()
 	if l == nil || !ok {
 		return
 	}
@@ -303,7 +400,7 @@ func (m *Model) addStat(op stats.Op) {
 // the others — x on mana value 1 keeps mana value 2. x.
 func (m *Model) dropStat() {
 	l := m.statList()
-	r, ok := m.statUnder()
+	r, ok := m.onCategory()
 	if l == nil || !ok {
 		return
 	}
@@ -383,14 +480,21 @@ func (m *Model) statsKey(key string) bool {
 		m.moveStat(1)
 	case keymap.StatsUp:
 		m.moveStat(-1)
-	case keymap.StatsOr:
-		m.addStat(stats.Or)
-	case keymap.StatsAnd:
-		m.addStat(stats.And)
-	case keymap.StatsNot:
-		m.addStat(stats.AndNot)
-	case keymap.StatsDrop:
-		m.dropStat()
+	case keymap.StatsOr, keymap.StatsAnd, keymap.StatsNot, keymap.StatsDrop:
+		// A heading filters nothing, so the key is the list's there.
+		if _, ok := m.onCategory(); !ok {
+			return false
+		}
+		switch keymap.Lookup(keymap.Stats, key) {
+		case keymap.StatsOr:
+			m.addStat(stats.Or)
+		case keymap.StatsAnd:
+			m.addStat(stats.And)
+		case keymap.StatsNot:
+			m.addStat(stats.AndNot)
+		default:
+			m.dropStat()
+		}
 	case keymap.StatsClear:
 		clearStatFilter(m.statList())
 	case keymap.StatsOddsNext:
@@ -400,8 +504,8 @@ func (m *Model) statsKey(key string) bool {
 	case keymap.StatsClose:
 		m.closeStats()
 	case keymap.StatsExpand:
-		// Only on a tag with tags under it.
-		if !m.toggleBranch() {
+		// On a heading, or a tag with tags under it.
+		if !m.toggleGroup() && !m.toggleBranch() {
 			return false
 		}
 	case keymap.StatsOtag:
@@ -427,52 +531,23 @@ func (m *Model) statsKey(key string) bool {
 
 // ── Drawing ─────────────────────────────────────────────────────
 
-// statLine is which rendered line a category sits on, counting the group
-// headings and the blank lines between them — which is what the panel has to
-// scroll by.
-func statLine(groups []stats.Group, row int) int {
-	if row < 0 {
+// statLine is which rendered line a row of the walk sits on, counting the
+// blank lines between groups — which is what the panel has to scroll by.
+func (m Model) statLine(groups []stats.Group, row int) int {
+	walk := m.statWalk(groups)
+	if row < 0 || row >= len(walk) {
 		return 0
 	}
-	line, at := 0, 0
-	for _, g := range groups {
-		if len(g.Rows) == 0 {
-			continue
-		}
-		if line > 0 {
-			line++ // the blank line between groups
-		}
-		line++ // the heading
-		for range g.Rows {
-			if at == row {
-				return line
-			}
-			at++
-			line++
-		}
-	}
-	return line
+	return walk[row].line
 }
 
-// statHeading is which rendered line the heading of a category's group sits
-// on.
-func statHeading(groups []stats.Group, row int) int {
-	line, at := 0, 0
-	for _, g := range groups {
-		if len(g.Rows) == 0 {
-			continue
-		}
-		if line > 0 {
-			line++
-		}
-		heading := line
-		line += 1 + len(g.Rows)
-		if row < at+len(g.Rows) {
-			return heading
-		}
-		at += len(g.Rows)
+// statHeading is which rendered line the heading of a row's group sits on.
+func (m Model) statHeading(groups []stats.Group, row int) int {
+	walk := m.statWalk(groups)
+	if row < 0 || row >= len(walk) {
+		return 0
 	}
-	return 0
+	return walk[row].heading
 }
 
 // statScroll is where the statistics are scrolled to, from offset: moved
@@ -487,9 +562,9 @@ func statHeading(groups []stats.Group, row int) int {
 func (m Model) statScroll(offset, height, total int) int {
 	groups := m.statGroups()
 	row := m.statCursor(groups)
-	line := statLine(groups, row)
+	line := m.statLine(groups, row)
 	offset = scrollTo(line, offset, height, total)
-	if head := statHeading(groups, row); line == offset && head < offset && line-head < height {
+	if head := m.statHeading(groups, row); line == offset && head < offset && line-head < height {
 		offset = head
 	}
 	return offset
@@ -567,13 +642,12 @@ func (m Model) renderStats(width int) []string {
 	// Two columns for the and/or mark, beside the label.
 	barWidth := maxInt(width-labelWidth-countWidth-4, 1)
 
-	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	cursor := m.statCursor(groups)
 	memo := m.stats.memo
 	key := drawKey{counted: memo.keyOrZero(), width: width, odds: m.stats.odds,
-		expr: expr.String(), hints: m.hintsExpanded}
+		expr: expr.String(), hints: m.hintsExpanded, folds: m.stats.foldGen}
 	if memo != nil && memo.ok && memo.drawnOK && memo.drawnKey == key {
 		return memo.highlight(cursor, m.tagMeaning(width))
 	}
@@ -582,27 +656,31 @@ func (m Model) renderStats(width int) []string {
 	var out []string
 	var bars []statBar
 	var barLine []int
-	at := 0
-	for _, g := range groups {
-		if len(out) > 0 {
-			out = append(out, "")
-		}
-		out = append(out, head.Render(fit(g.Title, width)))
-		for _, r := range g.Rows {
-			bar := statBar{row: r, label: m.statLabel(r), mark: statMark(expr, r),
-				labelWidth: labelWidth, barWidth: barWidth, countWidth: countWidth}
-			if m.stats.odds > 0 {
-				bar.fraction = statOdds(r, pop, m.stats.odds)
-				bar.value = fmt.Sprintf("%.0f%%", bar.fraction*100)
-			} else {
-				bar.fraction = float64(r.Count) / float64(widest)
-				bar.value = itoa(r.Count)
+	for _, e := range m.statWalk(groups) {
+		r := e.row
+		if r.Heading {
+			if len(out) > 0 {
+				out = append(out, "")
 			}
+			bar := statBar{row: r, heading: true, open: m.stats.openGroups[r.Label],
+				value: headingNote(expr, groups, r.Label), labelWidth: width}
 			bars = append(bars, bar)
 			barLine = append(barLine, len(out))
 			out = append(out, bar.render())
-			at++
+			continue
 		}
+		bar := statBar{row: r, label: m.statLabel(r), mark: statMark(expr, r),
+			labelWidth: labelWidth, barWidth: barWidth, countWidth: countWidth}
+		if m.stats.odds > 0 {
+			bar.fraction = statOdds(r, pop, m.stats.odds)
+			bar.value = fmt.Sprintf("%.0f%%", bar.fraction*100)
+		} else {
+			bar.fraction = float64(r.Count) / float64(widest)
+			bar.value = itoa(r.Count)
+		}
+		bars = append(bars, bar)
+		barLine = append(barLine, len(out))
+		out = append(out, bar.render())
 	}
 
 	out = append(out, "")
@@ -612,7 +690,7 @@ func (m Model) renderStats(width int) []string {
 	}
 	// The short reminder, for when ? isn't drawing the whole keymap below.
 	if !m.hintsExpanded {
-		out = append(out, dim.Render(fit("a/o/n and/or/not · x remove · p odds · s back", width)))
+		out = append(out, dim.Render(fit("enter opens · a/o/n and/or/not · x remove · p odds · s back", width)))
 	}
 	if memo == nil || !memo.ok {
 		d := statsMemo{drawn: out, bars: bars, barLine: barLine}
@@ -620,6 +698,26 @@ func (m Model) renderStats(width int) []string {
 	}
 	memo.drawnKey, memo.drawn, memo.bars, memo.barLine, memo.drawnOK = key, out, bars, barLine, true
 	return memo.highlight(cursor, m.tagMeaning(width))
+}
+
+// headingNote is what a group's heading says beside its title: how many of
+// its rows are in the filter, so a folded group still shows it narrows.
+func headingNote(expr stats.Expr, groups []stats.Group, title string) string {
+	n := 0
+	for _, g := range groups {
+		if g.Title != title {
+			continue
+		}
+		for _, r := range g.Rows {
+			if expr.Has(r) {
+				n++
+			}
+		}
+	}
+	if n == 0 {
+		return ""
+	}
+	return itoa(n) + " in filter"
 }
 
 // keyOrZero is the key the groups were counted under, for drawKey.
@@ -716,7 +814,10 @@ func statMark(expr stats.Expr, r stats.Row) string {
 }
 
 type statBar struct {
-	row                              stats.Row
+	row stats.Row
+	// heading is a group's title rather than a bar; open is whether its
+	// rows are showing, and value then says how many are in the filter.
+	heading, open                    bool
 	label                            string
 	under                            bool
 	mark                             string
@@ -726,6 +827,21 @@ type statBar struct {
 }
 
 func (b statBar) render() string {
+	if b.heading {
+		fold := "▸ "
+		if b.open {
+			fold = "▾ "
+		}
+		text := fold + b.row.Label
+		if b.value != "" {
+			text += " · " + b.value
+		}
+		style := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+		if b.under {
+			style = style.Reverse(true)
+		}
+		return style.Render(fit(text, b.labelWidth))
+	}
 	filled := int(b.fraction * float64(b.barWidth))
 	if b.fraction > 0 && filled == 0 {
 		filled = 1 // one card should never read as none

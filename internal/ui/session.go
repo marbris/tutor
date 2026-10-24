@@ -75,6 +75,8 @@ type session struct {
 	TagsByName bool `json:"tagsByName,omitempty"`
 	// OpenTags is the Scryfall Tagger rows opened in the statistics.
 	OpenTags []string `json:"openTags,omitempty"`
+	// OpenGroups is the statistics groups opened from their heading.
+	OpenGroups []string `json:"openGroups,omitempty"`
 	// Info is the information panel's view, when it is one worth coming
 	// back to: "printing" for gx's. The others are put up for a moment —
 	// the statistics are s away, a printed history is about one card.
@@ -104,6 +106,10 @@ func (m Model) saveSession() {
 		s.OpenTags = append(s.OpenTags, path)
 	}
 	sort.Strings(s.OpenTags)
+	for title := range m.stats.openGroups {
+		s.OpenGroups = append(s.OpenGroups, title)
+	}
+	sort.Strings(s.OpenGroups)
 	if m.info.mode == infoImage || (m.info.mode == infoVersions && m.info.prev == infoImage) {
 		s.Info = infoImage.String()
 	}
@@ -186,6 +192,13 @@ func (m *Model) restore() tea.Cmd {
 			m.stats.openTags[path] = true
 		}
 		m.stats.openGen++
+	}
+	if len(s.OpenGroups) > 0 {
+		m.stats.openGroups = map[string]bool{}
+		for _, title := range s.OpenGroups {
+			m.stats.openGroups[title] = true
+		}
+		m.stats.foldGen++
 	}
 	if s.Info == infoImage.String() && kittyGraphics() {
 		m.info.mode = infoImage

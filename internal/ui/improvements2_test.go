@@ -92,7 +92,7 @@ func TestCommaCyclesTheSecondOrderAndKeepsTheCursor(t *testing.T) {
 
 func TestNInTheStatisticsNegates(t *testing.T) {
 	m := withCards(sized(140, 30), "f", sample(), sortArrival)
-	m = drive(m, "s")
+	m = unfold(drive(m, "s"))
 	for i := 0; i < 40; i++ {
 		if r, ok := m.statUnder(); ok && r.Group == "Type" && r.Label == "Land" {
 			break

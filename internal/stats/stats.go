@@ -40,6 +40,10 @@ type Row struct {
 	// Name is how a filter writes the row, where its Label alone would be
 	// ambiguous: "ramp (this list)".
 	Name string
+
+	// Heading is a group's title, walked like a row so a folded group can
+	// be opened. It counts nothing and matches nothing.
+	Heading bool
 }
 
 // FilterName is how a filter writes the row.
