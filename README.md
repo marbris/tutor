@@ -166,6 +166,11 @@ any version can be brought back, and the library can be synced to a remote like 
 `w` commits the active list. `space w` commits every list with changes. Edits are written to the file
 as you make them, so nothing is lost if you forget.
 
+You can have Tutor open in several terminals at once. An edit to a list in one shows in the others
+within a second, and edits to the same list from two of them are merged card by card. If both
+changed the same card, the later edit wins. The same goes for a list edited in a text editor while
+Tutor has it open.
+
 To see a list's history:
 
 1. `space d` to open the lists panel.
@@ -616,7 +621,9 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 
 - **appearance**: the theme. `enter` drops down every theme, and each one goes on as you move to it.
   `enter` keeps it, `esc` puts the old one back.
-- **sync**: the git remote your lists mirror to. `enter` sets it, `d` disconnects.
+- **sync**: the git remote your lists mirror to. `enter` sets it, `d` disconnects. Under it,
+  *one editing deck for every ttr*: on, every Tutor you have open edits the same list, and `e` `E`
+  in any of them choose it for all. Each keeps its own panels, cursor and statistics.
 - **downloads**: the files Tutor keeps from Scryfall: every card and printing, the Tagger tags, every
   card's rulings, and its lists of keywords, types and card names. Each has its size, and `enter`
   turns it off or on. Off, Tutor does without it: searches go to Scryfall, and rulings are fetched a
