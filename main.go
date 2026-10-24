@@ -73,6 +73,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Warning:", err)
 	}
 	ui.SetOtagPrefix(config.Load().Otag())
+	ui.Version = version
 
 	args := os.Args[1:]
 

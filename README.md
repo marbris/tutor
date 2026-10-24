@@ -619,6 +619,8 @@ Lists are grouped into folders by their path: renaming a list to `aggro/mono-red
 
 `space c` opens the settings panel:
 
+- **tutor**: the version you're running. `enter` checks GitHub for a newer release, and `enter`
+  again installs it, as `ttr upgrade` does. The new version starts the next time you run Tutor.
 - **appearance**: the theme. `enter` drops down every theme, and each one goes on as you move to it.
   `enter` keeps it, `esc` puts the old one back.
 - **sync**: the git remote your lists mirror to. `enter` sets it, `d` disconnects. Under it,

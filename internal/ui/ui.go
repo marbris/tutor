@@ -371,6 +371,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleCardStoreTick()
 	case settingsDoneMsg:
 		return m.handleSettingsDone(msg)
+	case updateCheckedMsg:
+		return m.handleUpdateChecked(msg)
+	case updateInstalledMsg:
+		return m.handleUpdateInstalled(msg)
 	case refreshedMsg:
 		return m.handleRefreshed(msg)
 

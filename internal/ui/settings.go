@@ -13,8 +13,10 @@ import (
 )
 
 // The settings panel, space c: what used to be ttr sync remote and
-// ttr cache, in the TUI. Four groups of rows:
+// ttr cache, in the TUI. Five groups of rows:
 //
+//   - tutor: the version. enter checks for a newer release, and enter again
+//     installs it (update.go).
 //   - appearance: the theme. enter drops down every theme; moving through
 //     them puts each in force and saves it, enter keeps the one you're on and
 //     esc puts the one from before back.
@@ -34,6 +36,7 @@ type settingsRowKind int
 
 const (
 	srowHeading settingsRowKind = iota
+	srowVersion
 	srowTheme
 	srowThemeChoice
 	srowRemote
@@ -54,6 +57,9 @@ type settingsView struct {
 	cursor
 	rows []settingsRow
 
+	// update is the version row's check for a newer release.
+	update updateState
+
 	// picking is whether the theme dropdown is open, and before the theme
 	// that was in force when it opened, for esc to put back.
 	picking bool
@@ -73,6 +79,9 @@ func (v *settingsView) refresh() {
 	at := v.cursor.at
 	v.rows = nil
 	add := func(r settingsRow) { v.rows = append(v.rows, r) }
+
+	add(settingsRow{kind: srowHeading, label: "tutor"})
+	add(settingsRow{kind: srowVersion, label: "version", value: v.update.value()})
 
 	add(settingsRow{kind: srowHeading, label: "appearance"})
 	add(settingsRow{kind: srowTheme, label: "theme", value: theme.Current()})
@@ -142,7 +151,7 @@ func (v *settingsView) current() (settingsRow, bool) {
 }
 
 func (v *settingsView) title() string    { return "settings" }
-func (v *settingsView) subtitle() string { return "appearance · sync · downloads · cache" }
+func (v *settingsView) subtitle() string { return "tutor · appearance · sync · downloads · cache" }
 func (v *settingsView) clear() bool      { return false }
 
 func (v *settingsView) lines(width, height int, focused bool, m *Model) []string {
@@ -199,6 +208,8 @@ func (v *settingsView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	switch keymap.Lookup(keymap.Settings, k) {
 	case keymap.SettingsChange:
 		switch r.kind {
+		case srowVersion:
+			return true, m.updateKey(v, p)
 		case srowTheme:
 			v.openPicker()
 			return true, nil
@@ -255,6 +266,28 @@ func (v *settingsView) info(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	var body []string
 	switch r.kind {
+	case srowVersion:
+		body = []string{"This is ttr " + Version + ". New releases are at github.com/marbris/tutor."}
+		switch u := v.update; {
+		case Version == "dev":
+			body = append(body, "Built from source: git pull && make build updates it.")
+		case u.installed != "":
+			body = append(body, "ttr "+u.installed+" is installed in place of this one, and starts next time you run ttr.")
+		case u.canInstall():
+			body = append(body, "ttr "+u.latest.Version()+" is out. Installing downloads it, checks it against the release's checksums and puts it where this ttr is. This one keeps running; the next start is the new one.")
+			if u.latest.URL != "" {
+				body = append(body, "What's new: "+u.latest.URL)
+			}
+			if u.err != nil {
+				body = append(body, "Last try: "+errorText(u.err))
+			}
+			body = append(body, "enter installs it")
+		case !u.checking && !u.installing:
+			if u.err != nil {
+				body = append(body, "The check failed: "+errorText(u.err))
+			}
+			body = append(body, "enter checks for a newer release")
+		}
 	case srowTheme:
 		body = []string{
 			"The colors everything is drawn in. Your own themes go in " + theme.Dir() + "; ttr theme edit <name> copies one there to start from.",
@@ -327,6 +360,14 @@ func (v *settingsView) keys() []hintGroup {
 	var acts [][2]string
 	if r, ok := v.current(); ok {
 		switch r.kind {
+		case srowVersion:
+			switch u := v.update; {
+			case Version == "dev", u.checking, u.installing, u.installed != "":
+			case u.canInstall():
+				acts = append(acts, hint("install it", keymap.Settings, keymap.SettingsChange))
+			default:
+				acts = append(acts, hint("check for updates", keymap.Settings, keymap.SettingsChange))
+			}
 		case srowTheme:
 			acts = append(acts, hint("choose", keymap.Settings, keymap.SettingsChange))
 		case srowThemeChoice:
