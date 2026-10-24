@@ -423,9 +423,6 @@ func cardMeta(c deck.Card, p mtg.Card, width int, rulings []mtg.Ruling, rulingsE
 			out = append(out, packStyled(tagPieces(tags, lipgloss.NewStyle().Foreground(theme.Info), stats.OtagRow), " ", width)...)
 		}
 	}
-	if pick != nil {
-		out = append(out, muted.Render(fit("F picking · h l move · a/o/n and/or/not · esc done", width)))
-	}
 
 	// EDHREC ranks the card, not the printing; a printing that doesn't carry
 	// the rank still has it.

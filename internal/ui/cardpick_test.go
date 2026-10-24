@@ -122,7 +122,7 @@ func TestFPicksAScryfallTaggerTag(t *testing.T) {
 	l := m.ws.current().cardsView()
 	m = drive(m, "F")
 	view := stripANSI(m.View())
-	if !strings.Contains(view, "removal-artifact") || !strings.Contains(view, "F picking") {
+	if !strings.Contains(view, "removal-artifact") || !strings.Contains(view, "pick a tag to filter by") {
 		t.Fatalf("the picker isn't drawn:\n%s", view)
 	}
 	m = drive(m, "o")
@@ -133,5 +133,35 @@ func TestFPicksAScryfallTaggerTag(t *testing.T) {
 	// group shows it, so it can be taken off there.
 	if _, ok := findRow(m.statGroups(), "Tags", "removal-artifact"); !ok {
 		t.Error("the picked otag has no row among the tags")
+	}
+}
+
+func TestWhilePickingOnlyThePickersKeysAreOffered(t *testing.T) {
+	// The picker takes every key, so a panel offering its own would lie.
+	m := withCards(sized(170, 50), "d", pickSample(), sortArrival)
+	m = drive(m, "e", "s") // editing deck and statistics, each with keys to show
+	m = drive(m, "?")
+	before := stripANSI(m.View())
+	for _, want := range []string{"sort", "statistics"} {
+		if !strings.Contains(before, want) {
+			t.Fatalf("%q isn't offered before F, so the test proves nothing:\n%s", want, before)
+		}
+	}
+	m = drive(m, "F")
+	view := stripANSI(m.View())
+	for _, want := range []string{"pick a tag to filter by", "next/prev tag", "done"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("%q missing while picking:\n%s", want, view)
+		}
+	}
+	for _, gone := range []string{"sort", "remove from filter", "undo"} {
+		if strings.Contains(view, gone) {
+			t.Errorf("%q still offered while picking:\n%s", gone, view)
+		}
+	}
+	// Without ?, the picker still says how to leave.
+	m = drive(m, "esc", "?", "F")
+	if view := stripANSI(m.View()); !strings.Contains(view, "next/prev tag") {
+		t.Errorf("the picker's keys are hidden without ?:\n%s", view)
 	}
 }

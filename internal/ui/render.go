@@ -46,7 +46,10 @@ func (m Model) viewWorkspace() string {
 // headHeight is how many lines the title and the rows under it take; the
 // panel pads its own to that, so neighbours stay level.
 func (m Model) viewPanel(p *panel, index, width, height, headHeight int) string {
-	focused := index == m.ws.focused
+	// While F's picker is up the keys are its, in the card column: the
+	// panel loses the focus border and neither panel offers its keys.
+	picking := m.picking() != nil
+	focused := index == m.ws.focused && !picking
 	editing := index == m.ws.editing
 
 	// The border says which panel has the keys, and which one a/x/t are
@@ -91,7 +94,7 @@ func (m Model) viewPanel(p *panel, index, width, height, headHeight int) string 
 	// the editing deck's panel carries the keys that change it. One panel
 	// can be both, and then has both, each under its own rule.
 	var hints []string
-	if m.hintsExpanded {
+	if m.hintsExpanded && !picking {
 		var blocks [][]hintGroup
 		if focused {
 			blocks = append(blocks, m.panelHintGroups(p))
@@ -281,7 +284,13 @@ func sameMembers(a, b map[string]membership) bool {
 // viewInfo draws the information panel.
 func (m Model) viewInfo(width, height int) string {
 	inner, hints, room := m.infoFrame(width, height)
-	return viewColumn(m.infoTitle(), m.infoContent(inner), m.info.offset, hints, inner, room, height)
+	title, border := m.infoTitle(), theme.Border
+	// F's picker has the keys, so the card column wears the focus, the way
+	// the panel with the keys always does.
+	if m.picking() != nil {
+		title, border = "pick a tag to filter by", theme.BorderFocus
+	}
+	return viewColumn(title, m.infoContent(inner), m.info.offset, hints, inner, room, height, border)
 }
 
 // viewStats draws the statistics column, left of the information panel.
@@ -292,12 +301,12 @@ func (m Model) viewStats(width, height int) string {
 	// frame drawn before that — a resize, cards arriving — still shows the
 	// highlighted category.
 	offset := m.statScroll(m.stats.offset, room, len(body))
-	return viewColumn(m.statTitle(), body, offset, hints, inner, room, height)
+	return viewColumn(m.statTitle(), body, offset, hints, inner, room, height, theme.Border)
 }
 
 // viewColumn is one of the read-only columns on the right: a title, a rule,
 // the body scrolled to offset in the room the keys leave it, and the keys.
-func viewColumn(title string, body []string, offset int, hints []string, inner, room, height int) string {
+func viewColumn(title string, body []string, offset int, hints []string, inner, room, height int, border lipgloss.Color) string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 	lines := []string{
 		lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render(fit(title, inner)),
@@ -331,7 +340,7 @@ func viewColumn(title string, body []string, offset int, hints []string, inner, 
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(theme.Border).
+		BorderForeground(border).
 		Render(block)
 }
 
@@ -380,7 +389,9 @@ func (m Model) infoContent(inner int) []string {
 // body it shows between them and its title. One function for drawing and
 // for scrolling, so the two agree on where the bottom is.
 func (m Model) infoFrame(width, height int) (inner int, hints []string, room int) {
-	return columnFrame(m.infoHintGroups(), m.hintsExpanded, width, height)
+	// The picker's keys show whether or not ? is on: it is a mode, and a
+	// mode has to say how to get out of it.
+	return columnFrame(m.infoHintGroups(), m.hintsExpanded || m.picking() != nil, width, height)
 }
 
 // statsFrame is the same for the statistics column.
@@ -623,7 +634,7 @@ func (m Model) keyLines(spare bool) []string {
 	// One group, one row: no state offers more than that here. Cut to one
 	// regardless, so the line can't grow the block.
 	keys := m.hintGroupLines(m.footerGroups(), width)[:1]
-	if !m.hintsExpanded || m.barFocused() {
+	if !m.hintsExpanded || m.barFocused() || m.picking() != nil {
 		return keys
 	}
 	most := 1
@@ -660,7 +671,7 @@ func (m Model) barFocused() bool {
 // A focused search bar is the exception — it shows its own small keymap,
 // and ? is a character there, so there is nothing to grow.
 func (m Model) footerGroups() []hintGroup {
-	if m.barFocused() {
+	if m.barFocused() || m.picking() != nil {
 		return m.hintGroups()
 	}
 	return dropUnbound([]hintGroup{{"", restingKeys()}})

@@ -304,7 +304,7 @@ func (m Model) iHint(p *panel) (string, bool) {
 // keys, while it is up and has a list to count.
 func (m Model) statsHintGroups() []hintGroup {
 	p := m.ws.current()
-	if p == nil || (p.searchOpen && p.search.Focused()) || !m.stats.open || m.statList() == nil {
+	if p == nil || (p.searchOpen && p.search.Focused()) || !m.stats.open || m.statList() == nil || m.picking() != nil {
 		return nil
 	}
 	return dropUnbound([]hintGroup{{"statistics", m.statsHints()}})
@@ -316,6 +316,9 @@ func (m Model) infoHintGroups() []hintGroup {
 	p := m.ws.current()
 	if p == nil || (p.searchOpen && p.search.Focused()) {
 		return nil
+	}
+	if m.picking() != nil {
+		return dropUnbound([]hintGroup{{"", pickHints()}})
 	}
 	// Untitled: the keys sit in the panel they move, so a heading naming
 	// that panel says nothing.
