@@ -365,7 +365,7 @@ func TestOneCardNeverReadsAsNone(t *testing.T) {
 func TestThePanelScrollsToKeepTheCategoryInView(t *testing.T) {
 	// j past the bottom used to move a cursor you could no longer see.
 	m := withCards(sized(90, 16), "d", deckSample(), sortArrival)
-	m = drive(m, "s")
+	m = unfold(drive(m, "s"))
 
 	const room = 8
 	if m.statOffset(room) != 0 {
@@ -573,26 +573,22 @@ func TestTheHighlightedStatWearsItsBarsColour(t *testing.T) {
 }
 
 func TestCtrlJAndKWalkTheStatisticsAndJKScrollTheCard(t *testing.T) {
-	// ctrl+j and ctrl+k walk the categories and stop at either end; J and K
-	// are the card's beside them, as they are with the statistics down.
+	// ctrl+j and ctrl+k walk the categories, round from one end to the
+	// other; J and K are the card's beside them, as with the statistics down.
 	m := withCards(sized(150, 40), "d", deckSample(), sortArrival)
 	m = drive(unfold(drive(m, "s")), "ctrl+j")
 	m = drive(m, "ctrl+k") // back onto the first heading
-	first, _ := m.statUnder()
+	if got := m.statCursor(m.statGroups()); got != 0 {
+		t.Fatalf("on row %d, want the first", got)
+	}
+	last := len(m.statWalk(m.statGroups())) - 1
 	m = drive(m, "ctrl+k")
-	if r, _ := m.statUnder(); r.Path != first.Path || r.Label != first.Label {
-		t.Errorf("ctrl+k off the top moved to %s/%s", r.Group, r.Label)
+	if got := m.statCursor(m.statGroups()); got != last {
+		t.Errorf("ctrl+k off the top went to row %d, want the last, %d", got, last)
 	}
 	m = drive(m, "ctrl+j")
-	if r, _ := m.statUnder(); r.Label == first.Label && r.Group == first.Group {
-		t.Error("ctrl+j didn't move")
-	}
-	rows := m.statWalk(m.statGroups())
-	for i := 0; i < len(rows)+3; i++ {
-		m = drive(m, "ctrl+j")
-	}
-	if got := m.statCursor(m.statGroups()); got != len(rows)-1 {
-		t.Errorf("ctrl+j past the bottom is on row %d of %d", got, len(rows))
+	if got := m.statCursor(m.statGroups()); got != 0 {
+		t.Errorf("ctrl+j off the bottom went to row %d, want the first", got)
 	}
 	before, _ := m.statUnder()
 	m = drive(m, "J", "K")
@@ -680,8 +676,8 @@ func TestWalkingBackUpHoldsTheViewUntilTheTopEdge(t *testing.T) {
 			t.Fatalf("k on line %d moved the view from %d to %d (room %d)", line, bottom, m.stats.offset, room)
 		}
 	}
-	// Past the top edge it follows.
-	for i := 0; i < 12; i++ {
+	// Past the top edge it follows, short of wrapping round to the bottom.
+	for m.statCursor(m.statGroups()) > 1 {
 		m = drive(m, "ctrl+k")
 	}
 	if m.stats.offset >= bottom {

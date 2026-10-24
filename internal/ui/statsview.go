@@ -388,16 +388,16 @@ func (m *Model) toggleGlobalOtag() bool {
 	return true
 }
 
-// moveStat walks the categories, stopping at either end. Only moving;
-// nothing narrows until you add.
+// moveStat walks the categories, round from the last to the first and back.
+// Only moving; nothing narrows until you add.
 func (m *Model) moveStat(delta int) {
 	groups := m.statGroups()
 	walk := m.statWalk(groups)
 	if len(walk) == 0 {
 		return
 	}
-	at := m.statCursor(groups) + delta
-	m.pointAt(walk[maxInt(minInt(at, len(walk)-1), 0)].row)
+	at := (m.statCursor(groups) + delta%len(walk) + len(walk)) % len(walk)
+	m.pointAt(walk[at].row)
 }
 
 // addStat narrows the list by the highlighted category, joined to whatever
