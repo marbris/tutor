@@ -179,3 +179,32 @@ func ids(ps []mtg.Card) []string {
 	}
 	return out
 }
+
+func TestAStoreReplacedByAnotherTtrRefusesToReadRatherThanReadWrong(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "store")
+	built := time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC)
+	s, err := Build(strings.NewReader(fixture), dir, built)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i, _ := s.Find("Sol Ring")
+	if _, err := s.Card(i); err != nil || s.Replaced() {
+		t.Fatalf("a fresh store: %v, replaced %v", err, s.Replaced())
+	}
+	// Another ttr's download, with fewer cards: every offset moves.
+	var only string
+	for _, line := range strings.Split(fixture, "\n") {
+		if strings.Contains(line, `"id":"delver"`) {
+			only = "[\n" + strings.TrimSuffix(line, ",") + "\n]"
+		}
+	}
+	if _, err := Build(strings.NewReader(only), dir, built.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Replaced() {
+		t.Error("the old store doesn't know its file was replaced")
+	}
+	if _, err := s.Card(i); err != ErrReplaced {
+		t.Errorf("reading the replaced file: %v", err)
+	}
+}

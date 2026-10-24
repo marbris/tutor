@@ -92,3 +92,21 @@ func TestNoStoreCantSay(t *testing.T) {
 		t.Error("no store answered")
 	}
 }
+
+func TestRulingsReplacedByAnotherTtrAreNotReadAtTheOldPlaces(t *testing.T) {
+	serve(t)
+	s, _, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Another ttr's download, with the cards in other places.
+	if err := os.WriteFile(file(), []byte("aaa\t[]\nhoof\t[]\nbolt\t[]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Replaced() {
+		t.Error("the old store doesn't know its file was replaced")
+	}
+	if rs, ok := s.Of("bolt"); ok {
+		t.Errorf("read another card's line as bolt's: %v", rs)
+	}
+}

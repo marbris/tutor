@@ -40,6 +40,9 @@ func file() string { return filepath.Join(paths.Cache(), "rulings", "bulk.tsv") 
 type Store struct {
 	path string
 	at   map[string]span
+	// stamp is the file's size and modification time when it was indexed.
+	// Another ttr's weekly download puts a new file in its place.
+	stamp string
 }
 
 type span struct{ off, n int64 }
@@ -63,13 +66,33 @@ func (s *Store) Of(oracleID string) (rs []mtg.Ruling, ok bool) {
 	if _, err := f.ReadAt(buf, sp.off); err != nil {
 		return nil, false
 	}
-	if i := bytes.IndexByte(buf, '\t'); i >= 0 {
-		buf = buf[i+1:]
+	// A file downloaded again by another ttr has other cards at these
+	// offsets: the line has to be this card's.
+	id, buf, found := bytes.Cut(buf, []byte("\t"))
+	if !found || string(id) != oracleID {
+		return nil, false
 	}
 	if json.Unmarshal(buf, &rs) != nil {
 		return nil, false
 	}
 	return rs, true
+}
+
+// Replaced reports whether the file on disk is no longer the one this store
+// indexed, so Load should be asked again.
+func (s *Store) Replaced() bool {
+	if s == nil {
+		return false
+	}
+	return stampOf(s.path) != s.stamp
+}
+
+func stampOf(path string) string {
+	info, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d:%d", info.Size(), info.ModTime().UnixNano())
 }
 
 var current *Store
@@ -199,11 +222,22 @@ func write(path string, byCard map[string][]mtg.Ruling) error {
 		b.Write(js)
 		b.WriteByte('\n')
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b.Bytes(), 0644); err != nil {
+	// A temp file of its own, so two ttrs downloading at once don't write
+	// into the same one.
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+"-*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(b.Bytes()); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	os.Chmod(tmp.Name(), 0644)
+	return os.Rename(tmp.Name(), path)
 }
 
 // index reads where each card's line starts: the ids only, not the rulings.
@@ -216,6 +250,9 @@ func index(path string) (*Store, error) {
 	}
 	defer f.Close()
 	s := &Store{path: path, at: map[string]span{}}
+	if info, err := f.Stat(); err == nil {
+		s.stamp = fmt.Sprintf("%d:%d", info.Size(), info.ModTime().UnixNano())
+	}
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 1<<16), 16<<20)
 	var off int64

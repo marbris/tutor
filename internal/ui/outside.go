@@ -6,7 +6,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"ttr/internal/cardstore"
 	"ttr/internal/deck"
+	"ttr/internal/rulings"
 )
 
 // Decks changed outside this ttr.
@@ -150,7 +152,31 @@ type outsideChange struct {
 type outsideChangesMsg struct{ changes []outsideChange }
 
 func (m Model) handleFilesTick() (tea.Model, tea.Cmd) {
-	return m, tea.Batch(m.checkFiles(), filesTick())
+	return m, tea.Batch(m.checkFiles(), checkDownloads(), filesTick())
+}
+
+// checkDownloads reads the card data and the rulings in again when another
+// ttr has downloaded them since: the index in memory belongs to the old
+// files. Until then, reads from the new files are refused rather than wrong.
+func checkDownloads() tea.Cmd {
+	s, r := cardstore.Current(), rulings.Current()
+	return func() tea.Msg {
+		var out tea.BatchMsg
+		if s.Replaced() {
+			if fresh, stale := cardstore.Load(); fresh != nil {
+				out = append(out, func() tea.Msg { return cardStoreMsg{store: fresh, stale: stale} })
+			}
+		}
+		if r.Replaced() {
+			if fresh := rulings.Kept(); fresh != nil {
+				out = append(out, func() tea.Msg { return rulingsLoadedMsg{store: fresh} })
+			}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
 }
 
 // checkFiles stats every open deck of yours, and reads the ones whose file

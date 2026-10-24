@@ -45,6 +45,10 @@ const format = 2
 // Store is the cards on disk, and their Facts in memory.
 type Store struct {
 	path string
+	// stamp is the cards file's size and modification time when the index
+	// was read with it. Another ttr's weekly download puts a new file in
+	// its place, and this index would read the wrong lines out of it.
+	stamp string
 	// Built is when the cards were downloaded, which is how old the prices
 	// are.
 	Built time.Time
@@ -111,7 +115,7 @@ func (s *Store) Card(i int) (mtg.Card, error) {
 		return mtg.Card{}, fmt.Errorf("no such card")
 	}
 	sp := s.at[i]
-	f, err := os.Open(s.path)
+	f, err := s.open()
 	if err != nil {
 		return mtg.Card{}, err
 	}
@@ -201,7 +205,7 @@ func (s *Store) read(i int) (line, error) {
 	if s == nil || i < 0 || i >= len(s.at) {
 		return l, fmt.Errorf("no such card")
 	}
-	f, err := os.Open(s.path)
+	f, err := s.open()
 	if err != nil {
 		return l, err
 	}
@@ -338,9 +342,44 @@ func open() (*Store, error) {
 	return s, nil
 }
 
+// ErrReplaced is a read from a cards file that is no longer the one the
+// store's index belongs to: another ttr downloaded the cards again. Load
+// reads the new one.
+var ErrReplaced = fmt.Errorf("the card data was downloaded again; reading it in")
+
+// open is the cards file, if it is still the one the index belongs to.
+func (s *Store) open() (*os.File, error) {
+	f, err := os.Open(s.path)
+	if err != nil {
+		return nil, err
+	}
+	if info, err := f.Stat(); err != nil || stampOf(info) != s.stamp {
+		f.Close()
+		return nil, ErrReplaced
+	}
+	return f, nil
+}
+
+// Replaced reports whether the cards file on disk is no longer the one this
+// store was read with.
+func (s *Store) Replaced() bool {
+	if s == nil {
+		return false
+	}
+	info, err := os.Stat(s.path)
+	return err != nil || stampOf(info) != s.stamp
+}
+
+func stampOf(info os.FileInfo) string {
+	return fmt.Sprintf("%d:%d", info.Size(), info.ModTime().UnixNano())
+}
+
 func newStore(path string, ix index) *Store {
 	s := &Store{path: path, Built: ix.Built, facts: ix.Facts, at: ix.At,
 		byName: make(map[string]int, 2*len(ix.Facts))}
+	if info, err := os.Stat(path); err == nil && info.Size() == ix.Size {
+		s.stamp = stampOf(info)
+	}
 	for i := range s.facts {
 		f := &s.facts[i]
 		name := strings.ToLower(f.Name)

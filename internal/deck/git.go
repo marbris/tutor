@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // The decks directory is a git repository, so every change to a deck is
@@ -43,10 +44,19 @@ func git(args ...string) (string, error) {
 	if !GitAvailable() {
 		return "", fmt.Errorf("git not found")
 	}
-	cmd := exec.Command(gitPath, args...)
-	cmd.Dir = Dir()
-
-	out, err := cmd.CombinedOutput()
+	var out []byte
+	var err error
+	// Another ttr committing at the same moment holds git's lock for a few
+	// milliseconds: wait for it rather than fail.
+	for try := 0; ; try++ {
+		cmd := exec.Command(gitPath, args...)
+		cmd.Dir = Dir()
+		out, err = cmd.CombinedOutput()
+		if err == nil || try == 4 || !strings.Contains(string(out), "index.lock") {
+			break
+		}
+		time.Sleep(time.Duration(50<<try) * time.Millisecond)
+	}
 	text := strings.TrimRight(string(out), "\n")
 	if err != nil {
 		if text != "" {
