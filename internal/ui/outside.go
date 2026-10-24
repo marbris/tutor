@@ -38,10 +38,17 @@ type deckFiles struct {
 	seen    map[string]diskCopy
 	written map[string]uint64
 	wrote   map[string]string
+
+	// id is this ttr's, and shared and sharedAt the editing deck last
+	// shared with the others or taken from them (share.go). Main loop only.
+	id       uint64
+	shared   string
+	sharedAt int64
 }
 
 func newDeckFiles() *deckFiles {
-	return &deckFiles{seen: map[string]diskCopy{}, written: map[string]uint64{}, wrote: map[string]string{}}
+	return &deckFiles{seen: map[string]diskCopy{}, written: map[string]uint64{}, wrote: map[string]string{},
+		id: newInstanceID()}
 }
 
 var diskVer atomic.Uint64
@@ -152,7 +159,7 @@ type outsideChange struct {
 type outsideChangesMsg struct{ changes []outsideChange }
 
 func (m Model) handleFilesTick() (tea.Model, tea.Cmd) {
-	return m, tea.Batch(m.checkFiles(), checkDownloads(), filesTick())
+	return m, tea.Batch(m.checkFiles(), checkDownloads(), m.checkShared(), filesTick())
 }
 
 // checkDownloads reads the card data and the rulings in again when another

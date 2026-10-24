@@ -191,6 +191,17 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// The editing deck you choose is shared with the other ttrs (share.go):
+	// chosen by a key, or by opening a deck that becomes it. Not a session
+	// coming back, which would take the choice away from the ttr that made it.
+	before, chosen := m.editingSlug(), false
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		chosen = true
+	case deckOpenedMsg:
+		p := m.ws.byID(msg.panel)
+		chosen = p != nil && p.pending == nil
+	}
 	next, cmd := m.update(msg)
 	// Whatever the message changed — a card added, the editing deck moved,
 	// a panel opened — a list ordered by where else its cards are is kept
@@ -201,6 +212,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updated.syncGlobalTags()
 		updated.resortInclusion()
 		updated.followStats()
+		if chosen {
+			cmd = tea.Batch(cmd, updated.shareChoice(before))
+		}
 		// And the picture gx put up is the one the terminal holds, at the
 		// size the panel now has room for.
 		synced, imgCmd := updated.syncImage()
@@ -299,6 +313,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleFilesTick()
 	case outsideChangesMsg:
 		return m.handleOutsideChanges(msg)
+	case sharedChoiceMsg:
+		return m.handleSharedChoice(msg)
 
 	case deckWrittenMsg:
 		return m.handleDeckWritten(msg)

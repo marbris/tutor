@@ -19,7 +19,8 @@ import (
 //     them puts each in force and saves it, enter keeps the one you're on and
 //     esc puts the one from before back.
 //   - sync: the git remote your decks mirror to. enter sets it, d
-//     disconnects.
+//     disconnects. And whether the ttrs you have open share one editing
+//     deck (share.go). enter turns it on or off.
 //   - downloads: the bulk files Tutor keeps (downloads.go). enter turns one
 //     on or off.
 //   - cache: what's kept, by kind, and how much room it takes. d clears a
@@ -36,6 +37,7 @@ const (
 	srowTheme
 	srowThemeChoice
 	srowRemote
+	srowShare
 	srowDownload
 	srowCacheKind
 	srowCacheTotal
@@ -86,6 +88,11 @@ func (v *settingsView) refresh() {
 		remote = url + " (" + branch + ")"
 	}
 	add(settingsRow{kind: srowRemote, label: "git remote", value: remote})
+	share := "off"
+	if sharingEditing() {
+		share = "on"
+	}
+	add(settingsRow{kind: srowShare, label: "one editing deck for every ttr", value: share})
 
 	add(settingsRow{kind: srowHeading, label: "downloads"})
 	off := downloadsOff()
@@ -204,6 +211,21 @@ func (v *settingsView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			cmd := m.toggleDownload(r.name)
 			v.refresh()
 			return true, cmd
+		case srowShare:
+			on := !sharingEditing()
+			if err := setSharingEditing(on); err != nil {
+				m.notice = "error: " + err.Error()
+				return true, nil
+			}
+			v.refresh()
+			if !on {
+				m.notice = "each ttr edits its own deck"
+				return true, nil
+			}
+			// Turned on here, the deck edited here is the one to share.
+			m.notice = "every ttr edits the same deck"
+			m.files.shared = ""
+			return true, m.shareChoice("")
 		}
 	case keymap.SettingsClear:
 		switch r.kind {
@@ -252,6 +274,13 @@ func (v *settingsView) info(width int) []string {
 			"Your decks are a git repository. Connect a private repository you own, on any git host, " +
 				"and space s pushes your decks to it and pulls in what you changed elsewhere.",
 			"enter sets the remote · d disconnects (your decks stay as they are)",
+		}
+	case srowShare:
+		body = []string{
+			"With this on, every ttr you have open edits the same deck: choose it with e or E in any of them and the others follow. " +
+				"Each keeps its own panels, cursor and statistics. A deck the others don't have open is opened in a panel of its own.",
+			"Off, each ttr has its own editing deck. Either way, an edit one ttr makes to a deck another has open shows there within a second.",
+			"enter turns it on or off",
 		}
 	case srowDownload:
 		for _, d := range downloads {
@@ -305,6 +334,8 @@ func (v *settingsView) keys() []hintGroup {
 			if deck.SyncConfigured() {
 				acts = append(acts, hint("disconnect", keymap.Settings, keymap.SettingsClear))
 			}
+		case srowShare:
+			acts = append(acts, hint("turn on/off", keymap.Settings, keymap.SettingsChange))
 		case srowDownload:
 			acts = append(acts, hint("turn on/off", keymap.Settings, keymap.SettingsChange))
 			if !downloadsOff()[r.name] {
