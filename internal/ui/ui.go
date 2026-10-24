@@ -63,6 +63,10 @@ type Model struct {
 	// storeLoading is the cards on disk on their way in at the start, which
 	// a search from the session or the command line waits for.
 	storeLoading bool
+	// blurred is the terminal window in the background (it reports focus),
+	// and then no panel is drawn as having the keys: with two ttrs side by
+	// side, the one you're typing in is the one that looks it.
+	blurred bool
 	// files is the version of each open deck's file this ttr knows, for
 	// telling another ttr's changes from its own (outside.go).
 	files *deckFiles
@@ -198,6 +202,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		chosen = true
+		// A key means the window has the focus, whether or not the
+		// terminal said so.
+		m.blurred = false
 	case deckOpenedMsg:
 		p := m.ws.byID(msg.panel)
 		chosen = p != nil && p.pending == nil
@@ -308,6 +315,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.notice = "couldn't write " + msg.slug + ": " + msg.err.Error()
 		}
 		m.tookWrite(msg.file)
+		return m, nil
+	case tea.BlurMsg:
+		m.blurred = true
+		return m, nil
+	case tea.FocusMsg:
+		m.blurred = false
 		return m, nil
 	case filesTickMsg:
 		return m.handleFilesTick()
