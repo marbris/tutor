@@ -238,10 +238,13 @@ func sameList(a, b *cardList) bool {
 // Every list keeps it, not only the ones sorted by it, so that stepping onto
 // the inclusion order with . sorts by what is true now.
 //
-// The cursor stays on its card, unless that card is the one that moved: add
-// a card to the deck and it goes up to join the others, and the cursor goes
-// on to the card that was below it — so a run of adds walks down the list.
+// The cursor stays on its card, unless an edit moved that card: add a card
+// to the deck and it goes up to join the others, and the cursor goes on to
+// the card that was below it — so a run of adds walks down the list. Focus
+// or the editing deck moving regroups cards too, but that is no edit, and
+// walking on then made the cursor creep with every h and l.
 func (m Model) resortInclusion() {
+	view := m.membersView()
 	for _, p := range m.ws.panels {
 		for _, v := range p.stack {
 			l, ok := v.(*cardList)
@@ -249,6 +252,8 @@ func (m Model) resortInclusion() {
 				continue
 			}
 			members := m.membersFor(l)
+			sameView := l.membersView == view
+			l.membersView = view
 			if sameMembers(members, l.members) {
 				continue
 			}
@@ -267,13 +272,29 @@ func (m Model) resortInclusion() {
 			l.refresh()
 			switch {
 			case !had:
-			case before[markKey(on)] != members[markKey(on)] && hasBelow:
+			case sameView && before[markKey(on)] != members[markKey(on)] && hasBelow:
 				l.selectByName(below.Card.Name)
 			default:
 				l.selectByName(on.Card.Name)
 			}
 		}
 	}
+}
+
+// membersView names what membersFor depends on besides the lists' cards:
+// the focused panel and the editing deck.
+func (m Model) membersView() string {
+	view := ""
+	if p := m.ws.current(); p != nil {
+		view = itoa(p.id)
+	}
+	if slug := m.editingSlug(); slug != "" {
+		return view + "/" + slug
+	}
+	if p := m.ws.editingPanel(); p != nil {
+		return view + "/#" + itoa(p.id)
+	}
+	return view + "/"
 }
 
 func sameMembers(a, b map[string]membership) bool {

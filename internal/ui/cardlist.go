@@ -40,6 +40,9 @@ type cardList struct {
 	// members is where else on screen each card is, for the inclusion
 	// order. The workspace keeps it current; see Model.resortInclusion.
 	members map[string]membership
+	// membersView is the focus and editing deck members was worked out
+	// under, so a change in either isn't taken for an edit.
+	membersView string
 
 	// nameSet is names(), kept for the gen it was built at. Every frame asks
 	// each list what it holds, and building 20,000 names afresh each time
